@@ -65,15 +65,19 @@ export interface PostLike {
 export interface Banner {
   id: number;
   title: string;
-  pcImageUrl: string;
-  mobileImageUrl: string;
+  pUrl: string;
+  mUrl: string;
   startDate: string;
   endDate: string;
   isPublic: boolean;
   displayOrder: number;
-  type: 'main' | 'company' | 'bottom' | 'mini';
+  bannerType: "main" | "company" | "bottom" | "mini";
   companyDetailPath?: string;
   companyRedirectPath?: string;
+  linkUrl?: string;
+  targetPath?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // 페이지네이션 타입

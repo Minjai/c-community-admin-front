@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from "@prisma/client";
 
 // 데이터 모델 타입 정의 확장
 export interface User {
@@ -81,17 +81,19 @@ export interface PostLike {
 export interface Banner {
   id: number;
   title: string;
-  pcImageUrl: string;
-  mobileImageUrl: string;
+  pUrl: string;
+  mUrl: string;
   startDate: string;
   endDate: string;
   isPublic: boolean;
   displayOrder: number;
-  type: 'main' | 'company' | 'bottom' | 'mini';
+  bannerType: "main" | "company" | "bottom" | "mini";
   companyDetailPath?: string;
   companyRedirectPath?: string;
-  createdAt?: Date;
-  updatedAt?: Date;
+  linkUrl?: string;
+  targetPath?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface BannerClick {
@@ -108,7 +110,7 @@ export interface Guideline {
   id: number;
   title: string;
   content: string;
-  category: 'casino' | 'sports' | 'crypto';
+  category: "casino" | "sports" | "crypto";
   displayOrder: number;
   isPublic: boolean;
   createdAt: Date;
@@ -183,7 +185,7 @@ export interface SiteTerm {
   id: number;
   title: string;
   content: string;
-  type: 'terms' | 'privacy' | 'disclaimer';
+  type: "terms" | "privacy" | "disclaimer";
   version: string;
   isActive: boolean;
   createdAt: Date;

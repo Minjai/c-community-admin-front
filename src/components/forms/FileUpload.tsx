@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { CloudArrowUpIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import React, { useState, useRef, forwardRef, useImperativeHandle } from "react";
+import { CloudArrowUpIcon, XCircleIcon } from "@heroicons/react/24/outline";
 
 interface FileUploadProps {
   label?: string;
@@ -13,114 +13,207 @@ interface FileUploadProps {
   className?: string;
   accept?: string;
   preview?: boolean;
+  value?: string;
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({
-  label,
-  error,
-  helperText,
-  onChange,
-  id,
-  name,
-  required = false,
-  disabled = false,
-  className = '',
-  accept = 'image/png, image/jpeg',
-  preview = true,
-}) => {
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
+  (
+    {
+      label,
+      error,
+      helperText,
+      onChange,
+      id,
+      name,
+      required = false,
+      disabled = false,
+      className = "",
+      accept = "image/png, image/jpeg",
+      preview = true,
+      value,
+    },
+    ref
+  ) => {
+    const [file, setFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(value || null);
+    const [isDragging, setIsDragging] = useState<boolean>(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0] || null;
-    setFile(selectedFile);
-    onChange(selectedFile);
+    useImperativeHandle(ref, () => fileInputRef.current as HTMLInputElement);
 
-    if (selectedFile && preview) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrl(reader.result as string);
-      };
-      reader.readAsDataURL(selectedFile);
-    } else {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const selectedFile = e.target.files?.[0] || null;
+      setFile(selectedFile);
+      onChange(selectedFile);
+
+      if (selectedFile && preview) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPreviewUrl(reader.result as string);
+        };
+        reader.readAsDataURL(selectedFile);
+      } else {
+        setPreviewUrl(null);
+      }
+    };
+
+    const handleRemoveFile = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setFile(null);
       setPreviewUrl(null);
-    }
-  };
+      onChange(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    };
 
-  const handleRemoveFile = () => {
-    setFile(null);
-    setPreviewUrl(null);
-    onChange(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
+    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!disabled) {
+        setIsDragging(true);
+      }
+    };
 
-  return (
-    <div className="mb-4">
-      {label && (
-        <label htmlFor={id} className="label">
-          {label}
-        </label>
-      )}
-      <div className="mt-1 flex flex-col items-center">
-        <div className={`w-full flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md ${error ? 'border-red-500' : ''} ${className}`}>
-          <div className="space-y-1 text-center">
-            <CloudArrowUpIcon className="mx-auto h-12 w-12 text-gray-400" />
-            <div className="flex text-sm text-gray-600">
-              <label
-                htmlFor={id}
-                className={`relative cursor-pointer rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!disabled) {
+        setIsDragging(true);
+      }
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+
+      if (disabled) return;
+
+      const droppedFile = e.dataTransfer.files?.[0] || null;
+
+      if (droppedFile) {
+        if (accept) {
+          const acceptedTypes = accept.split(",").map((type) => type.trim());
+          if (
+            !acceptedTypes.some((type) => {
+              if (type.includes("*")) {
+                const mainType = type.split("/")[0];
+                return droppedFile.type.startsWith(mainType);
+              }
+              return type === droppedFile.type;
+            })
+          ) {
+            alert("지원하지 않는 파일 형식입니다.");
+            return;
+          }
+        }
+
+        setFile(droppedFile);
+        onChange(droppedFile);
+
+        if (preview) {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            setPreviewUrl(reader.result as string);
+          };
+          reader.readAsDataURL(droppedFile);
+        }
+      }
+    };
+
+    const handleImageClick = () => {
+      if (!disabled) {
+        fileInputRef.current?.click();
+      }
+    };
+
+    return (
+      <div className="mb-4">
+        {label && (
+          <label htmlFor={id} className="block mb-1 text-sm font-medium">
+            {label}
+          </label>
+        )}
+
+        <input
+          id={id}
+          name={name}
+          type="file"
+          ref={fileInputRef}
+          className="sr-only"
+          onChange={handleFileChange}
+          required={required}
+          disabled={disabled}
+          accept={accept}
+        />
+
+        {previewUrl ? (
+          <div className="relative">
+            <div className="relative border border-gray-300 rounded-md overflow-hidden">
+              <img
+                src={previewUrl}
+                alt="Preview"
+                className="w-full h-auto max-h-64 object-contain cursor-pointer"
+                onClick={handleImageClick}
+              />
+              <button
+                type="button"
+                onClick={handleRemoveFile}
+                className="absolute top-2 right-2 bg-red-100 text-red-600 p-1 rounded-full hover:bg-red-200"
               >
-                <span>파일 업로드</span>
-                <input
-                  id={id}
-                  name={name}
-                  type="file"
-                  ref={fileInputRef}
-                  className="sr-only"
-                  onChange={handleFileChange}
-                  required={required}
-                  disabled={disabled}
-                  accept={accept}
-                />
-              </label>
-              <p className="pl-1">또는 드래그 앤 드롭</p>
+                <XCircleIcon className="h-5 w-5" />
+              </button>
             </div>
-            <p className="text-xs text-gray-500">PNG, JPG 파일만 지원</p>
+            <p className="mt-2 text-xs text-gray-500 text-center">클릭하여 이미지 변경</p>
           </div>
-        </div>
+        ) : (
+          <div
+            className={`w-full flex justify-center px-6 pt-5 pb-6 border-2 border-dashed rounded-md transition-colors cursor-pointer
+            ${
+              isDragging
+                ? "border-blue-500 bg-blue-50"
+                : error
+                ? "border-red-500"
+                : "border-gray-300"
+            } 
+            ${className}`}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onClick={handleImageClick}
+          >
+            <div className="space-y-1 text-center">
+              <CloudArrowUpIcon className="mx-auto h-12 w-12 text-gray-400" />
+              <div className="flex flex-col text-sm text-gray-600">
+                <span className="font-medium text-primary-600">파일 업로드</span>
+                <p className="text-gray-500">또는 드래그 앤 드롭</p>
+              </div>
+              <p className="text-xs text-gray-500">PNG, JPG 파일만 지원</p>
+            </div>
+          </div>
+        )}
 
         {file && (
-          <div className="mt-2 flex items-center justify-between w-full">
-            <div className="flex items-center">
-              <span className="text-sm text-gray-500">{file.name}</span>
-            </div>
-            <button
-              type="button"
-              onClick={handleRemoveFile}
-              className="text-red-500 hover:text-red-700"
-            >
-              <XCircleIcon className="h-5 w-5" />
-            </button>
+          <div className="mt-2 flex items-center">
+            <span className="text-sm text-gray-500 truncate max-w-full">{file.name}</span>
           </div>
         )}
 
-        {previewUrl && preview && (
-          <div className="mt-2 w-full">
-            <img
-              src={previewUrl}
-              alt="Preview"
-              className="h-32 w-auto object-contain mx-auto"
-            />
-          </div>
-        )}
+        {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+        {helperText && !error && <p className="mt-1 text-sm text-gray-500">{helperText}</p>}
       </div>
-      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
-      {helperText && !error && <p className="mt-1 text-sm text-gray-500">{helperText}</p>}
-    </div>
-  );
-};
+    );
+  }
+);
+
+FileUpload.displayName = "FileUpload";
 
 export default FileUpload;
