@@ -4,8 +4,8 @@ import axios from "../api/axios";
 
 interface User {
   id: number;
-  name: string;
-  email: string;
+  nickname?: string;
+  email?: string;
   role: string;
 }
 
@@ -39,14 +39,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
 
     try {
+      // 올바른 API 경로 사용
       const response = await axios.post("/account/login", { email, password });
+      console.log("로그인 응답:", response.data);
 
-      if (response.data && response.data.success) {
+      // 응답 구조 확인 및 처리
+      if (response.data && response.data.message === "로그인 성공") {
+        // role 체크 - admin이 아니면 로그인 실패로 처리
+        if (response.data.role !== "admin") {
+          setError("관리자 계정이 아닙니다. 관리자 권한이 필요합니다.");
+          setIsLoading(false);
+          return;
+        }
+
         const userData = {
-          id: response.data.id,
-          name: response.data.name || email.split("@")[0],
+          id: response.data.userId,
+          nickname: response.data.nickname || "관리자계정",
           email: email,
-          role: response.data.role || "user",
+          role: response.data.role || "admin",
         };
 
         setUser(userData);
@@ -57,15 +67,27 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         // 토큰이 있는 경우 저장
         if (response.data.token) {
           localStorage.setItem("token", response.data.token);
+          localStorage.setItem("refreshToken", response.data.refreshToken);
         }
 
         navigate("/dashboard");
       } else {
-        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+        // 서버에서 받은 자세한 오류 메시지 사용
+        setError(response.data.details || "이메일 또는 비밀번호가 올바르지 않습니다.");
       }
-    } catch (err) {
-      setError("로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
-      console.error("Login error:", err);
+    } catch (err: any) {
+      console.log("로그인 에러:", err);
+
+      // 서버에서 받은 details 값 확인
+      const serverDetails = err.response?.data?.details;
+      const serverMessage = err.response?.data?.message;
+
+      // details 값이 있으면 그것을 사용, 없으면 message 사용, 둘 다 없으면 기본 메시지 사용
+      const errorMessage =
+        serverDetails || serverMessage || "로그인 중 오류가 발생했습니다. 다시 시도해주세요.";
+
+      setError(errorMessage);
+      console.error("Login error details:", serverDetails);
     } finally {
       setIsLoading(false);
     }
@@ -77,6 +99,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // 로컬 스토리지에서 인증 정보 제거
     localStorage.removeItem("user");
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");
 
     navigate("/login");
   };

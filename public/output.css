@@ -905,6 +905,10 @@ body {
   max-height: 100%;
 }
 
+.max-h-40 {
+  max-height: 10rem;
+}
+
 .min-h-\[200px\] {
   min-height: 200px;
 }
@@ -1168,6 +1172,10 @@ body {
 .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
   --tw-divide-opacity: 1;
   border-color: rgb(229 231 235 / var(--tw-divide-opacity, 1));
+}
+
+.overflow-auto {
+  overflow: auto;
 }
 
 .overflow-hidden {
