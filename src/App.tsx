@@ -10,6 +10,10 @@ import CompanyBannerPage from "./pages/banners/CompanyBannerPage";
 import RoleBasedRoute from "./components/RoleBasedRoute";
 import PostManagement from "./pages/community/PostManagement";
 import PostDetail from "./pages/community/PostManagementDetail";
+import GuidelineManagement from "./pages/guidelines/GuidelineManagement";
+import CasinoManagementDetail from "./pages/guidelines/CasinoManagementDetail";
+import SportsManagementDetail from "./pages/guidelines/SportsManagementDetail";
+import CryptoManagementDetail from "./pages/guidelines/CryptoManagementDetail";
 
 // 추후 구현할 페이지들을 위한 임시 컴포넌트
 const NotImplemented = ({ pageName }: { pageName: string }) => (
@@ -45,18 +49,12 @@ function App() {
               <Route path="banners/mini" element={<NotImplemented pageName="미니 배너 관리" />} />
 
               {/* 가이드라인 관리 */}
-              <Route
-                path="guidelines/casino"
-                element={<NotImplemented pageName="카지노 가이드라인" />}
-              />
-              <Route
-                path="guidelines/sports"
-                element={<NotImplemented pageName="스포츠 가이드라인" />}
-              />
-              <Route
-                path="guidelines/crypto"
-                element={<NotImplemented pageName="암호화폐 가이드라인" />}
-              />
+              <Route path="guidelines/casino" element={<GuidelineManagement boardId={3} />} />
+              <Route path="guidelines/casino/:id" element={<CasinoManagementDetail />} />
+              <Route path="guidelines/sports" element={<GuidelineManagement boardId={4} />} />
+              <Route path="guidelines/sports/:id" element={<SportsManagementDetail />} />
+              <Route path="guidelines/crypto" element={<GuidelineManagement boardId={5} />} />
+              <Route path="guidelines/crypto/:id" element={<CryptoManagementDetail />} />
 
               {/* 데이터 관리 */}
               <Route

@@ -2,7 +2,7 @@ import axios from "axios";
 import { authService } from "./authService";
 
 // API 기본 URL 설정
-const API_BASE_URL = "http://localhost:3000"; // 서버 URL 설정
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // axios 인스턴스 생성
 const apiClient = axios.create({
@@ -55,7 +55,7 @@ const DashboardService = {
   // 대시보드 통계 데이터 조회
   getDashboardStats: async () => {
     try {
-      const response = await apiClient.get("/api/dashboard/stats");
+      const response = await apiClient.get("/dashboard/stats");
       if (response.data && response.data.success) {
         return response.data.data;
       }

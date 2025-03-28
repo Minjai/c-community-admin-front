@@ -1,7 +1,8 @@
 import axios from "axios";
 
 // API 기본 URL 설정
-const BASE_URL = "http://localhost:3000/api";
+//if build, change to production server
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // Axios 인스턴스 생성
 const instance = axios.create({
