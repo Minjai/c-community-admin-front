@@ -71,6 +71,17 @@ export class GuidelineApiService {
     position?: number;
   }) {
     try {
+      console.log("가이드라인 생성 데이터:", {
+        title: data.title,
+        content: data.content.substring(0, 100) + "...", // 내용 일부만 로그
+        boardId: data.boardId,
+        hasImage: !!data.image,
+        tags: data.tags,
+        isPublic: data.isPublic,
+        displayOrder: data.displayOrder,
+        position: data.position,
+      });
+
       // 이미지 파일이 있는 경우 FormData로 처리
       if (data.image) {
         const formData = new FormData();
@@ -95,6 +106,18 @@ export class GuidelineApiService {
           formData.append("position", String(data.position));
         }
 
+        // FormData 내용 로그
+        console.log("FormData로 전송되는 필드:");
+        for (let [key, value] of formData.entries()) {
+          if (key === "image") {
+            console.log(`${key}: [File 객체]`);
+          } else if (key === "content") {
+            console.log(`${key}: ${String(value).substring(0, 100)}...`);
+          } else {
+            console.log(`${key}: ${value}`);
+          }
+        }
+
         const response = await axios.post("/guidelines", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
@@ -102,6 +125,9 @@ export class GuidelineApiService {
         });
         return response.data;
       } else {
+        // JSON 데이터 로그
+        console.log("JSON으로 전송되는 데이터:", data);
+
         // 일반 JSON 데이터로 처리
         const response = await axios.post("/guidelines", data);
         return response.data;
@@ -132,6 +158,17 @@ export class GuidelineApiService {
     }
   ) {
     try {
+      console.log(`가이드라인(ID: ${id}) 수정 데이터:`, {
+        title: data.title,
+        content: data.content ? data.content.substring(0, 100) + "..." : undefined,
+        boardId: data.boardId,
+        hasImage: !!data.image,
+        tags: data.tags,
+        isPublic: data.isPublic,
+        displayOrder: data.displayOrder,
+        position: data.position,
+      });
+
       // 이미지 파일이 있는 경우 FormData로 처리
       if (data.image) {
         const formData = new FormData();
@@ -157,6 +194,18 @@ export class GuidelineApiService {
           formData.append("position", String(data.position));
         }
 
+        // FormData 내용 로그
+        console.log(`FormData로 가이드라인(ID: ${id}) 수정 필드:`);
+        for (let [key, value] of formData.entries()) {
+          if (key === "image") {
+            console.log(`${key}: [File 객체]`);
+          } else if (key === "content") {
+            console.log(`${key}: ${String(value).substring(0, 100)}...`);
+          } else {
+            console.log(`${key}: ${value}`);
+          }
+        }
+
         const response = await axios.put(`/guidelines/${id}`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
@@ -164,6 +213,9 @@ export class GuidelineApiService {
         });
         return response.data;
       } else {
+        // JSON 데이터 로그
+        console.log(`JSON으로 가이드라인(ID: ${id}) 수정 데이터:`, data);
+
         // 일반 JSON 데이터로 처리
         const response = await axios.put(`/guidelines/${id}`, data);
         return response.data;
@@ -197,10 +249,21 @@ export class GuidelineApiService {
    */
   static async updateGuidelinePosition(id: number, position: number) {
     try {
-      const response = await axios.put("/guidelines/position", {
-        id,
-        position,
-      });
+      // 매개변수 로깅 (디버깅용)
+      console.log("가이드라인 위치 변경 요청 매개변수:", { id, position });
+      console.log("id 타입:", typeof id, "position 타입:", typeof position);
+
+      // 서버에 전송할 데이터
+      const data = {
+        id: parseInt(String(id)), // 확실하게 숫자로 변환
+        position: parseInt(String(position)), // 확실하게 숫자로 변환
+        guidelineId: parseInt(String(id)), // 서버에서 다른 이름으로 매개변수를 기대할 수 있음
+      };
+
+      console.log("서버로 전송되는 데이터:", data);
+
+      const response = await axios.put("/guidelines/position", data);
+
       return response.data;
     } catch (error) {
       console.error(`가이드라인 위치 변경 오류 (ID: ${id}):`, error);

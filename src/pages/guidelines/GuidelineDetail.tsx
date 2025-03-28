@@ -19,6 +19,7 @@ const GuidelineDetail = ({ boardId = 3 }) => {
   const [error, setError] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [positionCount, setPositionCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isNewPost = id === "new";
   const isEditMode = !isNewPost;
@@ -34,6 +35,19 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         return "/guidelines/crypto";
       default:
         return "/guidelines/casino";
+    }
+  };
+
+  // 현재 게시판의 게시물 개수 가져오기
+  const getGuidelineCount = async () => {
+    try {
+      const response = await GuidelineApiService.getGuidelines(boardId, 1, 1);
+      if (response && response.count !== undefined) {
+        setPositionCount(response.count);
+        console.log(`현재 가이드라인 카테고리(boardId: ${boardId})의 게시물 개수:`, response.count);
+      }
+    } catch (error) {
+      console.error("가이드라인 개수 조회 오류:", error);
     }
   };
 
@@ -127,7 +141,7 @@ const GuidelineDetail = ({ boardId = 3 }) => {
           image: imageFile,
           tags: tags.length > 0 ? JSON.stringify(tags) : undefined,
           isPublic: getPublicValue(), // 1 또는 0으로 전송
-          position: 0,
+          position: positionCount + 1, // 현재 게시물 개수 + 1
         });
 
         alert("가이드라인이 작성되었습니다.");
@@ -161,6 +175,7 @@ const GuidelineDetail = ({ boardId = 3 }) => {
 
     setLoading(true);
     try {
+      console.log("가이드라인 상세 조회 시작 - ID:", id);
       const response = await GuidelineApiService.getGuidelineById(parseInt(id as string));
       console.log("가이드라인 상세 응답:", response); // 서버 응답 로깅
 
@@ -178,17 +193,35 @@ const GuidelineDetail = ({ boardId = 3 }) => {
 
         // 태그 설정
         if (postData.tags) {
+          console.log("태그 데이터 타입:", typeof postData.tags, "값:", postData.tags);
           try {
             // 문자열로 저장된 경우 파싱
             if (typeof postData.tags === "string") {
-              setTags(JSON.parse(postData.tags));
+              // 이중 JSON 문자열 처리 (문자열 안에 이스케이프된 JSON이 있는 경우)
+              if (postData.tags.startsWith('"') && postData.tags.endsWith('"')) {
+                try {
+                  // 외부 따옴표 제거 후 파싱 시도
+                  const unescapedString = postData.tags.slice(1, -1).replace(/\\"/g, '"');
+                  setTags(JSON.parse(unescapedString));
+                  console.log("이중 JSON 문자열 파싱 성공");
+                } catch (e) {
+                  // 일반 방식으로 파싱 시도
+                  setTags(JSON.parse(postData.tags));
+                  console.log("일반 JSON 문자열 파싱 성공");
+                }
+              } else {
+                setTags(JSON.parse(postData.tags));
+                console.log("표준 JSON 문자열 파싱 성공");
+              }
             }
             // 이미 배열인 경우 그대로 사용
             else if (Array.isArray(postData.tags)) {
               setTags(postData.tags);
+              console.log("태그 배열 직접 사용");
             }
           } catch (e) {
-            console.error("태그 파싱 오류:", e);
+            console.error("태그 파싱 오류:", e, "원본 태그 데이터:", postData.tags);
+            // 파싱 오류 시 빈 배열로 설정하고 계속 진행
             setTags([]);
           }
         }
@@ -196,13 +229,19 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         // 이미지가 있으면 미리보기 설정
         if (postData.imageUrl) {
           setImagePreview(postData.imageUrl);
+          console.log("이미지 URL 설정:", postData.imageUrl);
         }
       } else {
+        console.error("응답 데이터 형식이 예상과 다름:", response);
         setError("가이드라인을 찾을 수 없습니다.");
         console.error("가이드라인 조회 실패: 데이터 없음");
       }
-    } catch (error) {
-      console.error("가이드라인 조회 오류:", error);
+    } catch (error: any) {
+      console.error("가이드라인 조회 중 예외 발생:", error);
+      if (error?.response) {
+        console.error("응답 상태:", error.response.status);
+        console.error("응답 데이터:", error.response.data);
+      }
       setError("가이드라인을 불러오는 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
@@ -211,6 +250,9 @@ const GuidelineDetail = ({ boardId = 3 }) => {
 
   useEffect(() => {
     getPostDetail();
+    if (isNewPost) {
+      getGuidelineCount();
+    }
   }, [id]);
 
   if (loading) {
