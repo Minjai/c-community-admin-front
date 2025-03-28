@@ -353,15 +353,33 @@ const CompanyBannerPage: React.FC = () => {
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof Banner,
-      cell: (value: boolean) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs ${
-            value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}
-        >
-          {value ? "공개" : "비공개"}
-        </span>
-      ),
+      cell: (value: boolean, row: Banner) => {
+        // 공개 여부가 false인 경우 단순히 "비공개"로 표시
+        if (!value) {
+          return (
+            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">비공개</span>
+          );
+        }
+
+        // 현재 시간과 시작일/종료일 비교
+        const now = new Date();
+        const startDate = row.startDate ? new Date(row.startDate) : null;
+        const endDate = row.endDate ? new Date(row.endDate) : null;
+
+        // 공개 상태 결정
+        let status = "공개";
+        let colorClass = "bg-green-100 text-green-800";
+
+        if (startDate && now < startDate) {
+          status = "공개 전";
+          colorClass = "bg-gray-100 text-gray-800";
+        } else if (endDate && now > endDate) {
+          status = "공개 종료";
+          colorClass = "bg-gray-100 text-gray-800";
+        }
+
+        return <span className={`px-2 py-1 rounded-full text-xs ${colorClass}`}>{status}</span>;
+      },
     },
     {
       header: "관리",

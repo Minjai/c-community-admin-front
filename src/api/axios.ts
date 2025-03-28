@@ -44,15 +44,18 @@ instance.interceptors.response.use(
     return response;
   },
   (error) => {
-    // 토큰 만료 오류(401)가 발생한 경우 자동으로 리프레시 토큰 사용 시도
+    // 토큰 만료 오류(401)가 발생한 경우 처리
     if (error.response && error.response.status === 401) {
-      const refreshToken = localStorage.getItem("refreshToken");
+      console.log("인증 오류: 인증 정보가 만료되었거나 유효하지 않습니다.");
 
-      // 리프레시 토큰이 있을 경우 자동 갱신 시도
-      if (refreshToken) {
-        // 여기에 토큰 갱신 로직 추가할 수 있음
-        console.log("토큰 만료, 리프레시 토큰으로 재인증 필요");
-      }
+      // 로컬 스토리지에서 인증 정보 제거
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
+
+      // 로그인 페이지로 리다이렉트
+      window.location.href = "/login";
+      return Promise.reject(new Error("인증 정보가 만료되었습니다. 다시 로그인해주세요."));
     }
 
     console.error("API 오류 상태:", error.response?.status);
