@@ -94,7 +94,7 @@ const PostManagement = () => {
       // 인증 오류 처리
       if (error.response?.status === 401 || error.response?.status === 403) {
         alert("권한이 없습니다. 로그인이 필요합니다.");
-        navigate("/login");
+        // navigate("/login");
       } else {
         alert(
           "게시물을 삭제하는 중 오류가 발생했습니다: " +

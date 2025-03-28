@@ -31,3 +31,6 @@
     @apply block text-sm font-medium text-gray-700 mb-1;
   }
 }
+.ql-container.ql-snow{
+  min-height: 500px;
+}

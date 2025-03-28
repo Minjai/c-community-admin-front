@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import TextEditor from "../../components/forms/TextEditor";
 import { useParams, useNavigate } from "react-router-dom";
-import { Post } from "@/types";
+import { Post, Comment } from "@/types";
 import axios from "@/api/axios";
 
 const PostDetail = () => {
@@ -10,6 +10,7 @@ const PostDetail = () => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [post, setPost] = useState<Post | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,10 +91,13 @@ const PostDetail = () => {
 
     setLoading(true);
     try {
-      const response = await axios.get<Post>(`/post/${id}`);
+      const [postResponse, commentsResponse] = await Promise.all([
+        axios.get<Post>(`/post/${id}`),
+        axios.get<Comment[]>(`/comment/${id}`)
+      ]);
 
-      if (response.data) {
-        const postData = response.data;
+      if (postResponse.data) {
+        const postData = postResponse.data;
         setPost(postData);
         setTitle(postData.title);
         setContent(postData.content);
@@ -101,11 +105,43 @@ const PostDetail = () => {
         setError("게시물을 찾을 수 없습니다.");
         console.error("게시물 조회 실패: 데이터 없음");
       }
+
+      if (commentsResponse.data) {
+        setComments(commentsResponse.data);
+      }
     } catch (error) {
-      console.error("게시물 조회 오류:", error);
+      console.error("게시물/댓글 조회 오류:", error);
       setError("게시물을 불러오는 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // 댓글 삭제 함수
+  const handleDeleteComment = async (commentId: number) => {
+    if (!window.confirm("정말 이 댓글을 삭제하시겠습니까?")) {
+      return;
+    }
+
+    try {
+      const response = await axios.delete(`/comment/${commentId}`);
+      if (response.status === 200 || response.status === 204) {
+        alert("댓글이 삭제되었습니다.");
+        getPostDetail();
+      } else {
+        alert("댓글 삭제에 실패했습니다.");
+      }
+    } catch (error: any) {
+      console.error("댓글 삭제 오류:", error);
+      if (error.response?.status === 401 || error.response?.status === 403) {
+        alert("권한이 없습니다. 로그인이 필요합니다.");
+        navigate("/login");
+      } else {
+        alert(
+          "댓글을 삭제하는 중 오류가 발생했습니다: " +
+            (error.response?.data?.error || "알 수 없는 오류")
+        );
+      }
     }
   };
 
@@ -173,6 +209,39 @@ const PostDetail = () => {
           </button>
         </div>
       </form>
+
+      {/* 댓글 목록 */}
+      {!isNewPost && (
+        <div className="mt-8">
+          <h2 className="text-xl font-semibold mb-4">댓글 목록</h2>
+          <div className="space-y-4">
+            {comments.length > 0 ? (
+              comments.map((comment) => (
+                <div key={comment.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm text-gray-900">{comment.content}</p>
+                      <div className="mt-2 flex items-center text-sm text-gray-500">
+                        <span>{comment.author?.nickname || "알 수 없음"}</span>
+                        <span className="mx-2">•</span>
+                        <span>{new Date(comment.createdAt).toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteComment(comment.id)}
+                      className="text-sm text-red-500 hover:text-red-700"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-500 text-center py-4">등록된 댓글이 없습니다.</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
