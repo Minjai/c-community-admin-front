@@ -116,8 +116,20 @@ const BannerApiService = {
     // 텍스트 데이터 추가
     Object.keys(bannerData).forEach((key) => {
       if (bannerData[key] !== undefined && bannerData[key] !== null) {
+        // 날짜 필드 처리
+        if (key === "startDate" || key === "endDate") {
+          try {
+            // ISO 형식으로 변환
+            const dateValue = new Date(bannerData[key]).toISOString();
+            formData.append(key, dateValue);
+            console.log(`변환된 ${key} (멀티파트):`, dateValue);
+          } catch (e) {
+            console.error(`${key} 형식 오류 (멀티파트):`, e);
+            formData.append(key, bannerData[key]); // 오류 시 원본 값 사용
+          }
+        }
         // position 값은 문자열로 변환하여 전송
-        if (key === "position") {
+        else if (key === "position") {
           formData.append(key, String(bannerData[key]));
         } else {
           formData.append(key, bannerData[key]);
@@ -193,11 +205,78 @@ const BannerApiService = {
     try {
       const formData = new FormData();
 
+      // 이미지 없이 기본 데이터만 전송하는 방식 시도
+      const hasNoImages =
+        (!pcImage || !(pcImage instanceof File) || pcImage.size === 0) &&
+        (!mobileImage || !(mobileImage instanceof File) || mobileImage.size === 0);
+
+      // 이미지가 없는 경우 일반 JSON 요청으로 처리
+      if (hasNoImages) {
+        console.log(`Sending JSON PUT request to /api/banner/main/${id} (without images)`, {
+          requestData: bannerData,
+          requestDataType: typeof bannerData,
+          startDate: bannerData.startDate,
+          startDateType: typeof bannerData.startDate,
+          endDate: bannerData.endDate,
+          endDateType: typeof bannerData.endDate,
+        });
+
+        // 날짜 형식 확인 및 변환
+        if (bannerData.startDate) {
+          try {
+            // ISO 형식인지 확인하고 아니면 변환 시도
+            const startDate = new Date(bannerData.startDate);
+            bannerData.startDate = startDate.toISOString();
+            console.log("변환된 startDate:", bannerData.startDate);
+          } catch (e) {
+            console.error("startDate 형식 오류:", e);
+          }
+        }
+
+        if (bannerData.endDate) {
+          try {
+            // ISO 형식인지 확인하고 아니면 변환 시도
+            const endDate = new Date(bannerData.endDate);
+            bannerData.endDate = endDate.toISOString();
+            console.log("변환된 endDate:", bannerData.endDate);
+          } catch (e) {
+            console.error("endDate 형식 오류:", e);
+          }
+        }
+
+        // 이미지 파일 없이 JSON 데이터만 PUT 요청
+        const response = await apiClient.put(`/api/banner/main/${id}`, bannerData, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.data && response.data.success) {
+          return response.data.data;
+        }
+
+        console.error("API Error response:", response.data);
+        throw new Error(response.data.message || "메인 배너 수정에 실패했습니다.");
+      }
+
+      // 이미지가 있는 경우 formData 사용
       // 텍스트 데이터 추가
       Object.keys(bannerData).forEach((key) => {
         if (bannerData[key] !== undefined && bannerData[key] !== null) {
+          // 날짜 필드 처리
+          if (key === "startDate" || key === "endDate") {
+            try {
+              // ISO 형식으로 변환
+              const dateValue = new Date(bannerData[key]).toISOString();
+              formData.append(key, dateValue);
+              console.log(`변환된 ${key} (멀티파트):`, dateValue);
+            } catch (e) {
+              console.error(`${key} 형식 오류 (멀티파트):`, e);
+              formData.append(key, bannerData[key]); // 오류 시 원본 값 사용
+            }
+          }
           // position 값은 문자열로 변환하여 전송
-          if (key === "position") {
+          else if (key === "position") {
             formData.append(key, String(bannerData[key]));
           } else {
             formData.append(key, bannerData[key]);
@@ -205,24 +284,26 @@ const BannerApiService = {
         }
       });
 
-      // 이미지 파일이 있으면 추가 - null 체크와 빈 파일 체크 추가
+      // 이미지 파일 추가 - key 이름을 서버 요구사항에 맞게 수정
       if (pcImage && pcImage instanceof File && pcImage.size > 0) {
-        formData.append("pUrl", pcImage);
+        formData.append("pUrl", pcImage); // "pcImage"에서 "pUrl"로 변경
+        console.log("PC 이미지 추가:", pcImage.name, pcImage.size, pcImage.type);
       }
 
       if (mobileImage && mobileImage instanceof File && mobileImage.size > 0) {
-        formData.append("mUrl", mobileImage);
+        formData.append("mUrl", mobileImage); // "mobileImage"에서 "mUrl"로 변경
+        console.log("모바일 이미지 추가:", mobileImage.name, mobileImage.size, mobileImage.type);
       }
 
-      console.log(`Sending PATCH request to /api/banner/main/${id}`, {
-        data: Object.fromEntries(formData.entries()),
+      console.log(`Sending multipart PUT request to /api/banner/main/${id}`, {
+        formDataKeys: [...formData.keys()],
         hasImages: { pc: !!pcImage, mobile: !!mobileImage },
       });
 
-      // PATCH 요청 사용
       const response = await apiClient.put(`/api/banner/main/${id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
+          Accept: "application/json",
         },
       });
 
@@ -245,29 +326,97 @@ const BannerApiService = {
     pcImage?: File | null,
     mobileImage?: File | null
   ): Promise<Banner> => {
-    const formData = new FormData();
-
-    // 텍스트 데이터 추가
-    Object.keys(bannerData).forEach((key) => {
-      if (bannerData[key] !== undefined && bannerData[key] !== null) {
-        formData.append(key, bannerData[key]);
-      }
-    });
-
-    // 이미지 파일이 있으면 추가
-    if (pcImage) {
-      formData.append("pUrl", pcImage);
-    }
-
-    if (mobileImage) {
-      formData.append("mUrl", mobileImage);
-    }
-
     try {
+      // 이미지 없이 기본 데이터만 전송하는 방식 시도
+      const hasNoImages =
+        (!pcImage || !(pcImage instanceof File) || pcImage.size === 0) &&
+        (!mobileImage || !(mobileImage instanceof File) || mobileImage.size === 0);
+
+      // 이미지가 없는 경우 일반 JSON 요청으로 처리
+      if (hasNoImages) {
+        console.log(`Sending JSON PUT request to /api/banner/company/${id} (without images)`, {
+          requestData: bannerData,
+          requestDataType: typeof bannerData,
+          startDate: bannerData.startDate,
+          startDateType: typeof bannerData.startDate,
+          endDate: bannerData.endDate,
+          endDateType: typeof bannerData.endDate,
+        });
+
+        // 날짜 형식 확인 및 변환
+        if (bannerData.startDate) {
+          try {
+            // ISO 형식인지 확인하고 아니면 변환 시도
+            const startDate = new Date(bannerData.startDate);
+            bannerData.startDate = startDate.toISOString();
+            console.log("변환된 startDate (업체):", bannerData.startDate);
+          } catch (e) {
+            console.error("startDate 형식 오류 (업체):", e);
+          }
+        }
+
+        if (bannerData.endDate) {
+          try {
+            // ISO 형식인지 확인하고 아니면 변환 시도
+            const endDate = new Date(bannerData.endDate);
+            bannerData.endDate = endDate.toISOString();
+            console.log("변환된 endDate (업체):", bannerData.endDate);
+          } catch (e) {
+            console.error("endDate 형식 오류 (업체):", e);
+          }
+        }
+
+        // 이미지 파일 없이 JSON 데이터만 PUT 요청
+        const response = await apiClient.put(`/api/banner/company/${id}`, bannerData, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.data && response.data.success) {
+          return response.data.data;
+        }
+
+        console.error("API Error response:", response.data);
+        throw new Error(response.data.message || "업체 배너 수정에 실패했습니다.");
+      }
+
+      // 이미지가 있는 경우 formData 사용
+      const formData = new FormData();
+
+      // 텍스트 데이터 추가
+      Object.keys(bannerData).forEach((key) => {
+        if (bannerData[key] !== undefined && bannerData[key] !== null) {
+          formData.append(key, bannerData[key]);
+        }
+      });
+
+      // 이미지 파일 추가 - key 이름을 서버 요구사항에 맞게 수정
+      if (pcImage && pcImage instanceof File && pcImage.size > 0) {
+        formData.append("pUrl", pcImage); // "pcImage"에서 "pUrl"로 변경
+        console.log("PC 이미지 추가(업체):", pcImage.name, pcImage.size, pcImage.type);
+      }
+
+      if (mobileImage && mobileImage instanceof File && mobileImage.size > 0) {
+        formData.append("mUrl", mobileImage); // "mobileImage"에서 "mUrl"로 변경
+        console.log(
+          "모바일 이미지 추가(업체):",
+          mobileImage.name,
+          mobileImage.size,
+          mobileImage.type
+        );
+      }
+
       // Authorization 헤더는 인터셉터에서 자동으로 추가됨
+      console.log(`Sending multipart PUT request to /api/banner/company/${id}`, {
+        formDataKeys: [...formData.keys()],
+        hasImages: { pc: !!pcImage, mobile: !!mobileImage },
+      });
+
       const response = await apiClient.put(`/api/banner/company/${id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
+          Accept: "application/json",
         },
       });
 

@@ -27,12 +27,17 @@ const CompanyBannerPage: React.FC = () => {
   // 날짜 포맷 변환 함수
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
+
+    // ISO 형식 문자열을 Date 객체로 변환 (UTC 시간 기준)
     const date = new Date(dateStr);
+
+    // 로컬 시간대로 변환
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
     const hours = String(date.getHours()).padStart(2, "0");
     const minutes = String(date.getMinutes()).padStart(2, "0");
+
     return `${year}.${month}.${day} ${hours}:${minutes}`;
   };
 
@@ -91,25 +96,31 @@ const CompanyBannerPage: React.FC = () => {
     // ISO 날짜 문자열을 datetime-local 형식으로 변환
     const formattedStartDate = banner.startDate
       ? (() => {
+          // UTC 시간을 로컬 시간으로 변환
           const date = new Date(banner.startDate);
           const year = date.getFullYear();
           const month = String(date.getMonth() + 1).padStart(2, "0");
           const day = String(date.getDate()).padStart(2, "0");
           const hours = String(date.getHours()).padStart(2, "0");
           const minutes = String(date.getMinutes()).padStart(2, "0");
-          return `${year}-${month}-${day}T${hours}:${minutes}`;
+          const formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+          console.log("원본 시작일(업체):", banner.startDate, "변환된 시작일:", formattedDate);
+          return formattedDate;
         })()
       : "";
 
     const formattedEndDate = banner.endDate
       ? (() => {
+          // UTC 시간을 로컬 시간으로 변환
           const date = new Date(banner.endDate);
           const year = date.getFullYear();
           const month = String(date.getMonth() + 1).padStart(2, "0");
           const day = String(date.getDate()).padStart(2, "0");
           const hours = String(date.getHours()).padStart(2, "0");
           const minutes = String(date.getMinutes()).padStart(2, "0");
-          return `${year}-${month}-${day}T${hours}:${minutes}`;
+          const formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
+          console.log("원본 종료일(업체):", banner.endDate, "변환된 종료일:", formattedDate);
+          return formattedDate;
         })()
       : "";
 
@@ -138,13 +149,40 @@ const CompanyBannerPage: React.FC = () => {
       if (isEditing && currentBanner.id) {
         // 수정 모드일 때
         try {
+          // 날짜 형식 변환 - 로컬 시간 유지하면서 ISO 형식으로 변환
+          // 브라우저에서 new Date()는 로컬 시간을 기준으로 하지만, toISOString()은 항상 UTC로 변환
+          // 따라서 시간대 차이를 보정해야 함
+
+          // 시간대 오프셋 계산 (분 단위)
+          const tzOffset = new Date().getTimezoneOffset(); // 예: 한국은 -540 (UTC+9)
+
+          // 시작일 변환
+          const startDateObj = new Date(currentBanner.startDate);
+          // 로컬 시간 유지를 위해 타임존 오프셋 적용 (UTC로 변환될 때 오프셋을 적용)
+          startDateObj.setMinutes(startDateObj.getMinutes() - tzOffset);
+          const startDate = startDateObj.toISOString();
+
+          // 종료일 변환
+          const endDateObj = new Date(currentBanner.endDate);
+          // 로컬 시간 유지를 위해 타임존 오프셋 적용
+          endDateObj.setMinutes(endDateObj.getMinutes() - tzOffset);
+          const endDate = endDateObj.toISOString();
+
+          console.log("날짜 변환 전/후 비교(업체):", {
+            원래_시작일: currentBanner.startDate,
+            변환된_시작일: startDate,
+            원래_종료일: currentBanner.endDate,
+            변환된_종료일: endDate,
+            타임존_오프셋: tzOffset,
+          });
+
           await BannerApiService.updateCompanyBanner(
             currentBanner.id,
             {
               id: currentBanner.id,
               title: currentBanner.title,
-              startDate: currentBanner.startDate,
-              endDate: currentBanner.endDate,
+              startDate: startDate, // 변환된 ISO 형식 사용
+              endDate: endDate, // 변환된 ISO 형식 사용
               isPublic: currentBanner.isPublic,
               position: currentBanner.position,
               bannerType: "company",
@@ -154,6 +192,27 @@ const CompanyBannerPage: React.FC = () => {
             pcImageFile || undefined,
             mobileImageFile || undefined
           );
+
+          // 수정 후 데이터 즉시 확인 (변경 사항이 제대로 적용되었는지 확인)
+          try {
+            const response = await BannerApiService.getCompanyBanners();
+            if (response && Array.isArray(response)) {
+              const updatedBanner = response.find((b) => b.id === currentBanner.id);
+              if (updatedBanner) {
+                console.log("업체 배너 수정 후 서버 데이터:", {
+                  id: updatedBanner.id,
+                  title: updatedBanner.title,
+                  startDate: updatedBanner.startDate,
+                  endDate: updatedBanner.endDate,
+                  변경되었는가:
+                    updatedBanner.startDate !== currentBanner.startDate ||
+                    updatedBanner.endDate !== currentBanner.endDate,
+                });
+              }
+            }
+          } catch (checkErr) {
+            console.error("수정 후 데이터 확인 중 오류(업체):", checkErr);
+          }
 
           setAlertMessage({ type: "success", message: "배너가 수정되었습니다." });
         } catch (err) {
@@ -197,7 +256,11 @@ const CompanyBannerPage: React.FC = () => {
       setShowModal(false);
       setPcImageFile(null);
       setMobileImageFile(null);
-      fetchBanners();
+
+      // 데이터 저장 후 서버가 처리할 시간을 약간 주기 위해 타임아웃 추가
+      setTimeout(() => {
+        fetchBanners();
+      }, 500);
     } catch (err) {
       console.error("Error saving banner:", err);
       setAlertMessage({ type: "error", message: "배너 저장 중 오류가 발생했습니다." });
