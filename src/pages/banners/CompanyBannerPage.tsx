@@ -88,7 +88,36 @@ const CompanyBannerPage: React.FC = () => {
 
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
-    setCurrentBanner({ ...banner });
+    // ISO 날짜 문자열을 datetime-local 형식으로 변환
+    const formattedStartDate = banner.startDate
+      ? (() => {
+          const date = new Date(banner.startDate);
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
+          const hours = String(date.getHours()).padStart(2, "0");
+          const minutes = String(date.getMinutes()).padStart(2, "0");
+          return `${year}-${month}-${day}T${hours}:${minutes}`;
+        })()
+      : "";
+
+    const formattedEndDate = banner.endDate
+      ? (() => {
+          const date = new Date(banner.endDate);
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, "0");
+          const day = String(date.getDate()).padStart(2, "0");
+          const hours = String(date.getHours()).padStart(2, "0");
+          const minutes = String(date.getMinutes()).padStart(2, "0");
+          return `${year}-${month}-${day}T${hours}:${minutes}`;
+        })()
+      : "";
+
+    setCurrentBanner({
+      ...banner,
+      startDate: formattedStartDate,
+      endDate: formattedEndDate,
+    });
     setPcImageFile(null);
     setMobileImageFile(null);
     setShowModal(true);
