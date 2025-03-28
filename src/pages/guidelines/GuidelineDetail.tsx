@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Post } from "@/types";
 import axios from "@/api/axios";
 
-const CasinoManagementDetail = () => {
+const GuidelineDetail = ({boardId =1}) => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [title, setTitle] = useState("");
@@ -43,16 +43,16 @@ const CasinoManagementDetail = () => {
 
         if (response.status === 200) {
           alert("가이드라인이 수정되었습니다.");
-          navigate("/guidelines/casino");
+          navigate("/guidelines/casino");// 케이스 따라서 다르게 라우팅
         } else {
           setError("가이드라인 수정 중 오류가 발생했습니다.");
         }
       } else {
         // 새 가이드라인 작성
-        const response = await axios.post<Post>("/casino-guideline", {
+        const response = await axios.post<Post>("/guideline", {
           title,
           content,
-          boardId: 2, // 기본 자유게시판으로 설정
+          boardId: boardId, // 기본 자유게시판으로 설정
         });
 
         if (response.status === 201 || response.status === 200) {
@@ -177,4 +177,4 @@ const CasinoManagementDetail = () => {
   );
 };
 
-export default CasinoManagementDetail; 
+export default GuidelineDetail;

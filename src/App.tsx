@@ -11,9 +11,7 @@ import RoleBasedRoute from "./components/RoleBasedRoute";
 import PostManagement from "./pages/community/PostManagement";
 import PostDetail from "./pages/community/PostManagementDetail";
 import GuidelineManagement from "./pages/guidelines/GuidelineManagement";
-import CasinoManagementDetail from "./pages/guidelines/CasinoManagementDetail";
-import SportsManagementDetail from "./pages/guidelines/SportsManagementDetail";
-import CryptoManagementDetail from "./pages/guidelines/CryptoManagementDetail";
+import GuidelineDetail from "./pages/guidelines/GuidelineDetail.tsx";
 
 // 추후 구현할 페이지들을 위한 임시 컴포넌트
 const NotImplemented = ({ pageName }: { pageName: string }) => (
@@ -50,11 +48,11 @@ function App() {
 
               {/* 가이드라인 관리 */}
               <Route path="guidelines/casino" element={<GuidelineManagement boardId={3} />} />
-              <Route path="guidelines/casino/:id" element={<CasinoManagementDetail />} />
+              <Route path="guidelines/casino/:id" element={<GuidelineDetail boardId={3} />} />
               <Route path="guidelines/sports" element={<GuidelineManagement boardId={4} />} />
-              <Route path="guidelines/sports/:id" element={<SportsManagementDetail />} />
+              <Route path="guidelines/sports/:id" element={<GuidelineDetail boardId={4} />} />
               <Route path="guidelines/crypto" element={<GuidelineManagement boardId={5} />} />
-              <Route path="guidelines/crypto/:id" element={<CryptoManagementDetail />} />
+              <Route path="guidelines/crypto/:id" element={<GuidelineDetail boardId={5} />} />
 
               {/* 데이터 관리 */}
               <Route
