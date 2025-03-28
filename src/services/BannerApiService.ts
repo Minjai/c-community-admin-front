@@ -56,7 +56,7 @@ const BannerApiService = {
   // 메인 배너 목록 조회
   getMainBanners: async (): Promise<Banner[]> => {
     try {
-      const response = await apiClient.get("/api/banner/main");
+      const response = await apiClient.get("/banner/main");
       if (response.data && response.data.success) {
         return response.data.data;
       }
@@ -70,7 +70,7 @@ const BannerApiService = {
   // 업체 배너 목록 조회
   getCompanyBanners: async (): Promise<Banner[]> => {
     try {
-      const response = await apiClient.get("/api/banner/company");
+      const response = await apiClient.get("/banner/company");
       if (response.data && response.data.success) {
         return response.data.data;
       }
@@ -84,7 +84,7 @@ const BannerApiService = {
   // 하단 배너 목록 조회
   getBottomBanners: async (): Promise<Banner[]> => {
     try {
-      const response = await apiClient.get("/api/banner/bottom");
+      const response = await apiClient.get("/banner/bottom");
       if (response.data && response.data.success) {
         return response.data.data;
       }
@@ -98,7 +98,7 @@ const BannerApiService = {
   // 미니 배너 목록 조회
   getMiniBanners: async (): Promise<Banner[]> => {
     try {
-      const response = await apiClient.get("/api/banner/mini");
+      const response = await apiClient.get("/banner/mini");
       if (response.data && response.data.success) {
         return response.data.data;
       }
@@ -142,7 +142,7 @@ const BannerApiService = {
     formData.append("mUrl", mobileImage);
 
     try {
-      const response = await apiClient.post("/api/banner/main", formData, {
+      const response = await apiClient.post("/banner/main", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -179,7 +179,7 @@ const BannerApiService = {
 
     try {
       // Authorization 헤더는 인터셉터에서 자동으로 추가됨
-      const response = await apiClient.post("/api/banner/company", formData, {
+      const response = await apiClient.post("/banner/company", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -212,7 +212,7 @@ const BannerApiService = {
 
       // 이미지가 없는 경우 일반 JSON 요청으로 처리
       if (hasNoImages) {
-        console.log(`Sending JSON PUT request to /api/banner/main/${id} (without images)`, {
+        console.log(`Sending JSON PUT request to /banner/main/${id} (without images)`, {
           requestData: bannerData,
           requestDataType: typeof bannerData,
           startDate: bannerData.startDate,
@@ -245,7 +245,7 @@ const BannerApiService = {
         }
 
         // 이미지 파일 없이 JSON 데이터만 PUT 요청
-        const response = await apiClient.put(`/api/banner/main/${id}`, bannerData, {
+        const response = await apiClient.put(`/banner/main/${id}`, bannerData, {
           headers: {
             "Content-Type": "application/json",
           },
@@ -295,12 +295,12 @@ const BannerApiService = {
         console.log("모바일 이미지 추가:", mobileImage.name, mobileImage.size, mobileImage.type);
       }
 
-      console.log(`Sending multipart PUT request to /api/banner/main/${id}`, {
+      console.log(`Sending multipart PUT request to /banner/main/${id}`, {
         formDataKeys: [...formData.keys()],
         hasImages: { pc: !!pcImage, mobile: !!mobileImage },
       });
 
-      const response = await apiClient.put(`/api/banner/main/${id}`, formData, {
+      const response = await apiClient.put(`/banner/main/${id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           Accept: "application/json",
@@ -334,7 +334,7 @@ const BannerApiService = {
 
       // 이미지가 없는 경우 일반 JSON 요청으로 처리
       if (hasNoImages) {
-        console.log(`Sending JSON PUT request to /api/banner/company/${id} (without images)`, {
+        console.log(`Sending JSON PUT request to /banner/company/${id} (without images)`, {
           requestData: bannerData,
           requestDataType: typeof bannerData,
           startDate: bannerData.startDate,
@@ -367,7 +367,7 @@ const BannerApiService = {
         }
 
         // 이미지 파일 없이 JSON 데이터만 PUT 요청
-        const response = await apiClient.put(`/api/banner/company/${id}`, bannerData, {
+        const response = await apiClient.put(`/banner/company/${id}`, bannerData, {
           headers: {
             "Content-Type": "application/json",
           },
@@ -408,12 +408,12 @@ const BannerApiService = {
       }
 
       // Authorization 헤더는 인터셉터에서 자동으로 추가됨
-      console.log(`Sending multipart PUT request to /api/banner/company/${id}`, {
+      console.log(`Sending multipart PUT request to /banner/company/${id}`, {
         formDataKeys: [...formData.keys()],
         hasImages: { pc: !!pcImage, mobile: !!mobileImage },
       });
 
-      const response = await apiClient.put(`/api/banner/company/${id}`, formData, {
+      const response = await apiClient.put(`/banner/company/${id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           Accept: "application/json",
@@ -433,7 +433,7 @@ const BannerApiService = {
   // 메인 배너 삭제
   deleteMainBanner: async (id: number): Promise<void> => {
     try {
-      const response = await apiClient.delete(`/api/banner/main/${id}`);
+      const response = await apiClient.delete(`/banner/main/${id}`);
       if (response.data && !response.data.success) {
         throw new Error(response.data.message || "메인 배너 삭제에 실패했습니다.");
       }
@@ -446,7 +446,7 @@ const BannerApiService = {
   // 업체 배너 삭제
   deleteCompanyBanner: async (id: number): Promise<void> => {
     try {
-      const response = await apiClient.delete(`/api/banner/company/${id}`);
+      const response = await apiClient.delete(`/banner/company/${id}`);
       if (response.data && !response.data.success) {
         throw new Error(response.data.message || "업체 배너 삭제에 실패했습니다.");
       }

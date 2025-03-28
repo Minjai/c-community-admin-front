@@ -16,6 +16,9 @@ export interface Post {
   boardId: number;
   viewCount: number;
   isPopular: number;
+  isPublic?: boolean | number;
+  position?: number;
+  imageUrl?: string;
   author?: User;
   attachments?: Attachment[];
   comments?: Comment[];
