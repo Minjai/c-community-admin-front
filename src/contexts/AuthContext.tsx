@@ -78,7 +78,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           localStorage.setItem("refreshToken", response.data.refreshToken);
         }
 
-        navigate("/dashboard");
+        navigate("/banners/main");
       } else {
         // 서버에서 받은 자세한 오류 메시지 사용
         setError(response.data.details || "이메일 또는 비밀번호가 올바르지 않습니다.");
