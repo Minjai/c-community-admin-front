@@ -27,11 +27,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => {
     // 로컬 스토리지에서 인증 정보 복원
-    const storedUser = localStorage.getItem("user");
+    const restoreAuth = () => {
+      const storedUser = localStorage.getItem("user");
+      const token = localStorage.getItem("token");
 
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
+      if (storedUser && token) {
+        setUser(JSON.parse(storedUser));
+      } else {
+        // 인증 정보가 없으면 로그아웃 상태로 설정
+        setUser(null);
+      }
+    };
+
+    restoreAuth();
   }, []);
 
   const handleLogin = async (email: string, password: string) => {
@@ -128,12 +136,32 @@ export const useAuth = (): AuthContextType => {
 export const ProtectedRoute: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    if (!user) {
-      navigate("/login");
-    }
-  }, [user, navigate]);
+    // 로컬 스토리지에서 사용자 정보를 확인
+    const checkAuth = async () => {
+      const storedUser = localStorage.getItem("user");
+      const token = localStorage.getItem("token");
+
+      if (!storedUser || !token) {
+        navigate("/login");
+      }
+
+      setIsCheckingAuth(false);
+    };
+
+    checkAuth();
+  }, [navigate]);
+
+  // 인증 확인 중에는 로딩 상태 표시
+  if (isCheckingAuth) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return user ? <>{children}</> : null;
 };

@@ -70,7 +70,7 @@ export interface Banner {
   startDate: string;
   endDate: string;
   isPublic: boolean;
-  displayOrder: number;
+  position: number;
   bannerType: "main" | "company" | "bottom" | "mini";
   companyDetailPath?: string;
   companyRedirectPath?: string;

@@ -92,7 +92,12 @@ const BannerApiService = {
     // 텍스트 데이터 추가
     Object.keys(bannerData).forEach((key) => {
       if (bannerData[key] !== undefined && bannerData[key] !== null) {
-        formData.append(key, bannerData[key]);
+        // position 값은 문자열로 변환하여 전송
+        if (key === "position") {
+          formData.append(key, String(bannerData[key]));
+        } else {
+          formData.append(key, bannerData[key]);
+        }
       }
     });
 
@@ -101,7 +106,6 @@ const BannerApiService = {
     formData.append("mUrl", mobileImage);
 
     try {
-      // Authorization 헤더는 인터셉터에서 자동으로 추가됨
       const response = await apiClient.post("/api/banner/main", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -162,26 +166,36 @@ const BannerApiService = {
     pcImage?: File | null,
     mobileImage?: File | null
   ): Promise<Banner> => {
-    const formData = new FormData();
-
-    // 텍스트 데이터 추가
-    Object.keys(bannerData).forEach((key) => {
-      if (bannerData[key] !== undefined && bannerData[key] !== null) {
-        formData.append(key, bannerData[key]);
-      }
-    });
-
-    // 이미지 파일이 있으면 추가
-    if (pcImage) {
-      formData.append("pUrl", pcImage);
-    }
-
-    if (mobileImage) {
-      formData.append("mUrl", mobileImage);
-    }
-
     try {
-      // Authorization 헤더는 인터셉터에서 자동으로 추가됨
+      const formData = new FormData();
+
+      // 텍스트 데이터 추가
+      Object.keys(bannerData).forEach((key) => {
+        if (bannerData[key] !== undefined && bannerData[key] !== null) {
+          // position 값은 문자열로 변환하여 전송
+          if (key === "position") {
+            formData.append(key, String(bannerData[key]));
+          } else {
+            formData.append(key, bannerData[key]);
+          }
+        }
+      });
+
+      // 이미지 파일이 있으면 추가 - null 체크와 빈 파일 체크 추가
+      if (pcImage && pcImage instanceof File && pcImage.size > 0) {
+        formData.append("pUrl", pcImage);
+      }
+
+      if (mobileImage && mobileImage instanceof File && mobileImage.size > 0) {
+        formData.append("mUrl", mobileImage);
+      }
+
+      console.log(`Sending PATCH request to /api/banner/main/${id}`, {
+        data: Object.fromEntries(formData.entries()),
+        hasImages: { pc: !!pcImage, mobile: !!mobileImage },
+      });
+
+      // PATCH 요청 사용
       const response = await apiClient.put(`/api/banner/main/${id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -191,6 +205,8 @@ const BannerApiService = {
       if (response.data && response.data.success) {
         return response.data.data;
       }
+
+      console.error("API Error response:", response.data);
       throw new Error(response.data.message || "메인 배너 수정에 실패했습니다.");
     } catch (error) {
       console.error("메인 배너 수정 오류:", error);
