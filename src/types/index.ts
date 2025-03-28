@@ -75,6 +75,7 @@ export interface Banner {
   companyDetailPath?: string;
   companyRedirectPath?: string;
   linkUrl?: string;
+  linkUrl2?: string;
   targetPath?: string;
   createdAt?: string;
   updatedAt?: string;
