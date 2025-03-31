@@ -19,6 +19,7 @@ import SportsGuidelineManagement from "./pages/guidelines/SportsGuidelineManagem
 import CryptoGuidelineManagement from "./pages/guidelines/CryptoGuidelineManagement";
 import NoticeManagement from "./pages/notice/NoticeManagement";
 import NoticeDetail from "./pages/notice/NoticeDetail";
+import CasinoCompanyPage from "./pages/reviews/CasinoCompanyPage";
 
 // 추후 구현할 페이지들을 위한 임시 컴포넌트
 const NotImplemented = ({ pageName }: { pageName: string }) => (
@@ -81,7 +82,7 @@ function App() {
                 path="reviews/casino"
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
-                    <NotImplemented pageName="카지노 업체 관리" />
+                    <CasinoCompanyPage />
                   </RoleBasedRoute>
                 }
               />

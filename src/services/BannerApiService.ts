@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from "../api/axios";
 import { Banner } from "../types";
 import { authService } from "./authService";
 
@@ -56,7 +56,7 @@ const BannerApiService = {
   // 메인 배너 목록 조회
   getMainBanners: async (): Promise<Banner[]> => {
     try {
-      const response = await apiClient.get("/banner/main");
+      const response = await axios.get("/banner/main");
       if (response.data && response.data.success) {
         return response.data.data;
       }
@@ -70,7 +70,7 @@ const BannerApiService = {
   // 업체 배너 목록 조회
   getCompanyBanners: async (): Promise<Banner[]> => {
     try {
-      const response = await apiClient.get("/banner/company");
+      const response = await axios.get("/banner/company");
       if (response.data && response.data.success) {
         return response.data.data;
       }
@@ -84,7 +84,7 @@ const BannerApiService = {
   // 하단 배너 목록 조회
   getBottomBanners: async (): Promise<Banner[]> => {
     try {
-      const response = await apiClient.get("/banner/bottom");
+      const response = await axios.get("/banner/bottom");
       if (response.data && response.data.success) {
         return response.data.data;
       }
@@ -98,7 +98,7 @@ const BannerApiService = {
   // 미니 배너 목록 조회
   getMiniBanners: async (): Promise<Banner[]> => {
     try {
-      const response = await apiClient.get("/banner/mini");
+      const response = await axios.get("/banner/mini");
       if (response.data && response.data.success) {
         return response.data.data;
       }
@@ -142,7 +142,7 @@ const BannerApiService = {
     formData.append("mUrl", mobileImage);
 
     try {
-      const response = await apiClient.post("/banner/main", formData, {
+      const response = await axios.post("/banner/main", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -179,7 +179,7 @@ const BannerApiService = {
 
     try {
       // Authorization 헤더는 인터셉터에서 자동으로 추가됨
-      const response = await apiClient.post("/banner/company", formData, {
+      const response = await axios.post("/banner/company", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -245,7 +245,7 @@ const BannerApiService = {
         }
 
         // 이미지 파일 없이 JSON 데이터만 PUT 요청
-        const response = await apiClient.put(`/banner/main/${id}`, bannerData, {
+        const response = await axios.put(`/banner/main/${id}`, bannerData, {
           headers: {
             "Content-Type": "application/json",
           },
@@ -300,7 +300,7 @@ const BannerApiService = {
         hasImages: { pc: !!pcImage, mobile: !!mobileImage },
       });
 
-      const response = await apiClient.put(`/banner/main/${id}`, formData, {
+      const response = await axios.put(`/banner/main/${id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           Accept: "application/json",
@@ -367,7 +367,7 @@ const BannerApiService = {
         }
 
         // 이미지 파일 없이 JSON 데이터만 PUT 요청
-        const response = await apiClient.put(`/banner/company/${id}`, bannerData, {
+        const response = await axios.put(`/banner/company/${id}`, bannerData, {
           headers: {
             "Content-Type": "application/json",
           },
@@ -413,7 +413,7 @@ const BannerApiService = {
         hasImages: { pc: !!pcImage, mobile: !!mobileImage },
       });
 
-      const response = await apiClient.put(`/banner/company/${id}`, formData, {
+      const response = await axios.put(`/banner/company/${id}`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
           Accept: "application/json",
@@ -433,7 +433,7 @@ const BannerApiService = {
   // 메인 배너 삭제
   deleteMainBanner: async (id: number): Promise<void> => {
     try {
-      const response = await apiClient.delete(`/banner/main/${id}`);
+      const response = await axios.delete(`/banner/main/${id}`);
       if (response.data && !response.data.success) {
         throw new Error(response.data.message || "메인 배너 삭제에 실패했습니다.");
       }
@@ -446,7 +446,7 @@ const BannerApiService = {
   // 업체 배너 삭제
   deleteCompanyBanner: async (id: number): Promise<void> => {
     try {
-      const response = await apiClient.delete(`/banner/company/${id}`);
+      const response = await axios.delete(`/banner/company/${id}`);
       if (response.data && !response.data.success) {
         throw new Error(response.data.message || "업체 배너 삭제에 실패했습니다.");
       }
@@ -477,7 +477,7 @@ const BannerApiService = {
 
     try {
       // Authorization 헤더는 인터셉터에서 자동으로 추가됨
-      const response = await apiClient.post("/banner/bottom", formData, {
+      const response = await axios.post("/banner/bottom", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -510,7 +510,7 @@ const BannerApiService = {
 
     try {
       // Authorization 헤더는 인터셉터에서 자동으로 추가됨
-      const response = await apiClient.post("/banner/mini", formData, {
+      const response = await axios.post("/banner/mini", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
@@ -565,7 +565,7 @@ const BannerApiService = {
         }
 
         // 이미지 파일 없이 JSON 데이터만 PUT 요청
-        const response = await apiClient.put(`/banner/bottom/${id}`, bannerData, {
+        const response = await axios.put(`/banner/bottom/${id}`, bannerData, {
           headers: {
             "Content-Type": "application/json",
           },
@@ -593,7 +593,7 @@ const BannerApiService = {
           formData.append("mUrl", mobileImage);
         }
 
-        const response = await apiClient.put(`/banner/bottom/${id}`, formData, {
+        const response = await axios.put(`/banner/bottom/${id}`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
@@ -649,7 +649,7 @@ const BannerApiService = {
         }
 
         // 이미지 파일 없이 JSON 데이터만 PUT 요청
-        const response = await apiClient.put(`/banner/mini/${id}`, bannerData, {
+        const response = await axios.put(`/banner/mini/${id}`, bannerData, {
           headers: {
             "Content-Type": "application/json",
           },
@@ -677,7 +677,7 @@ const BannerApiService = {
           formData.append("mUrl", mobileImage);
         }
 
-        const response = await apiClient.put(`/banner/mini/${id}`, formData, {
+        const response = await axios.put(`/banner/mini/${id}`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
@@ -697,7 +697,7 @@ const BannerApiService = {
   // 하단 배너 삭제
   deleteBottomBanner: async (id: number): Promise<void> => {
     try {
-      const response = await apiClient.delete(`/banner/bottom/${id}`);
+      const response = await axios.delete(`/banner/bottom/${id}`);
       if (!response.data.success) {
         throw new Error(response.data.message || "하단 배너 삭제에 실패했습니다.");
       }
@@ -710,7 +710,7 @@ const BannerApiService = {
   // 미니 배너 삭제
   deleteMiniBanner: async (id: number): Promise<void> => {
     try {
-      const response = await apiClient.delete(`/banner/mini/${id}`);
+      const response = await axios.delete(`/banner/mini/${id}`);
       if (!response.data.success) {
         throw new Error(response.data.message || "미니 배너 삭제에 실패했습니다.");
       }

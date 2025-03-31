@@ -84,6 +84,38 @@ export interface Banner {
   updatedAt?: string;
 }
 
+// 카지노 업체 관련 타입
+export interface CasinoCompany {
+  id: number;
+  companyName: string; // 업체명
+  description: string; // 업체소개
+  imageUrl: string; // 이미지 URL
+  isPublic: boolean; // 공개여부
+  displayOrder: number; // 순서 (서버에서는 displayOrder)
+  linkUrl1?: string; // 링크 URL 1
+  linkUrl2?: string; // 링크 URL 2
+  rating: number; // 평점
+  position?: number; // 내부 위치 속성 (서버에서도 position이 있음)
+  createdAt: string; // 등록일자
+  updatedAt?: string; // 수정일자
+  reviews?: CompanyReview[]; // 리뷰 (상세 조회시)
+}
+
+// 회사 리뷰 타입
+export interface CompanyReview {
+  id: number;
+  content: string;
+  rating: number;
+  userId: number;
+  companyId: number;
+  createdAt: string;
+  updatedAt: string;
+  user?: {
+    id: number;
+    nickname: string;
+  };
+}
+
 // 페이지네이션 타입
 export interface PaginationParams {
   page: number;
