@@ -1,6 +1,24 @@
 import axios from "../api/axios";
 import { CasinoCompany, CompanyReview, ApiResponse } from "../types";
 
+// .env에서 카지노 정보 URL 접두사 가져오기
+const CASINO_INFO_URL_PREFIX =
+  import.meta.env.VITE_CASINO_INFO_URL_PREFIX || "www.casinoguru-en.com/";
+
+// 접두사 제거 유틸리티 함수
+const removeUrlPrefix = (url: string | undefined): string | undefined => {
+  if (!url) return url;
+  return url.startsWith(CASINO_INFO_URL_PREFIX) ? url.replace(CASINO_INFO_URL_PREFIX, "") : url;
+};
+
+// 단일 회사 객체에서 접두사 제거
+const processCompanyData = (company: CasinoCompany): CasinoCompany => {
+  if (company.linkUrl2) {
+    company.linkUrl2 = removeUrlPrefix(company.linkUrl2);
+  }
+  return company;
+};
+
 // 카지노 업체 API 서비스
 const CasinoCompanyApiService = {
   // 카지노 업체 목록 조회
@@ -8,7 +26,9 @@ const CasinoCompanyApiService = {
     try {
       const response = await axios.get("/companies");
       if (response.data && response.data.success) {
-        return response.data.data;
+        // 각 회사 객체의 linkUrl2에서 접두사 제거
+        const companies = response.data.data;
+        return companies.map((company) => processCompanyData(company));
       }
       throw new Error(response.data.message || "카지노 업체 조회에 실패했습니다.");
     } catch (error) {
@@ -22,7 +42,8 @@ const CasinoCompanyApiService = {
     try {
       const response = await axios.get(`/companies/${id}`);
       if (response.data && response.data.success) {
-        return response.data.data;
+        // 회사 객체의 linkUrl2에서 접두사 제거
+        return processCompanyData(response.data.data);
       }
       throw new Error(response.data.message || "카지노 업체 상세 조회에 실패했습니다.");
     } catch (error) {
@@ -42,7 +63,16 @@ const CasinoCompanyApiService = {
     if (companyData.companyName) formData.append("companyName", companyData.companyName);
     if (companyData.description) formData.append("description", companyData.description);
     if (companyData.linkUrl1) formData.append("linkUrl1", companyData.linkUrl1);
-    if (companyData.linkUrl2) formData.append("linkUrl2", companyData.linkUrl2);
+
+    // linkUrl2에는 접두사를 붙여서 전송
+    if (companyData.linkUrl2) {
+      let fullUrl = companyData.linkUrl2;
+      // 이미 접두사가 있는 경우 중복 방지
+      if (!fullUrl.startsWith(CASINO_INFO_URL_PREFIX)) {
+        fullUrl = CASINO_INFO_URL_PREFIX + fullUrl;
+      }
+      formData.append("linkUrl2", fullUrl);
+    }
 
     // boolean과 number 값은 문자열로 변환
     if (companyData.isPublic !== undefined)
@@ -83,7 +113,16 @@ const CasinoCompanyApiService = {
       if (companyData.companyName) formData.append("companyName", companyData.companyName);
       if (companyData.description) formData.append("description", companyData.description);
       if (companyData.linkUrl1) formData.append("linkUrl1", companyData.linkUrl1);
-      if (companyData.linkUrl2) formData.append("linkUrl2", companyData.linkUrl2);
+
+      // linkUrl2에는 접두사를 붙여서 전송
+      if (companyData.linkUrl2) {
+        let fullUrl = companyData.linkUrl2;
+        // 이미 접두사가 있는 경우 중복 방지
+        if (!fullUrl.startsWith(CASINO_INFO_URL_PREFIX)) {
+          fullUrl = CASINO_INFO_URL_PREFIX + fullUrl;
+        }
+        formData.append("linkUrl2", fullUrl);
+      }
 
       // boolean과 number 값은 문자열로 변환
       if (companyData.isPublic !== undefined)
