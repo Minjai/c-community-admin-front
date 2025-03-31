@@ -10,6 +10,10 @@ import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
 import { formatDate } from "../../utils/dateUtils";
 
+// .env에서 카지노 정보 URL 접두사 가져오기
+const CASINO_INFO_URL_PREFIX =
+  import.meta.env.VITE_CASINO_INFO_URL_PREFIX || "www.casinoguru-en.com/";
+
 const CasinoCompanyPage: React.FC = () => {
   const [companies, setCompanies] = useState<CasinoCompany[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -130,6 +134,18 @@ const CasinoCompanyPage: React.FC = () => {
     setPreviewUrl(company.imageUrl || null);
   };
 
+  // 업체 저장 전 URL 처리 함수
+  const processUrls = (company: Partial<CasinoCompany>): Partial<CasinoCompany> => {
+    let processedCompany = { ...company };
+
+    // 업체 정보 URL에서 접두사 제거 후 저장 (이미 접두사가 있는 경우 중복 방지)
+    if (processedCompany.linkUrl2 && processedCompany.linkUrl2.startsWith(CASINO_INFO_URL_PREFIX)) {
+      processedCompany.linkUrl2 = processedCompany.linkUrl2.replace(CASINO_INFO_URL_PREFIX, "");
+    }
+
+    return processedCompany;
+  };
+
   // 업체 저장 (추가 또는 수정)
   const handleSaveCompany = async () => {
     if (!currentCompany) return;
@@ -141,18 +157,21 @@ const CasinoCompanyPage: React.FC = () => {
         return;
       }
 
-      if (isEditing && currentCompany.id) {
+      // URL 처리
+      const processedCompany = processUrls(currentCompany);
+
+      if (isEditing && processedCompany.id) {
         // 수정 모드일 때
         try {
           await CasinoCompanyApiService.updateCasinoCompany(
-            currentCompany.id,
+            processedCompany.id,
             {
-              companyName: currentCompany.companyName,
-              description: currentCompany.description,
-              linkUrl1: currentCompany.linkUrl1,
-              linkUrl2: currentCompany.linkUrl2,
-              isPublic: currentCompany.isPublic,
-              displayOrder: currentCompany.displayOrder,
+              companyName: processedCompany.companyName,
+              description: processedCompany.description,
+              linkUrl1: processedCompany.linkUrl1,
+              linkUrl2: processedCompany.linkUrl2,
+              isPublic: processedCompany.isPublic,
+              displayOrder: processedCompany.displayOrder,
             },
             imageFile || undefined
           );
@@ -172,12 +191,12 @@ const CasinoCompanyPage: React.FC = () => {
         try {
           await CasinoCompanyApiService.createCasinoCompany(
             {
-              companyName: currentCompany.companyName,
-              description: currentCompany.description,
-              linkUrl1: currentCompany.linkUrl1,
-              linkUrl2: currentCompany.linkUrl2,
-              isPublic: currentCompany.isPublic,
-              displayOrder: currentCompany.displayOrder,
+              companyName: processedCompany.companyName,
+              description: processedCompany.description,
+              linkUrl1: processedCompany.linkUrl1,
+              linkUrl2: processedCompany.linkUrl2,
+              isPublic: processedCompany.isPublic,
+              displayOrder: processedCompany.displayOrder,
             },
             imageFile
           );
@@ -363,8 +382,35 @@ const CasinoCompanyPage: React.FC = () => {
     },
   ];
 
+  // 업체 정보 필드의 UI 처리
+  const renderCasinoInfoField = () => {
+    const companyInfoPath = currentCompany?.linkUrl2 || "";
+
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">업체 정보</label>
+        <div className="flex items-center">
+          <span className="bg-gray-100 px-3 py-2 text-gray-500 border border-r-0 border-gray-300 rounded-l-md">
+            {CASINO_INFO_URL_PREFIX}
+          </span>
+          <input
+            type="text"
+            value={companyInfoPath}
+            onChange={(e) => setCurrentCompany({ ...currentCompany!, linkUrl2: e.target.value })}
+            placeholder="업체 고유 경로 입력"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-r-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        <p className="mt-1 text-xs text-gray-500">
+          전체 URL: {CASINO_INFO_URL_PREFIX}
+          {companyInfoPath}
+        </p>
+      </div>
+    );
+  };
+
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="w-full px-8 py-8">
       <div className="mb-6 flex justify-between items-center">
         <h1 className="text-2xl font-bold">카지노 업체 관리</h1>
         <Button onClick={handleAddCompany} variant="primary">
@@ -401,6 +447,7 @@ const CasinoCompanyPage: React.FC = () => {
           isOpen={showModal}
           onClose={() => setShowModal(false)}
           title={isEditing ? "업체 정보 수정" : "새 업체 추가"}
+          size="xl"
         >
           <div className="space-y-4">
             <Input
@@ -494,12 +541,7 @@ const CasinoCompanyPage: React.FC = () => {
               placeholder="https://"
             />
 
-            <Input
-              label="업체 정보"
-              value={currentCompany.linkUrl2 || ""}
-              onChange={(e) => setCurrentCompany({ ...currentCompany, linkUrl2: e.target.value })}
-              placeholder="https://"
-            />
+            {renderCasinoInfoField()}
 
             <div className="flex items-center">
               <input
