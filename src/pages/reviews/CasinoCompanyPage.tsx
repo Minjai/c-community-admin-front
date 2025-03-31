@@ -324,16 +324,6 @@ const CasinoCompanyPage: React.FC = () => {
       ),
     },
     {
-      header: "평점",
-      accessor: "rating" as keyof CasinoCompany,
-      cell: (value: any, company: CasinoCompany) => (
-        <div className="flex items-center">
-          <span className="text-yellow-500 mr-1">★</span>
-          <span>{typeof company.rating === "number" ? company.rating.toFixed(1) : "0.0"}</span>
-        </div>
-      ),
-    },
-    {
       header: "등록일자",
       accessor: "createdAt" as keyof CasinoCompany,
       cell: (value: any, company: CasinoCompany) => formatDate(company.createdAt),
