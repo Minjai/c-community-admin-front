@@ -31,6 +31,7 @@ const PostManagement = () => {
         params: {
           page,
           pageSize: pagination.limit,
+          boardId: 2, // 자유게시판(boardId: 2)에 해당하는 게시물만 불러오기
         },
       });
 

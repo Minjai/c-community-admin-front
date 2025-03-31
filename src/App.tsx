@@ -17,6 +17,8 @@ import GuidelineDetail from "./pages/guidelines/GuidelineDetail.tsx";
 import CasinoGuidelineManagement from "./pages/guidelines/CasinoGuidelineManagement";
 import SportsGuidelineManagement from "./pages/guidelines/SportsGuidelineManagement";
 import CryptoGuidelineManagement from "./pages/guidelines/CryptoGuidelineManagement";
+import NoticeManagement from "./pages/notice/NoticeManagement";
+import NoticeDetail from "./pages/notice/NoticeDetail";
 
 // 추후 구현할 페이지들을 위한 임시 컴포넌트
 const NotImplemented = ({ pageName }: { pageName: string }) => (
@@ -46,10 +48,10 @@ function App() {
               <Route path="dashboard" element={<DashboardPage />} />
 
               {/* 배너 관리 */}
-              <Route path="/banners/main" element={<MainBannerPage />} />
-              <Route path="/banners/company" element={<CompanyBannerPage />} />
-              <Route path="/banners/bottom" element={<BottomBannerPage />} />
-              <Route path="/banners/mini" element={<MiniBannerPage />} />
+              <Route path="banners/main" element={<MainBannerPage />} />
+              <Route path="banners/company" element={<CompanyBannerPage />} />
+              <Route path="banners/bottom" element={<BottomBannerPage />} />
+              <Route path="banners/mini" element={<MiniBannerPage />} />
 
               {/* 가이드라인 관리 */}
               <Route path="guidelines/casino" element={<CasinoGuidelineManagement />} />
@@ -85,10 +87,9 @@ function App() {
               />
 
               {/* 커뮤니티 관리 */}
-              <Route
-                path="community/notices"
-                element={<NotImplemented pageName="공지사항 관리" />}
-              />
+              <Route path="community/notices" element={<NoticeManagement />} />
+              <Route path="notice/:id" element={<NoticeDetail />} />
+              <Route path="notice" element={<NoticeManagement />} />
               <Route path="community/posts" element={<PostManagement />} />
               <Route path="community/posts/:id" element={<PostDetail />} />
 

@@ -1,77 +1,6 @@
-import React, { useRef, useState } from "react";
-import ReactQuill, { Quill } from "react-quill";
-import ImageResize from "quill-image-resize-module-react";
+import React, { useRef, useEffect, useCallback } from "react";
+import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
-
-const Parchment = Quill.import("parchment");
-
-Quill.register("modules/imageResize", ImageResize);
-
-let BaseImageFormat = Quill.import("formats/image");
-const ImageFormatAttributesList = ["alt", "height", "width", "style"];
-const COLORS = [
-  "#000000",
-  "#e60000",
-  "#ff9900",
-  "#ffff00",
-  "#008a00",
-  "#0066cc",
-  "#9933ff",
-  "#ffffff",
-  "#facccc",
-  "#ffebcc",
-  "#ffffcc",
-  "#cce8cc",
-  "#cce0f5",
-  "#ebd6ff",
-  "#bbbbbb",
-  "#f06666",
-  "#ffc266",
-  "#ffff66",
-  "#66b966",
-  "#66a3e0",
-  "#c285ff",
-  "#888888",
-  "#a10000",
-  "#b26b00",
-  "#b2b200",
-  "#006100",
-  "#0047b2",
-  "#6b24b2",
-  "#444444",
-  "#5c0000",
-  "#663d00",
-  "#666600",
-  "#003700",
-  "#002966",
-  "#3d1466",
-];
-
-class ImageFormat extends BaseImageFormat {
-  static formats(domNode: HTMLElement) {
-    return ImageFormatAttributesList.reduce((formats: any, attribute) => {
-      if (domNode.hasAttribute(attribute)) {
-        formats[attribute] = domNode.getAttribute(attribute);
-      }
-      formats["max-width"] = "-webkit-fill-available";
-      return formats;
-    }, {});
-  }
-
-  format(name: string, value: any) {
-    if (ImageFormatAttributesList.indexOf(name) > -1) {
-      if (value) {
-        this.domNode.setAttribute(name, value);
-      } else {
-        this.domNode.removeAttribute(name);
-      }
-    } else {
-      super.format(name, value);
-    }
-  }
-}
-
-Quill.register(ImageFormat, true);
 
 interface TextEditorProps {
   content: string;
@@ -79,46 +8,216 @@ interface TextEditorProps {
   showImageAndLink?: boolean;
 }
 
+const MAX_IMAGE_SIZE_MB = 1; // 1MB 이미지 크기 제한
+
 const TextEditor: React.FC<TextEditorProps> = ({
   content,
   setContent,
   showImageAndLink = true,
 }) => {
-  const quill = useRef<ReactQuill>(null);
-  const ImageAndLink = showImageAndLink ? ["link", "image"] : [];
+  const quillRef = useRef<ReactQuill>(null);
 
+  // 에디터에 이미지 삽입
+  const insertToEditor = useCallback((url: string) => {
+    try {
+      const editor = quillRef.current?.getEditor();
+      if (editor) {
+        const range = editor.getSelection() || { index: 0, length: 0 };
+        editor.insertEmbed(range.index, "image", url);
+        editor.setSelection(range.index + 1, 0);
+      }
+    } catch (error) {
+      console.error("이미지 삽입 오류:", error);
+    }
+  }, []);
+
+  // 이미지를 Base64로 변환하여 에디터에 삽입
+  const insertBase64Image = useCallback(
+    (file: File) => {
+      try {
+        // 이미지 크기 체크
+        if (file.size > MAX_IMAGE_SIZE_MB * 1024 * 1024) {
+          alert(`이미지 크기는 ${MAX_IMAGE_SIZE_MB}MB 이하여야 합니다.`);
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const base64Image = reader.result as string;
+            insertToEditor(base64Image);
+          } catch (e) {
+            console.error("이미지 변환 오류:", e);
+          }
+        };
+        reader.onerror = () => {
+          console.error("파일 읽기 오류");
+        };
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error("이미지 처리 오류:", error);
+      }
+    },
+    [insertToEditor]
+  );
+
+  // 이미지 핸들러 함수
+  const imageHandler = useCallback(() => {
+    try {
+      const input = document.createElement("input");
+      input.setAttribute("type", "file");
+      input.setAttribute("accept", "image/*");
+
+      input.onchange = (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        if (target.files && target.files[0]) {
+          insertBase64Image(target.files[0]);
+        }
+      };
+
+      input.click();
+    } catch (error) {
+      console.error("이미지 선택 오류:", error);
+    }
+  }, [insertBase64Image]);
+
+  // 드래그 앤 드롭 이벤트 핸들러
+  const handleDrop = useCallback(
+    (e: Event) => {
+      try {
+        e.preventDefault();
+        const dragEvent = e as DragEvent;
+        if (dragEvent.dataTransfer?.files && dragEvent.dataTransfer.files.length > 0) {
+          const file = dragEvent.dataTransfer.files[0];
+          if (file.type.match(/^image\//)) {
+            insertBase64Image(file);
+          }
+        }
+      } catch (error) {
+        console.error("드래그 앤 드롭 오류:", error);
+      }
+    },
+    [insertBase64Image]
+  );
+
+  const handleDragOver = useCallback((e: Event) => {
+    e.preventDefault();
+  }, []);
+
+  // 드래그 앤 드롭 이벤트 처리
+  useEffect(() => {
+    try {
+      const editorContainer = document.querySelector(".quill-editor-container");
+      if (!editorContainer) return;
+
+      // 명시적으로 EventListener 타입으로 캐스팅
+      const dropHandler = handleDrop as unknown as EventListener;
+      const dragOverHandler = handleDragOver as unknown as EventListener;
+
+      editorContainer.addEventListener("drop", dropHandler);
+      editorContainer.addEventListener("dragover", dragOverHandler);
+
+      return () => {
+        editorContainer.removeEventListener("drop", dropHandler);
+        editorContainer.removeEventListener("dragover", dragOverHandler);
+      };
+    } catch (error) {
+      console.error("이벤트 리스너 설정 오류:", error);
+    }
+  }, [handleDrop, handleDragOver]);
+
+  // 붙여넣기 이벤트 처리
+  useEffect(() => {
+    try {
+      const editor = quillRef.current?.getEditor();
+      if (!editor) return;
+
+      const handlePaste = (e: Event) => {
+        try {
+          const pasteEvent = e as ClipboardEvent;
+          const clipboardData = pasteEvent.clipboardData;
+          if (!clipboardData) return;
+
+          let imageFound = false;
+
+          for (let i = 0; i < clipboardData.items.length; i++) {
+            const item = clipboardData.items[i];
+            if (item.type.match(/^image\//)) {
+              const file = item.getAsFile();
+              if (file) {
+                e.preventDefault();
+                insertBase64Image(file);
+                imageFound = true;
+                break;
+              }
+            }
+          }
+
+          // 이미지가 감지된 경우에만 기본 동작 방지
+          if (imageFound) {
+            e.preventDefault();
+          }
+        } catch (error) {
+          console.error("붙여넣기 처리 오류:", error);
+        }
+      };
+
+      // 명시적으로 EventListener 타입으로 캐스팅
+      const pasteHandler = handlePaste as unknown as EventListener;
+
+      editor.root.addEventListener("paste", pasteHandler);
+
+      return () => {
+        editor.root.removeEventListener("paste", pasteHandler);
+      };
+    } catch (error) {
+      console.error("붙여넣기 이벤트 설정 오류:", error);
+    }
+  }, [insertBase64Image, quillRef.current]);
+
+  // 기본 툴바 옵션
   const modules = {
-    toolbar: [
-      [{ header: [1, 2, false] }],
-      ["bold", "italic", "underline", "strike", "blockquote"],
-      [{ list: "ordered" }, { list: "bullet" }, { indent: "-1" }, { indent: "+1" }],
-      [{ align: "" }, { align: "center" }, { align: "right" }, { align: "justify" }],
-      [{ color: COLORS }],
-      ImageAndLink,
-    ],
-    imageResize: {
-      parchment: Quill.import("parchment"),
-      handleStyles: {
-        backgroundColor: "black",
-        border: "none",
-        color: "white",
+    toolbar: {
+      container: [
+        [{ header: [1, 2, false] }],
+        ["bold", "italic", "underline", "strike", "blockquote"],
+        [{ list: "ordered" }, { list: "bullet" }, { indent: "-1" }, { indent: "+1" }],
+        [{ align: "" }, { align: "center" }, { align: "right" }, { align: "justify" }],
+        ["link", "image"],
+      ],
+      handlers: {
+        image: imageHandler,
       },
-      modules: ["Resize", "DisplaySize", "Toolbar"],
     },
   };
 
-  const handleChange = (value: string) => {
-    setContent(value);
-  };
+  const formats = [
+    "header",
+    "bold",
+    "italic",
+    "underline",
+    "strike",
+    "blockquote",
+    "list",
+    "bullet",
+    "indent",
+    "align",
+    "link",
+    "image",
+  ];
 
   return (
-    <ReactQuill
-      placeholder="내용을 입력해 주세요."
-      ref={quill}
-      value={content}
-      modules={modules}
-      onChange={handleChange}
-    />
+    <div className="quill-editor-container">
+      <ReactQuill
+        theme="snow"
+        ref={quillRef}
+        value={content}
+        onChange={setContent}
+        modules={modules}
+        formats={formats}
+        placeholder="내용을 입력하세요..."
+      />
+    </div>
   );
 };
 
