@@ -7,6 +7,8 @@ import LoginPage from "./pages/LoginPage";
 import DashboardPage from "./pages/DashboardPage";
 import MainBannerPage from "./pages/banners/MainBannerPage";
 import CompanyBannerPage from "./pages/banners/CompanyBannerPage";
+import BottomBannerPage from "./pages/banners/BottomBannerPage";
+import MiniBannerPage from "./pages/banners/MiniBannerPage";
 import RoleBasedRoute from "./components/RoleBasedRoute";
 import PostManagement from "./pages/community/PostManagement";
 import PostDetail from "./pages/community/PostManagementDetail";
@@ -44,10 +46,10 @@ function App() {
               <Route path="dashboard" element={<DashboardPage />} />
 
               {/* 배너 관리 */}
-              <Route path="banners/main" element={<MainBannerPage />} />
-              <Route path="banners/company" element={<CompanyBannerPage />} />
-              <Route path="banners/bottom" element={<NotImplemented pageName="하단 배너 관리" />} />
-              <Route path="banners/mini" element={<NotImplemented pageName="미니 배너 관리" />} />
+              <Route path="/banners/main" element={<MainBannerPage />} />
+              <Route path="/banners/company" element={<CompanyBannerPage />} />
+              <Route path="/banners/bottom" element={<BottomBannerPage />} />
+              <Route path="/banners/mini" element={<MiniBannerPage />} />
 
               {/* 가이드라인 관리 */}
               <Route path="guidelines/casino" element={<CasinoGuidelineManagement />} />

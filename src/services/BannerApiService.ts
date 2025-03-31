@@ -455,6 +455,270 @@ const BannerApiService = {
       throw error;
     }
   },
+
+  // 하단 배너 생성
+  createBottomBanner: async (
+    bannerData: any,
+    pcImage: File,
+    mobileImage: File
+  ): Promise<Banner> => {
+    const formData = new FormData();
+
+    // 텍스트 데이터 추가
+    Object.keys(bannerData).forEach((key) => {
+      if (bannerData[key] !== undefined && bannerData[key] !== null) {
+        formData.append(key, bannerData[key]);
+      }
+    });
+
+    // 이미지 파일 추가
+    formData.append("pUrl", pcImage);
+    formData.append("mUrl", mobileImage);
+
+    try {
+      // Authorization 헤더는 인터셉터에서 자동으로 추가됨
+      const response = await apiClient.post("/banner/bottom", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (response.data && response.data.success) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || "하단 배너 생성에 실패했습니다.");
+    } catch (error) {
+      console.error("하단 배너 생성 오류:", error);
+      throw error;
+    }
+  },
+
+  // 미니 배너 생성
+  createMiniBanner: async (bannerData: any, pcImage: File, mobileImage: File): Promise<Banner> => {
+    const formData = new FormData();
+
+    // 텍스트 데이터 추가
+    Object.keys(bannerData).forEach((key) => {
+      if (bannerData[key] !== undefined && bannerData[key] !== null) {
+        formData.append(key, bannerData[key]);
+      }
+    });
+
+    // 이미지 파일 추가
+    formData.append("pUrl", pcImage);
+    formData.append("mUrl", mobileImage);
+
+    try {
+      // Authorization 헤더는 인터셉터에서 자동으로 추가됨
+      const response = await apiClient.post("/banner/mini", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      if (response.data && response.data.success) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || "미니 배너 생성에 실패했습니다.");
+    } catch (error) {
+      console.error("미니 배너 생성 오류:", error);
+      throw error;
+    }
+  },
+
+  // 하단 배너 수정
+  updateBottomBanner: async (
+    id: number,
+    bannerData: any,
+    pcImage?: File | null,
+    mobileImage?: File | null
+  ): Promise<Banner> => {
+    try {
+      const formData = new FormData();
+
+      // 이미지 없이 기본 데이터만 전송하는 방식 시도
+      const hasNoImages =
+        (!pcImage || !(pcImage instanceof File) || pcImage.size === 0) &&
+        (!mobileImage || !(mobileImage instanceof File) || mobileImage.size === 0);
+
+      // 이미지가 없는 경우 일반 JSON 요청으로 처리
+      if (hasNoImages) {
+        // 날짜 형식 확인 및 변환
+        if (bannerData.startDate) {
+          try {
+            // ISO 형식인지 확인하고 아니면 변환 시도
+            const startDate = new Date(bannerData.startDate);
+            bannerData.startDate = startDate.toISOString();
+          } catch (e) {
+            console.error("startDate 형식 오류:", e);
+          }
+        }
+
+        if (bannerData.endDate) {
+          try {
+            // ISO 형식인지 확인하고 아니면 변환 시도
+            const endDate = new Date(bannerData.endDate);
+            bannerData.endDate = endDate.toISOString();
+          } catch (e) {
+            console.error("endDate 형식 오류:", e);
+          }
+        }
+
+        // 이미지 파일 없이 JSON 데이터만 PUT 요청
+        const response = await apiClient.put(`/banner/bottom/${id}`, bannerData, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.data && response.data.success) {
+          return response.data.data;
+        }
+        throw new Error(response.data.message || "하단 배너 수정에 실패했습니다.");
+      } else {
+        // 이미지가 있는 경우 multipart/form-data로 처리
+        // 텍스트 데이터 추가
+        Object.keys(bannerData).forEach((key) => {
+          if (bannerData[key] !== undefined && bannerData[key] !== null) {
+            formData.append(key, bannerData[key]);
+          }
+        });
+
+        // 이미지 파일 추가
+        if (pcImage && pcImage instanceof File && pcImage.size > 0) {
+          formData.append("pUrl", pcImage);
+        }
+
+        if (mobileImage && mobileImage instanceof File && mobileImage.size > 0) {
+          formData.append("mUrl", mobileImage);
+        }
+
+        const response = await apiClient.put(`/banner/bottom/${id}`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+
+        if (response.data && response.data.success) {
+          return response.data.data;
+        }
+        throw new Error(response.data.message || "하단 배너 수정에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("하단 배너 수정 오류:", error);
+      throw error;
+    }
+  },
+
+  // 미니 배너 수정
+  updateMiniBanner: async (
+    id: number,
+    bannerData: any,
+    pcImage?: File | null,
+    mobileImage?: File | null
+  ): Promise<Banner> => {
+    try {
+      const formData = new FormData();
+
+      // 이미지 없이 기본 데이터만 전송하는 방식 시도
+      const hasNoImages =
+        (!pcImage || !(pcImage instanceof File) || pcImage.size === 0) &&
+        (!mobileImage || !(mobileImage instanceof File) || mobileImage.size === 0);
+
+      // 이미지가 없는 경우 일반 JSON 요청으로 처리
+      if (hasNoImages) {
+        // 날짜 형식 확인 및 변환
+        if (bannerData.startDate) {
+          try {
+            // ISO 형식인지 확인하고 아니면 변환 시도
+            const startDate = new Date(bannerData.startDate);
+            bannerData.startDate = startDate.toISOString();
+          } catch (e) {
+            console.error("startDate 형식 오류:", e);
+          }
+        }
+
+        if (bannerData.endDate) {
+          try {
+            // ISO 형식인지 확인하고 아니면 변환 시도
+            const endDate = new Date(bannerData.endDate);
+            bannerData.endDate = endDate.toISOString();
+          } catch (e) {
+            console.error("endDate 형식 오류:", e);
+          }
+        }
+
+        // 이미지 파일 없이 JSON 데이터만 PUT 요청
+        const response = await apiClient.put(`/banner/mini/${id}`, bannerData, {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (response.data && response.data.success) {
+          return response.data.data;
+        }
+        throw new Error(response.data.message || "미니 배너 수정에 실패했습니다.");
+      } else {
+        // 이미지가 있는 경우 multipart/form-data로 처리
+        // 텍스트 데이터 추가
+        Object.keys(bannerData).forEach((key) => {
+          if (bannerData[key] !== undefined && bannerData[key] !== null) {
+            formData.append(key, bannerData[key]);
+          }
+        });
+
+        // 이미지 파일 추가
+        if (pcImage && pcImage instanceof File && pcImage.size > 0) {
+          formData.append("pUrl", pcImage);
+        }
+
+        if (mobileImage && mobileImage instanceof File && mobileImage.size > 0) {
+          formData.append("mUrl", mobileImage);
+        }
+
+        const response = await apiClient.put(`/banner/mini/${id}`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+
+        if (response.data && response.data.success) {
+          return response.data.data;
+        }
+        throw new Error(response.data.message || "미니 배너 수정에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("미니 배너 수정 오류:", error);
+      throw error;
+    }
+  },
+
+  // 하단 배너 삭제
+  deleteBottomBanner: async (id: number): Promise<void> => {
+    try {
+      const response = await apiClient.delete(`/banner/bottom/${id}`);
+      if (!response.data.success) {
+        throw new Error(response.data.message || "하단 배너 삭제에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("하단 배너 삭제 오류:", error);
+      throw error;
+    }
+  },
+
+  // 미니 배너 삭제
+  deleteMiniBanner: async (id: number): Promise<void> => {
+    try {
+      const response = await apiClient.delete(`/banner/mini/${id}`);
+      if (!response.data.success) {
+        throw new Error(response.data.message || "미니 배너 삭제에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("미니 배너 삭제 오류:", error);
+      throw error;
+    }
+  },
 };
 
 export default BannerApiService;
