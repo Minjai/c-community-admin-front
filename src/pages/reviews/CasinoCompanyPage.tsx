@@ -347,20 +347,34 @@ const CasinoCompanyPage: React.FC = () => {
     {
       header: "관리",
       accessor: "id" as keyof CasinoCompany,
-      cell: (value: any, company: CasinoCompany) => (
+      cell: (value: any, company: CasinoCompany, index: number) => (
         <div className="flex space-x-2">
-          <button
+          <ActionButton
+            onClick={() => handleMoveUp(company, index)}
+            disabled={index === 0}
+            action="up"
+            label="위로"
+            size="sm"
+          />
+          <ActionButton
+            onClick={() => handleMoveDown(company, index)}
+            disabled={index === companies.length - 1}
+            action="down"
+            label="아래로"
+            size="sm"
+          />
+          <ActionButton
             onClick={() => handleEditCompany(company)}
-            className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
-          >
-            수정
-          </button>
-          <button
+            action="edit"
+            label="수정"
+            size="sm"
+          />
+          <ActionButton
             onClick={() => handleDeleteCompany(company.id)}
-            className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600"
-          >
-            삭제
-          </button>
+            action="delete"
+            label="삭제"
+            size="sm"
+          />
         </div>
       ),
     },

@@ -1,17 +1,40 @@
-import { useEffect, useState } from "react";
-import { Post } from "@/types/index";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { Post as Guideline } from "@/types";
 import GuidelineApiService from "@/services/GuidelineApiService";
+import DataTable from "@/components/DataTable";
+import Button from "@/components/Button";
+import ActionButton from "@/components/ActionButton";
+import Modal from "@/components/Modal";
+import Input from "@/components/forms/Input";
+import TextEditor from "@/components/forms/TextEditor";
+import FileUpload from "@/components/forms/FileUpload";
+import Alert from "@/components/Alert";
+import { formatDate } from "@/utils/dateUtils";
+
+// Guideline 타입에 position과 displayOrder가 선택적으로 포함될 수 있도록 확장
+interface GuidelineWithOrder extends Guideline {
+  position?: number;
+  displayOrder?: number;
+}
 
 const GuidelineManagement = ({ boardId = 3 }) => {
-  const [loading, setLoading] = useState<boolean>(false);
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [guidelines, setGuidelines] = useState<GuidelineWithOrder[]>([]); // GuidelineWithOrder 사용
+  const [error, setError] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState<boolean>(false);
+  const [currentGuideline, setCurrentGuideline] = useState<Partial<GuidelineWithOrder> | null>(
+    null
+  ); // GuidelineWithOrder 사용
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [alertMessage, setAlertMessage] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 10,
-    total: 0,
-  });
 
   // boardId 기반 경로 및 타이틀 결정
   const getPageInfo = () => {
@@ -29,366 +52,361 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
   const { path, title } = getPageInfo();
 
-  // 게시물 상세 페이지로 이동
-  const handleClick = (id: number) => {
-    navigate(`${path}/${id}`);
-  };
-
-  // 페이지 변경 처리
-  const handlePageChange = (page: number) => {
-    getAllPost(page);
-  };
-
-  // 전체 게시물 목록 가져오기
-  const getAllPost = async (page = 1) => {
+  // 가이드라인 목록 조회
+  const fetchGuidelines = async () => {
     setLoading(true);
+    setError(null);
+
     try {
-      console.log(`${title} 가이드라인 요청 매개변수:`, {
-        boardId,
-        page,
-        pageSize: pagination.limit,
-      }); // 요청 매개변수 로깅
+      const response = await GuidelineApiService.getGuidelines(boardId);
 
-      const response = await GuidelineApiService.getGuidelines(boardId, page, pagination.limit);
-
-      console.log(`${title} API 응답:`, response);
-
-      // 서버 응답 형식에 맞게 처리
-      if (response) {
-        // 응답이 posts 배열을 포함하는 객체인지 확인
-        if (response.posts && Array.isArray(response.posts)) {
-          console.log("응답 타입: posts 배열 포함 객체", response.posts);
-          setPosts(response.posts);
-          // 페이지네이션 정보가 있는 경우 업데이트
-          setPagination({
-            page: response.currentPage || page,
-            limit: pagination.limit,
-            total: response.totalPosts || 0,
-          });
-        }
-        // 응답이 직접 배열인 경우
-        else if (Array.isArray(response)) {
-          console.log("응답 타입: 직접 배열", response);
-          setPosts(response);
-          // 페이지네이션 정보 업데이트 (배열 길이 기반)
-          setPagination((prev) => ({
-            ...prev,
-            page,
-            total: response.length > 0 ? response.length * 5 : 0, // 임시 값
-          }));
-        } else if (response.data && Array.isArray(response.data)) {
-          console.log("응답 타입: data 속성 배열", response.data);
-          setPosts(response.data);
-          setPagination((prev) => ({
-            ...prev,
-            page,
-            total: response.count || response.data.length,
-          }));
-        } else {
-          console.error(`${title} 불러오기 실패: 잘못된 응답 형식`, response);
-        }
+      if (response?.data && Array.isArray(response.data)) {
+        // displayOrder 또는 position 필드를 기준으로 정렬
+        const sortedGuidelines = [...response.data].sort(
+          (
+            a: GuidelineWithOrder,
+            b: GuidelineWithOrder // 타입 명시
+          ) => (a.position || a.displayOrder || 0) - (b.position || b.displayOrder || 0)
+        );
+        setGuidelines(sortedGuidelines);
       } else {
-        console.error(`${title} 불러오기 실패: 응답 데이터 없음`);
+        setGuidelines([]);
+        setError(`${title} 가이드라인을 불러오는데 실패했습니다.`);
       }
-    } catch (error) {
-      console.error(`${title} 불러오기 오류:`, error);
+    } catch (err) {
+      console.error(`Error fetching ${title} guidelines:`, err);
+      setError(`${title} 가이드라인을 불러오는데 실패했습니다.`);
+      setGuidelines([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // 게시물 삭제 함수
-  const handleDelete = async (id: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // 이벤트 버블링 방지
-    if (!window.confirm("정말 이 가이드라인을 삭제하시겠습니까?")) {
-      return;
+  useEffect(() => {
+    fetchGuidelines();
+  }, [boardId]);
+
+  // 이미지 파일 처리 함수
+  const handleFile = (file: File | null) => {
+    setImageFile(file);
+    if (file) {
+      const fileUrl = URL.createObjectURL(file);
+      setPreviewUrl(fileUrl);
+    } else {
+      setPreviewUrl(null);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      handleFile(e.target.files[0]);
+    } else {
+      handleFile(null); // 파일 선택 취소 시
+    }
+  };
+
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  // 모달 열기 (추가)
+  const handleAddGuideline = () => {
+    setCurrentGuideline({
+      title: "",
+      content: "",
+      boardId: boardId,
+      isPublic: true,
+      position: guidelines.length + 1, // 기본 순서
+      imageUrl: "",
+    });
+    setImageFile(null);
+    setShowModal(true);
+    setIsEditing(false);
+    setPreviewUrl(null);
+  };
+
+  // 모달 열기 (수정)
+  const handleEditGuideline = (guideline: GuidelineWithOrder) => {
+    // GuidelineWithOrder 사용
+    setCurrentGuideline({ ...guideline });
+    setImageFile(null);
+    setShowModal(true);
+    setIsEditing(true);
+    setPreviewUrl(guideline.imageUrl || null);
+  };
+
+  // 가이드라인 저장 (추가 또는 수정)
+  const handleSaveGuideline = async () => {
+    if (!currentGuideline) return;
+
+    try {
+      if (!currentGuideline.title || !currentGuideline.content) {
+        setAlertMessage({ type: "error", message: "제목과 내용은 필수 항목입니다." });
+        return;
+      }
+
+      const dataToSend = {
+        title: currentGuideline.title,
+        content: currentGuideline.content,
+        boardId: boardId,
+        isPublic: currentGuideline.isPublic,
+        position: currentGuideline.position,
+        image: imageFile || undefined,
+        // tags: currentGuideline.tags // 태그 필드가 있다면 추가
+      };
+
+      if (isEditing && currentGuideline.id) {
+        await GuidelineApiService.updateGuideline(currentGuideline.id, dataToSend);
+        setAlertMessage({ type: "success", message: "가이드라인이 수정되었습니다." });
+      } else {
+        await GuidelineApiService.createGuideline(dataToSend);
+        setAlertMessage({ type: "success", message: "새 가이드라인이 추가되었습니다." });
+      }
+
+      setShowModal(false);
+      fetchGuidelines();
+    } catch (error) {
+      console.error("Error saving guideline:", error);
+      setAlertMessage({ type: "error", message: "가이드라인 저장 중 오류가 발생했습니다." });
+    }
+  };
+
+  // 가이드라인 삭제
+  const handleDeleteGuideline = async (id: number) => {
+    if (!window.confirm("정말 이 가이드라인을 삭제하시겠습니까?")) return;
 
     try {
       await GuidelineApiService.deleteGuideline(id);
-      alert("가이드라인이 삭제되었습니다.");
-      // 현재 페이지를 다시 불러오기
-      getAllPost(pagination.page);
-    } catch (error: any) {
-      console.error("가이드라인 삭제 오류:", error);
-
-      // 인증 오류 처리
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        alert("권한이 없습니다. 로그인이 필요합니다.");
-        navigate("/login");
-      } else {
-        alert(
-          "가이드라인을 삭제하는 중 오류가 발생했습니다: " +
-            (error.response?.data?.error || "알 수 없는 오류")
-        );
-      }
+      setAlertMessage({ type: "success", message: "가이드라인이 삭제되었습니다." });
+      fetchGuidelines();
+    } catch (err) {
+      console.error("Error deleting guideline:", err);
+      setAlertMessage({ type: "error", message: "가이드라인 삭제 중 오류가 발생했습니다." });
     }
   };
 
-  // 게시물 수정 페이지로 이동
-  const handleEdit = (id: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // 이벤트 버블링 방지
-    navigate(`${path}/${id}`);
-  };
+  // 순서 변경 (위로)
+  const handleMoveUp = async (index: number) => {
+    if (index <= 0) return;
 
-  // 가이드라인 노출 순위 변경
-  const handleChangePosition = async (id: number, newPosition: number, e: React.MouseEvent) => {
-    e.stopPropagation(); // 이벤트 버블링 방지
+    const currentGuideline = guidelines[index];
+    const targetGuideline = guidelines[index - 1];
 
-    if (newPosition < 0) {
-      alert("노출 순위는 0보다 작을 수 없습니다.");
-      return;
-    }
+    // position 또는 displayOrder 값 교환
+    const currentPosition = currentGuideline.position || currentGuideline.displayOrder || 0;
+    const targetPosition = targetGuideline.position || targetGuideline.displayOrder || 0;
 
     try {
-      await GuidelineApiService.updateGuidelinePosition(id, newPosition);
-      alert("노출 순위가 변경되었습니다.");
-      // 목록 다시 불러오기
-      getAllPost(pagination.page);
-    } catch (error: any) {
-      console.error("노출 순위 변경 오류:", error);
+      // API 호출 (개별 업데이트 방식 사용)
+      await GuidelineApiService.updateGuidelinePosition(currentGuideline.id, targetPosition);
+      await GuidelineApiService.updateGuidelinePosition(targetGuideline.id, currentPosition);
 
-      // 인증 오류 처리
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        alert("권한이 없습니다. 로그인이 필요합니다.");
-        navigate("/login");
-      } else {
-        alert(
-          "노출 순위를 변경하는 중 오류가 발생했습니다: " +
-            (error.response?.data?.error || "알 수 없는 오류")
-        );
-      }
+      fetchGuidelines(); // 목록 새로고침
+    } catch (err) {
+      console.error("Error moving guideline up:", err);
+      setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+      fetchGuidelines(); // 에러 시 원상복구
     }
   };
 
-  useEffect(() => {
-    getAllPost();
-  }, []);
+  // 순서 변경 (아래로)
+  const handleMoveDown = async (index: number) => {
+    if (index >= guidelines.length - 1) return;
 
-  useEffect(() => {
-    getAllPost();
-  }, [boardId]);
+    const currentGuideline = guidelines[index];
+    const targetGuideline = guidelines[index + 1];
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
+    const currentPosition = currentGuideline.position || currentGuideline.displayOrder || 0;
+    const targetPosition = targetGuideline.position || targetGuideline.displayOrder || 0;
+
+    try {
+      await GuidelineApiService.updateGuidelinePosition(currentGuideline.id, targetPosition);
+      await GuidelineApiService.updateGuidelinePosition(targetGuideline.id, currentPosition);
+
+      fetchGuidelines();
+    } catch (err) {
+      console.error("Error moving guideline down:", err);
+      setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+      fetchGuidelines();
+    }
+  };
+
+  // DataTable 컬럼 정의
+  const columns = [
+    {
+      header: "순서",
+      accessor: "position" as keyof GuidelineWithOrder, // GuidelineWithOrder 사용
+      cell: (value: any, row: GuidelineWithOrder) => (
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">데이터를 가지고 오는 중입니다...</p>
+          <span className="font-medium">{row.position ?? row.displayOrder ?? "-"}</span>
         </div>
-      </div>
-    );
-  }
+      ),
+    },
+    {
+      header: "썸네일",
+      accessor: "imageUrl" as keyof GuidelineWithOrder,
+      cell: (value: string) => (
+        <div className="w-20 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
+          {value ? (
+            <img src={value} alt="썸네일" className="max-w-full max-h-full object-contain" />
+          ) : (
+            <span className="text-xs text-gray-500">이미지 없음</span>
+          )}
+        </div>
+      ),
+    },
+    { header: "제목", accessor: "title" as keyof GuidelineWithOrder },
+    {
+      header: "등록일자",
+      accessor: "createdAt" as keyof GuidelineWithOrder,
+      cell: (value: string) => formatDate(value),
+    },
+    {
+      header: "공개 여부",
+      accessor: "isPublic" as keyof GuidelineWithOrder,
+      cell: (value: boolean | number) => (
+        <span
+          className={`px-2 py-1 rounded text-xs ${
+            value === true || value === 1
+              ? "bg-green-100 text-green-800"
+              : "bg-red-100 text-red-800"
+          }`}
+        >
+          {value === true || value === 1 ? "공개" : "비공개"}
+        </span>
+      ),
+    },
+    {
+      header: "관리",
+      accessor: "id" as keyof GuidelineWithOrder,
+      cell: (value: number, row: GuidelineWithOrder, index: number) => (
+        <div className="flex space-x-2">
+          <ActionButton
+            onClick={() => handleMoveUp(index)}
+            disabled={index === 0}
+            action="up"
+            label="위로"
+            size="sm"
+          />
+          <ActionButton
+            onClick={() => handleMoveDown(index)}
+            disabled={index === guidelines.length - 1}
+            action="down"
+            label="아래로"
+            size="sm"
+          />
+          <ActionButton
+            onClick={() => handleEditGuideline(row)}
+            action="edit"
+            label="수정"
+            size="sm"
+          />
+          <ActionButton
+            onClick={() => handleDeleteGuideline(value)}
+            action="delete"
+            label="삭제"
+            size="sm"
+          />
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden">
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold">{title}</h2>
-          <button
-            onClick={() => navigate(`${path}/new`)}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
-          >
-            가이드라인 등록
-          </button>
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">{title}</h1>
+        <Button onClick={handleAddGuideline} variant="primary">
+          가이드라인 추가
+        </Button>
+      </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  순서
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  썸네일
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  타이틀
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  작성일
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  공개여부
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  관리
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {posts.length > 0 ? (
-                posts.map((post, index) => (
-                  <tr key={post.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {index + 1}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {post.imageUrl ? (
-                        <img
-                          src={post.imageUrl}
-                          alt={post.title}
-                          className="h-16 w-24 object-cover rounded"
-                        />
-                      ) : (
-                        <div className="h-16 w-24 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs">
-                          이미지 없음
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div
-                        className="text-sm font-medium text-blue-600 cursor-pointer"
-                        onClick={() => handleClick(post.id)}
-                      >
-                        {post.title}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(post.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <span
-                        className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          post.isPublic === 1
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {post.isPublic === 1 ? "공개" : "비공개"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                      <div className="flex justify-center items-center space-x-2">
-                        <div className="flex flex-col">
-                          <button
-                            type="button"
-                            onClick={(e) =>
-                              handleChangePosition(post.id, (post.position || 0) - 1, e)
-                            }
-                            className="text-gray-400 hover:text-gray-600 text-xs"
-                            title="순위 올리기"
-                          >
-                            ▲
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) =>
-                              handleChangePosition(post.id, (post.position || 0) + 1, e)
-                            }
-                            className="text-gray-400 hover:text-gray-600 text-xs"
-                            title="순위 내리기"
-                          >
-                            ▼
-                          </button>
-                        </div>
+      {alertMessage && (
+        <Alert
+          type={alertMessage.type}
+          message={alertMessage.message}
+          onClose={() => setAlertMessage(null)}
+          className="mb-4"
+        />
+      )}
 
-                        <button
-                          onClick={(e) => handleEdit(post.id, e)}
-                          className="text-indigo-600 hover:text-indigo-900 mx-1"
-                          title="수정"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                        </button>
+      {error && (
+        <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
+      )}
 
-                        <button
-                          onClick={(e) => handleDelete(post.id, e)}
-                          className="text-red-600 hover:text-red-900 mx-1"
-                          title="삭제"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-5 w-5"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={1.5}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-sm text-gray-500">
-                    등록된 가이드라인이 없습니다.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+      <DataTable
+        columns={columns}
+        data={guidelines}
+        loading={loading}
+        emptyMessage="등록된 가이드라인이 없습니다."
+      />
 
-        <div className="bg-white py-3 flex items-center justify-between border-t border-gray-200 mt-4">
-          <div className="flex-1 flex justify-between items-center">
-            <p className="text-sm text-gray-700">
-              총 <span className="font-medium">{pagination.total || 0}</span>건
-            </p>
+      {/* 가이드라인 추가/수정 모달 */}
+      {currentGuideline && (
+        <Modal
+          isOpen={showModal}
+          onClose={() => setShowModal(false)}
+          title={isEditing ? "가이드라인 수정" : "새 가이드라인 추가"}
+          size="xl"
+        >
+          <div className="space-y-4">
+            <Input
+              label="제목"
+              value={currentGuideline.title || ""}
+              onChange={(e) => setCurrentGuideline({ ...currentGuideline, title: e.target.value })}
+              required
+            />
+
+            <FileUpload
+              label="썸네일 이미지"
+              id="guidelineImage"
+              onChange={handleFile}
+              value={previewUrl || currentGuideline.imageUrl}
+            />
+            {isEditing && !previewUrl && currentGuideline.imageUrl && (
+              <p className="mt-1 text-xs text-gray-500">
+                이미지를 변경하지 않으면 기존 이미지가 유지됩니다.
+              </p>
+            )}
+
             <div>
-              <nav
-                className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
-                aria-label="Pagination"
-              >
-                <button
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={pagination.page <= 1}
-                  className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  이전
-                </button>
-                {Array.from(
-                  { length: Math.ceil((pagination.total || 0) / pagination.limit) },
-                  (_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => handlePageChange(i + 1)}
-                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium
-                        ${
-                          pagination.page === i + 1
-                            ? "z-10 bg-indigo-50 border-indigo-500 text-indigo-600"
-                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                        }
-                      `}
-                    >
-                      {i + 1}
-                    </button>
-                  )
-                )}
-                <button
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={
-                    pagination.page >= Math.ceil((pagination.total || 0) / pagination.limit)
-                  }
-                  className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  다음
-                </button>
-              </nav>
+              <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
+              <TextEditor
+                content={currentGuideline.content || ""}
+                setContent={(content: string) =>
+                  setCurrentGuideline({ ...currentGuideline, content })
+                }
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isPublic"
+                checked={currentGuideline.isPublic === true || currentGuideline.isPublic === 1}
+                onChange={(e) =>
+                  setCurrentGuideline({
+                    ...currentGuideline,
+                    isPublic: e.target.checked ? 1 : 0,
+                  })
+                }
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <label htmlFor="isPublic" className="ml-2 block text-sm text-gray-900">
+                공개 여부
+              </label>
             </div>
           </div>
-        </div>
-      </div>
+          <div className="mt-6 flex justify-end space-x-3">
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
+              취소
+            </Button>
+            <Button variant="primary" onClick={handleSaveGuideline}>
+              저장
+            </Button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };
