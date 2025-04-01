@@ -297,24 +297,8 @@ const CasinoCompanyPage: React.FC = () => {
       header: "순서",
       accessor: "displayOrder" as keyof CasinoCompany,
       cell: (value: any, company: CasinoCompany, index: number) => (
-        <div className="flex flex-col space-y-1 items-center">
+        <div className="text-center">
           <span className="font-medium">{company.displayOrder}</span>
-          <div className="flex space-x-1">
-            <button
-              onClick={() => handleMoveUp(company, index)}
-              className="px-1 py-0.5 bg-gray-200 text-gray-700 rounded text-xs"
-              disabled={index === 0}
-            >
-              ↑
-            </button>
-            <button
-              onClick={() => handleMoveDown(company, index)}
-              className="px-1 py-0.5 bg-gray-200 text-gray-700 rounded text-xs"
-              disabled={index === companies.length - 1}
-            >
-              ↓
-            </button>
-          </div>
         </div>
       ),
     },
