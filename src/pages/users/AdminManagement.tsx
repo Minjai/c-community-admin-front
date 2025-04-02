@@ -15,6 +15,17 @@ interface Rank {
   score: number;
 }
 
+interface Activity {
+  type: "comment" | "post" | "like";
+  message: string;
+  timestamp: string;
+  data: {
+    commentId?: number;
+    postId?: number;
+    content?: string;
+  };
+}
+
 interface AdminUser {
   id: number;
   email: string;
@@ -26,7 +37,8 @@ interface AdminUser {
   role: string;
   status: string;
   rank: Rank;
-  password?: string; // 비밀번호는 입력용으로만 사용
+  password?: string;
+  activities: Activity[];
 }
 
 interface AdminResponse {
@@ -58,7 +70,7 @@ const AdminManagement: React.FC = () => {
     try {
       const response = await axios.get<AdminResponse>(`/admin/admins?page=${page}`);
 
-      if (response.data && Array.isArray(response.data.users)) {
+      if (response.data) {
         setAdmins(response.data.users);
         setCurrentPage(response.data.page);
         setTotalPages(response.data.totalPages);
@@ -101,17 +113,31 @@ const AdminManagement: React.FC = () => {
         image: "",
         score: 0,
       },
+      activities: [],
     });
     setShowModal(true);
     setIsEditing(false);
   };
 
+  // 관리자 상세 정보 조회
+  const fetchAdminDetail = async (id: number) => {
+    try {
+      const response = await axios.get(`/admin/account/${id}`);
+      if (response.data && response.data.success) {
+        setCurrentAdmin(response.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching admin detail:", err);
+      setAlertMessage({
+        type: "error",
+        message: "관리자 정보를 불러오는데 실패했습니다.",
+      });
+    }
+  };
+
   // 관리자 수정 모달 열기
   const handleEditAdmin = (admin: AdminUser) => {
-    setCurrentAdmin({
-      ...admin,
-      password: "", // 보안상 비밀번호는 빈 값으로 설정
-    });
+    fetchAdminDetail(admin.id);
     setShowModal(true);
     setIsEditing(true);
   };
@@ -121,34 +147,29 @@ const AdminManagement: React.FC = () => {
     if (!currentAdmin) return;
 
     try {
-      // 필수 필드 검증
-      if (!currentAdmin.nickname || !currentAdmin.email) {
-        setAlertMessage({ type: "error", message: "이름과 이메일은 필수 항목입니다." });
-        return;
-      }
-
-      if (!isEditing && !currentAdmin.password) {
-        setAlertMessage({ type: "error", message: "비밀번호는 필수 항목입니다." });
+      // 필수 필드 검증 (새 관리자 추가 시에만)
+      if (!isEditing && (!currentAdmin.nickname || !currentAdmin.email || !currentAdmin.password)) {
+        setAlertMessage({ type: "error", message: "이름, 이메일, 비밀번호는 필수 항목입니다." });
         return;
       }
 
       if (isEditing && currentAdmin.id) {
-        // 수정 모드일 때
-        await axios.put(`/admin/users/${currentAdmin.id}`, {
-          nickname: currentAdmin.nickname,
-          email: currentAdmin.email,
-          role: currentAdmin.role,
-          ...(currentAdmin.password ? { password: currentAdmin.password } : {}),
-        });
+        // 수정 모드일 때 - 입력된 필드만 전송
+        const updateData: any = {};
+
+        if (currentAdmin.email) updateData.email = currentAdmin.email;
+        if (currentAdmin.nickname) updateData.nickname = currentAdmin.nickname;
+        if (currentAdmin.password) updateData.password = currentAdmin.password;
+
+        await axios.put(`/admin/account/${currentAdmin.id}`, updateData);
 
         setAlertMessage({ type: "success", message: "관리자 정보가 수정되었습니다." });
       } else {
         // 추가 모드일 때
-        await axios.post("/admin/users", {
-          nickname: currentAdmin.nickname,
+        await axios.post("/admin/signup", {
           email: currentAdmin.email,
           password: currentAdmin.password,
-          role: currentAdmin.role,
+          nickname: currentAdmin.nickname,
         });
 
         setAlertMessage({ type: "success", message: "새 관리자가 추가되었습니다." });
@@ -175,7 +196,7 @@ const AdminManagement: React.FC = () => {
     }
 
     try {
-      await axios.delete(`/admin/users/${id}`);
+      await axios.delete(`/admin/account/${id}`);
       setAlertMessage({ type: "success", message: "관리자가 삭제되었습니다." });
       fetchAdmins(currentPage);
     } catch (error: any) {
@@ -356,20 +377,40 @@ const AdminManagement: React.FC = () => {
               required={!isEditing}
             />
 
-            <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
-                관리자 등급
-              </label>
-              <select
-                id="role"
-                value={currentAdmin.role}
-                onChange={(e) => handleInputChange("role", e.target.value)}
-                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              >
-                <option value="admin">관리자</option>
-                <option value="superadmin">최고 관리자</option>
-              </select>
-            </div>
+            {isEditing && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">가입일자</label>
+                  <div className="text-gray-900">{formatDate(currentAdmin.createdAt)}</div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">상태</label>
+                  <div
+                    className={`px-2 py-1 rounded-full text-xs inline-block ${getStatusClassName(
+                      currentAdmin.status
+                    )}`}
+                  >
+                    {currentAdmin.status}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">활동내역</label>
+                  <div className="mt-1 text-sm text-gray-900 space-y-2">
+                    {currentAdmin.activities.length > 0 ? (
+                      currentAdmin.activities.map((activity, index) => (
+                        <div key={index} className="ml-2">
+                          {activity.message}
+                        </div>
+                      ))
+                    ) : (
+                      <div>활동 내역이 없습니다.</div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="flex justify-end space-x-3 pt-4">
               <Button onClick={() => setShowModal(false)} variant="secondary">

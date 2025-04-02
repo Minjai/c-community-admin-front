@@ -191,7 +191,7 @@ const UserManagement = () => {
     }
 
     try {
-      await axios.delete(`/admin/users/${userId}`);
+      await axios.delete(`/admin/account/${userId}`);
 
       setAlertMessage({
         type: "success",
