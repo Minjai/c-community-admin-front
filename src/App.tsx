@@ -20,6 +20,12 @@ import CryptoGuidelineManagement from "./pages/guidelines/CryptoGuidelineManagem
 import NoticeManagement from "./pages/notice/NoticeManagement";
 import NoticeDetail from "./pages/notice/NoticeDetail";
 import CasinoCompanyPage from "./pages/reviews/CasinoCompanyPage";
+import CasinoGameManagement from "./pages/data/CasinoGameManagement";
+import CasinoRecommendationManagement from "./pages/data/CasinoRecommendationManagement";
+import SportsManagement from "./pages/data/SportsManagement";
+import UserManagement from "./pages/users/UserManagement";
+import UserRankManagement from "./pages/users/UserRankManagement";
+import AdminManagement from "./pages/users/AdminManagement";
 
 // 추후 구현할 페이지들을 위한 임시 컴포넌트
 const NotImplemented = ({ pageName }: { pageName: string }) => (
@@ -63,15 +69,12 @@ function App() {
               <Route path="guidelines/crypto/:id" element={<GuidelineDetail boardId={5} />} />
 
               {/* 데이터 관리 */}
-              <Route
-                path="data/casino-games"
-                element={<NotImplemented pageName="카지노 게임 관리" />}
-              />
+              <Route path="data/casino-games" element={<CasinoGameManagement />} />
               <Route
                 path="data/casino-recommendations"
-                element={<NotImplemented pageName="카지노 게임 추천" />}
+                element={<CasinoRecommendationManagement />}
               />
-              <Route path="data/sports" element={<NotImplemented pageName="스포츠 종목 관리" />} />
+              <Route path="data/sports" element={<SportsManagement />} />
               <Route
                 path="data/sports-recommendations"
                 element={<NotImplemented pageName="스포츠 종목 추천" />}
@@ -99,7 +102,7 @@ function App() {
                 path="users/info"
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
-                    <NotImplemented pageName="회원 정보 관리" />
+                    <UserManagement />
                   </RoleBasedRoute>
                 }
               />
@@ -107,17 +110,19 @@ function App() {
                 path="users/admin"
                 element={
                   <RoleBasedRoute allowedRoles={["superadmin"]}>
-                    <NotImplemented pageName="관리자 계정 관리" />
+                    <AdminManagement />
                   </RoleBasedRoute>
                 }
               />
+              <Route path="/users" element={<UserManagement />} />
+              <Route path="/user-ranks" element={<UserRankManagement />} />
 
               {/* 기타 관리 - 관리자 권한 필요 */}
               <Route
                 path="settings/user-levels"
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
-                    <NotImplemented pageName="회원 등급 관리" />
+                    <UserRankManagement />
                   </RoleBasedRoute>
                 }
               />

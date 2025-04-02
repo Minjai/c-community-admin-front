@@ -11,6 +11,7 @@ const PostDetail = () => {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [tags, setTags] = useState("");
+  const [isPopular, setIsPopular] = useState(false);
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +47,7 @@ const PostDetail = () => {
           content,
           tags: tags || undefined,
           boardId: post?.boardId || 2, // 기본값 설정 (자유게시판)
+          isPopular: isPopular ? 1 : 0, // 인기 게시물 여부 (1 또는 0)
         });
 
         if (response.status === 200) {
@@ -61,6 +63,7 @@ const PostDetail = () => {
           content,
           tags: tags || undefined,
           boardId: 2, // 기본 자유게시판으로 설정
+          isPopular: isPopular ? 1 : 0, // 인기 게시물 여부 (1 또는 0)
         });
 
         if (response.status === 201 || response.status === 200) {
@@ -139,6 +142,9 @@ const PostDetail = () => {
         if (postData.tags) {
           setTags(typeof postData.tags === "string" ? postData.tags : "");
         }
+
+        // 인기 게시물 상태 설정
+        setIsPopular(postData.isPopular === 1 || postData.isPopular === true);
 
         // 안전하게 content 설정 - 비동기 처리
         setTimeout(() => {
@@ -389,6 +395,19 @@ const PostDetail = () => {
             className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
           />
           <p className="mt-1 text-xs text-gray-500">예시: 자유게시판,질문,정보</p>
+        </div>
+
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="isPopular"
+            checked={isPopular}
+            onChange={(e) => setIsPopular(e.target.checked)}
+            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          />
+          <label htmlFor="isPopular" className="ml-2 block text-sm text-gray-700">
+            인기 게시물로 등록
+          </label>
         </div>
 
         <div className="flex justify-end space-x-3">
