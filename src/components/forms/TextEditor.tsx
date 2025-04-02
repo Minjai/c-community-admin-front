@@ -16,6 +16,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
   showImageAndLink = true,
 }) => {
   const quillRef = useRef<ReactQuill>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
 
   // 에디터에 이미지 삽입
   const insertToEditor = useCallback((url: string) => {
@@ -107,26 +108,26 @@ const TextEditor: React.FC<TextEditorProps> = ({
   // 드래그 앤 드롭 이벤트 처리
   useEffect(() => {
     try {
-      const editorContainer = document.querySelector(".quill-editor-container");
-      if (!editorContainer) return;
+      if (!editorRef.current) return;
 
-      // 명시적으로 EventListener 타입으로 캐스팅
       const dropHandler = handleDrop as unknown as EventListener;
       const dragOverHandler = handleDragOver as unknown as EventListener;
 
-      editorContainer.addEventListener("drop", dropHandler);
-      editorContainer.addEventListener("dragover", dragOverHandler);
+      editorRef.current.addEventListener("drop", dropHandler);
+      editorRef.current.addEventListener("dragover", dragOverHandler);
 
       return () => {
-        editorContainer.removeEventListener("drop", dropHandler);
-        editorContainer.removeEventListener("dragover", dragOverHandler);
+        if (editorRef.current) {
+          editorRef.current.removeEventListener("drop", dropHandler);
+          editorRef.current.removeEventListener("dragover", dragOverHandler);
+        }
       };
     } catch (error) {
       console.error("이벤트 리스너 설정 오류:", error);
     }
   }, [handleDrop, handleDragOver]);
 
-  // 붙여넣기 이벤트 처리
+  // 붙여넣기 이벤트 처리 - MutationObserver 사용
   useEffect(() => {
     try {
       const editor = quillRef.current?.getEditor();
@@ -153,7 +154,6 @@ const TextEditor: React.FC<TextEditorProps> = ({
             }
           }
 
-          // 이미지가 감지된 경우에만 기본 동작 방지
           if (imageFound) {
             e.preventDefault();
           }
@@ -162,18 +162,49 @@ const TextEditor: React.FC<TextEditorProps> = ({
         }
       };
 
-      // 명시적으로 EventListener 타입으로 캐스팅
-      const pasteHandler = handlePaste as unknown as EventListener;
+      // DOMNodeInserted 대신 MutationObserver 사용
+      const setupMutationObserver = () => {
+        if (!editor.root) return;
 
+        // 이미지 변경 감지를 위한 MutationObserver 설정
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+              mutation.addedNodes.forEach((node) => {
+                if (node instanceof HTMLImageElement) {
+                  // 새로 추가된 이미지에 대한 처리
+                  node.addEventListener("error", () => {
+                    console.warn("이미지 로드 오류:", node.src);
+                  });
+                }
+              });
+            }
+          });
+        });
+
+        // 옵저버 시작
+        observer.observe(editor.root, {
+          childList: true,
+          subtree: true,
+        });
+
+        return observer;
+      };
+
+      const observer = setupMutationObserver();
+      const pasteHandler = handlePaste as unknown as EventListener;
       editor.root.addEventListener("paste", pasteHandler);
 
       return () => {
         editor.root.removeEventListener("paste", pasteHandler);
+        if (observer) {
+          observer.disconnect();
+        }
       };
     } catch (error) {
       console.error("붙여넣기 이벤트 설정 오류:", error);
     }
-  }, [insertBase64Image, quillRef.current]);
+  }, [insertBase64Image]);
 
   // 기본 툴바 옵션
   const modules = {
@@ -207,7 +238,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
   ];
 
   return (
-    <div className="quill-editor-container">
+    <div ref={editorRef} className="quill-editor-container">
       <ReactQuill
         theme="snow"
         ref={quillRef}

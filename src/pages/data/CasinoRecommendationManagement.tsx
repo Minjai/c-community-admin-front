@@ -14,9 +14,10 @@ interface CasinoRecommendation {
   title: string;
   isMainFeatured: boolean;
   games: string[];
+  gameIds?: number[];
   startDate: string;
   endDate: string;
-  isPublic: boolean;
+  isPublic: boolean | number;
   position: number;
   createdAt: string;
   updatedAt: string;
@@ -74,12 +75,16 @@ const CasinoRecommendationManagement = () => {
     setError(null);
 
     try {
-      // API 경로는 실제 환경에 맞게 수정 필요
-      const response = await axios.get("/casino-recommendations");
+      // 올바른 API 경로로 수정
+      const response = await axios.get("/casino-recommends", {
+        headers: {
+          Accept: "application/json",
+        },
+      });
 
-      if (response.data && Array.isArray(response.data)) {
+      if (response.data && response.data.success && Array.isArray(response.data.data)) {
         // position 기준으로 정렬
-        const sortedRecommendations = [...response.data].sort(
+        const sortedRecommendations = [...response.data.data].sort(
           (a, b) => (a.position || 0) - (b.position || 0)
         );
         setRecommendations(sortedRecommendations);
@@ -87,8 +92,20 @@ const CasinoRecommendationManagement = () => {
         setRecommendations([]);
         setError("게임 추천 목록을 불러오는데 실패했습니다.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching casino recommendations:", err);
+
+      // 인증 오류 처리
+      if (err.response?.status === 401 || err.response?.status === 403 || err.isAuthError) {
+        setError("인증 정보가 만료되었습니다. 다시 로그인해주세요.");
+
+        // 3초 후 로그인 페이지로 이동
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 3000);
+        return;
+      }
+
       setError("게임 추천 목록을 불러오는데 실패했습니다.");
       setRecommendations([]);
     } finally {
@@ -99,13 +116,35 @@ const CasinoRecommendationManagement = () => {
   // 가능한 게임 목록 가져오기
   const fetchAvailableGames = async () => {
     try {
-      const response = await axios.get("/casino-games");
-      if (response.data && Array.isArray(response.data)) {
-        setAvailableGames(response.data);
-        setFilteredGames(response.data);
+      // 올바른 API 경로로 수정
+      const response = await axios.get("/casino", {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (response.data && response.data.success && Array.isArray(response.data.data)) {
+        setAvailableGames(response.data.data);
+        setFilteredGames(response.data.data);
+      } else {
+        setAvailableGames([]);
+        setFilteredGames([]);
+        setError("게임 목록을 불러오는데 실패했습니다.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error fetching available games:", err);
+
+      // 인증 오류 처리
+      if (err.response?.status === 401 || err.response?.status === 403 || err.isAuthError) {
+        setError("인증 정보가 만료되었습니다. 다시 로그인해주세요.");
+
+        // 3초 후 로그인 페이지로 이동
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 3000);
+        return;
+      }
+
       setError("게임 목록을 불러오는데 실패했습니다.");
     }
   };
@@ -185,11 +224,38 @@ const CasinoRecommendationManagement = () => {
     }
 
     try {
-      await axios.delete(`/casino-recommendations/${id}`);
+      // 올바른 API 경로로 수정
+      await axios.delete(`/casino-recommends/${id}`, {
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      });
       setAlertMessage({ type: "success", message: "게임 추천이 삭제되었습니다." });
       fetchRecommendations(); // 목록 새로고침
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error deleting recommendation:", err);
+      console.log("Error details:", {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+      });
+
+      // 인증 오류 처리
+      if (err.response?.status === 401 || err.response?.status === 403 || err.isAuthError) {
+        setAlertMessage({
+          type: "error",
+          message: "로그인이 필요하거나 접근 권한이 없습니다.",
+        });
+
+        // 3초 후에 로그인 페이지로 리다이렉트
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 3000);
+
+        return;
+      }
+
       setAlertMessage({ type: "error", message: "게임 추천 삭제 중 오류가 발생했습니다." });
     }
   };
@@ -206,17 +272,46 @@ const CasinoRecommendationManagement = () => {
       const newPosition = recommendationAbove.position;
       const oldPosition = recommendationToMove.position;
 
-      await axios.patch(`/casino-recommendations/${recommendationToMove.id}`, {
-        position: newPosition,
+      // FormData 사용
+      const formData1 = new FormData();
+      formData1.append("position", newPosition.toString());
+
+      const formData2 = new FormData();
+      formData2.append("position", oldPosition.toString());
+
+      // 올바른 API 경로로 수정
+      await axios.patch(`/casino-recommends/${recommendationToMove.id}`, formData1, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
-      await axios.patch(`/casino-recommendations/${recommendationAbove.id}`, {
-        position: oldPosition,
+
+      await axios.patch(`/casino-recommends/${recommendationAbove.id}`, formData2, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
 
       setAlertMessage({ type: "success", message: "게임 추천 순서가 변경되었습니다." });
       fetchRecommendations(); // 목록 새로고침
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error moving recommendation up:", err);
+
+      // 인증 오류 처리
+      if (err.response?.status === 401 || err.response?.status === 403 || err.isAuthError) {
+        setAlertMessage({
+          type: "error",
+          message: "로그인이 필요하거나 접근 권한이 없습니다.",
+        });
+
+        // 3초 후에 로그인 페이지로 리다이렉트
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 3000);
+
+        return;
+      }
+
       setAlertMessage({ type: "error", message: "게임 추천 순서 변경 중 오류가 발생했습니다." });
     }
   };
@@ -233,17 +328,46 @@ const CasinoRecommendationManagement = () => {
       const newPosition = recommendationBelow.position;
       const oldPosition = recommendationToMove.position;
 
-      await axios.patch(`/casino-recommendations/${recommendationToMove.id}`, {
-        position: newPosition,
+      // FormData 사용
+      const formData1 = new FormData();
+      formData1.append("position", newPosition.toString());
+
+      const formData2 = new FormData();
+      formData2.append("position", oldPosition.toString());
+
+      // 올바른 API 경로로 수정
+      await axios.patch(`/casino-recommends/${recommendationToMove.id}`, formData1, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
-      await axios.patch(`/casino-recommendations/${recommendationBelow.id}`, {
-        position: oldPosition,
+
+      await axios.patch(`/casino-recommends/${recommendationBelow.id}`, formData2, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
 
       setAlertMessage({ type: "success", message: "게임 추천 순서가 변경되었습니다." });
       fetchRecommendations(); // 목록 새로고침
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error moving recommendation down:", err);
+
+      // 인증 오류 처리
+      if (err.response?.status === 401 || err.response?.status === 403 || err.isAuthError) {
+        setAlertMessage({
+          type: "error",
+          message: "로그인이 필요하거나 접근 권한이 없습니다.",
+        });
+
+        // 3초 후에 로그인 페이지로 리다이렉트
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 3000);
+
+        return;
+      }
+
       setAlertMessage({ type: "error", message: "게임 추천 순서 변경 중 오류가 발생했습니다." });
     }
   };
@@ -295,36 +419,90 @@ const CasinoRecommendationManagement = () => {
     try {
       setSaving(true);
 
-      const recommendationData = {
-        title,
-        isMainFeatured,
-        games: selectedGames,
-        gameIds: selectedGameIds,
-        startDate,
-        endDate,
-        isPublic,
-      };
+      // FormData 형식으로 변경
+      const formData = new FormData();
+      formData.append("title", title.trim());
+      formData.append("startDate", startDate);
+      formData.append("endDate", endDate);
+      formData.append("isPublic", isPublic ? "1" : "0");
+
+      // 각 게임 ID를 개별적으로 추가 (서버 요구사항에 따라 방식 선택)
+      selectedGameIds.forEach((gameId, index) => {
+        formData.append(`gameIds[${index}]`, gameId.toString());
+      });
+
+      // FormData 내용 디버깅용 로그
+      console.log("FormData contents:");
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}: ${value}`);
+      }
 
       if (!isEditing) {
         // 새 추천 생성
-        await axios.post("/casino-recommendations", recommendationData);
+        const response = await axios.post("/casino-recommends", formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+        console.log("Response:", response);
         setAlertMessage({ type: "success", message: "게임 추천이 성공적으로 추가되었습니다." });
       } else if (currentRecommendation) {
         // 기존 추천 수정
-        await axios.put(`/casino-recommendations/${currentRecommendation.id}`, recommendationData);
+        const response = await axios.put(
+          `/casino-recommends/${currentRecommendation.id}`,
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          }
+        );
+        console.log("Response:", response);
         setAlertMessage({ type: "success", message: "게임 추천 정보가 수정되었습니다." });
       }
 
       // 성공 후 모달 닫기 및 목록 새로고침
       setShowModal(false);
       fetchRecommendations();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving recommendation:", err);
+      console.log("Error response:", err.response);
+      console.log("Error details:", {
+        status: err.response?.status,
+        statusText: err.response?.statusText,
+        data: err.response?.data,
+        headers: err.response?.headers,
+      });
+
+      // 인증 오류 처리
+      if (err.response?.status === 401 || err.response?.status === 403 || err.isAuthError) {
+        // 토큰 재확인
+        const token = localStorage.getItem("token");
+        console.log("Current token:", token ? "존재함" : "없음");
+
+        setAlertMessage({
+          type: "error",
+          message: "로그인이 필요하거나 접근 권한이 없습니다. 다시 로그인해주세요.",
+        });
+
+        // 3초 후에 로그인 페이지로 리다이렉트 (사용자에게 메시지를 볼 시간을 줌)
+        setTimeout(() => {
+          window.location.href = "/login"; // React Router의 navigate 대신 직접적인 리다이렉트 사용
+        }, 3000);
+
+        return; // 인증 오류 처리 후 함수 종료
+      }
+
+      // 서버에서 응답한 에러 메시지가 있으면 표시
+      const errorMessage =
+        err.response?.data?.message ||
+        (!isEditing
+          ? "게임 추천 추가 중 오류가 발생했습니다."
+          : "게임 추천 정보 수정 중 오류가 발생했습니다.");
+
       setAlertMessage({
         type: "error",
-        message: !isEditing
-          ? "게임 추천 추가 중 오류가 발생했습니다."
-          : "게임 추천 정보 수정 중 오류가 발생했습니다.",
+        message: errorMessage,
       });
     } finally {
       setSaving(false);

@@ -54,9 +54,10 @@ instance.interceptors.response.use(
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
 
-      // 로그인 페이지로 리다이렉트
-      window.location.href = "/login";
-      return Promise.reject(new Error("인증 정보가 만료되었습니다. 다시 로그인해주세요."));
+      // 이 부분 주석 처리: 자동 리다이렉트하지 않고 오류를 컴포넌트로 전달
+      // window.location.href = "/login";
+      // 오류 객체에 인증 만료 플래그 추가
+      error.isAuthError = true;
     }
 
     console.error("API 오류 상태:", error.response?.status);

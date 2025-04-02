@@ -58,12 +58,27 @@ const CasinoGameManagement = () => {
     setError(null);
 
     try {
-      // API 경로는 실제 환경에 맞게 수정 필요
-      const response = await axios.get("/casino-games");
+      const response = await axios.get("/casino");
 
-      if (response.data && Array.isArray(response.data)) {
+      if (response.data && response.data.success && Array.isArray(response.data.data)) {
+        // 서버 응답 데이터를 클라이언트 형식으로 변환
+        const transformedGames = response.data.data.map((game: any) => ({
+          id: game.id,
+          title: game.title,
+          description: game.content,
+          thumbnailUrl: game.imageUrl,
+          rating: Number(game.rating) || 0,
+          returnRate: Number(game.payoutRate) || 0,
+          isDirectLinkEnabled: game.isShortcut === 1 || game.isShortcut === true,
+          directLinkUrl: game.shortcutUrl || "",
+          isPublic: game.isPublic === 1 || game.isPublic === true,
+          position: game.displayOrder,
+          createdAt: game.createdAt,
+          updatedAt: game.updatedAt,
+        }));
+
         // position 기준으로 정렬
-        const sortedGames = [...response.data].sort(
+        const sortedGames = [...transformedGames].sort(
           (a, b) => (a.position || 0) - (b.position || 0)
         );
         setGames(sortedGames);
@@ -110,14 +125,20 @@ const CasinoGameManagement = () => {
   const handleEditGame = (game: CasinoGame) => {
     setCurrentGame(game);
     setTitle(game.title || "");
+
+    // 설명 설정 - 기존 문제였던 비동기 타이밍 이슈 해결
     setDescription(game.description || "");
+
     setRating(game.rating || 5.0);
     setReturnRate(game.returnRate || 95);
     setIsDirectLinkEnabled(game.isDirectLinkEnabled || false);
     setDirectLinkUrl(game.directLinkUrl || "");
-    setIsPublic(game.isPublic === true || game.isPublic === 1);
+    setIsPublic(game.isPublic || false);
     setThumbnailFile(null);
+
+    // 이미지 URL 처리
     setThumbnailPreview(game.thumbnailUrl || null);
+
     setIsEditing(true);
     setShowModal(true);
   };
@@ -129,7 +150,7 @@ const CasinoGameManagement = () => {
     }
 
     try {
-      await axios.delete(`/casino-games/${id}`);
+      await axios.delete(`/casino/${id}`);
       setAlertMessage({ type: "success", message: "게임이 삭제되었습니다." });
       fetchGames(); // 목록 새로고침
     } catch (err) {
@@ -151,15 +172,50 @@ const CasinoGameManagement = () => {
   };
 
   // 썸네일 업로드 처리
-  const handleThumbnailUpload = (file: File) => {
-    setThumbnailFile(file);
-    setThumbnailPreview(URL.createObjectURL(file));
+  const handleThumbnailUpload = (file: File | null) => {
+    if (!file) {
+      setThumbnailFile(null);
+      setThumbnailPreview(null);
+      return;
+    }
+
+    // 파일 크기 체크 (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setAlertMessage({ type: "error", message: "이미지 크기는 2MB를 초과할 수 없습니다." });
+      return;
+    }
+
+    // 파일 타입 체크
+    if (!file.type.startsWith("image/")) {
+      setAlertMessage({ type: "error", message: "이미지 파일만 업로드 가능합니다." });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setThumbnailFile(file);
+      setThumbnailPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 바로가기 노출 토글
+  const handleDirectLinkToggle = (enabled: boolean) => {
+    setIsDirectLinkEnabled(enabled);
+    if (!enabled) {
+      setDirectLinkUrl("");
+    }
   };
 
   // 게임 저장 처리
   const handleSaveGame = async () => {
     if (!title.trim()) {
       setAlertMessage({ type: "error", message: "게임 제목을 입력해주세요." });
+      return;
+    }
+
+    if (!description.trim()) {
+      setAlertMessage({ type: "error", message: "게임 설명을 입력해주세요." });
       return;
     }
 
@@ -180,46 +236,62 @@ const CasinoGameManagement = () => {
 
       // 폼 데이터 구성
       const formData = new FormData();
-      formData.append("title", title);
-      formData.append("description", description);
-      formData.append("rating", rating.toString());
-      formData.append("returnRate", returnRate.toString());
-      formData.append("isDirectLinkEnabled", isDirectLinkEnabled ? "1" : "0");
-      formData.append("directLinkUrl", directLinkUrl);
-      formData.append("isPublic", isPublic ? "1" : "0");
+      formData.append("title", title.trim());
+      formData.append("content", description); // HTML 형식 그대로 전송
 
-      if (thumbnailFile) {
-        formData.append("thumbnail", thumbnailFile);
+      formData.append("rating", rating.toString());
+      formData.append("payoutRate", returnRate.toString());
+      formData.append("isShortcut", isDirectLinkEnabled ? "1" : "0");
+
+      if (isDirectLinkEnabled && directLinkUrl) {
+        formData.append("shortcutUrl", directLinkUrl.trim());
       }
+
+      formData.append("isPublic", isPublic ? "1" : "0");
 
       if (!isEditing) {
         // 새 게임 생성
-        await axios.post("/casino-games", formData, {
+        if (thumbnailFile) {
+          formData.append("image", thumbnailFile);
+        }
+
+        const response = await axios.post("/casino", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
         });
-        setAlertMessage({ type: "success", message: "게임이 성공적으로 추가되었습니다." });
+
+        if (response.status === 201 || response.status === 200) {
+          setAlertMessage({ type: "success", message: "게임이 성공적으로 추가되었습니다." });
+        }
       } else if (currentGame) {
         // 기존 게임 수정
-        await axios.put(`/casino-games/${currentGame.id}`, formData, {
+        if (thumbnailFile) {
+          formData.append("image", thumbnailFile);
+        }
+
+        const response = await axios.put(`/casino/${currentGame.id}`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
         });
-        setAlertMessage({ type: "success", message: "게임 정보가 수정되었습니다." });
+
+        if (response.status === 200) {
+          setAlertMessage({ type: "success", message: "게임 정보가 수정되었습니다." });
+        }
       }
 
       // 모달 닫기 및 목록 새로고침
       setShowModal(false);
       fetchGames();
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error saving game:", err);
+
+      // 서버 오류 메시지 표시
+      const errorMessage = err.response?.data?.message || "게임 저장 중 오류가 발생했습니다.";
       setAlertMessage({
         type: "error",
-        message: !isEditing
-          ? "게임 추가 중 오류가 발생했습니다."
-          : "게임 정보 수정 중 오류가 발생했습니다.",
+        message: errorMessage,
       });
     } finally {
       setSaving(false);
@@ -238,8 +310,8 @@ const CasinoGameManagement = () => {
       const newPosition = gameAbove.position;
       const oldPosition = gameToMove.position;
 
-      await axios.patch(`/casino-games/${gameToMove.id}`, { position: newPosition });
-      await axios.patch(`/casino-games/${gameAbove.id}`, { position: oldPosition });
+      await axios.patch(`/casino/${gameToMove.id}`, { position: newPosition });
+      await axios.patch(`/casino/${gameAbove.id}`, { position: oldPosition });
 
       setAlertMessage({ type: "success", message: "게임 순서가 변경되었습니다." });
       fetchGames(); // 목록 새로고침
@@ -261,8 +333,8 @@ const CasinoGameManagement = () => {
       const newPosition = gameBelow.position;
       const oldPosition = gameToMove.position;
 
-      await axios.patch(`/casino-games/${gameToMove.id}`, { position: newPosition });
-      await axios.patch(`/casino-games/${gameBelow.id}`, { position: oldPosition });
+      await axios.patch(`/casino/${gameToMove.id}`, { position: newPosition });
+      await axios.patch(`/casino/${gameBelow.id}`, { position: oldPosition });
 
       setAlertMessage({ type: "success", message: "게임 순서가 변경되었습니다." });
       fetchGames(); // 목록 새로고침
@@ -302,28 +374,8 @@ const CasinoGameManagement = () => {
       header: "순서",
       accessor: "position" as keyof CasinoGame,
       cell: (value: any, row: CasinoGame, index: number) => (
-        <div className="flex items-center space-x-1 justify-center">
+        <div className="flex items-center justify-center">
           <span className="font-medium">{value || index + 1}</span>
-          <div className="flex flex-col">
-            <button
-              onClick={() => handleMoveUp(index)}
-              disabled={index === 0}
-              className={`p-1 ${
-                index === 0 ? "text-gray-300" : "text-blue-500 hover:text-blue-700"
-              }`}
-            >
-              ▲
-            </button>
-            <button
-              onClick={() => handleMoveDown(index)}
-              disabled={index === games.length - 1}
-              className={`p-1 ${
-                index === games.length - 1 ? "text-gray-300" : "text-blue-500 hover:text-blue-700"
-              }`}
-            >
-              ▼
-            </button>
-          </div>
         </div>
       ),
     },
@@ -332,7 +384,7 @@ const CasinoGameManagement = () => {
       accessor: "thumbnailUrl" as keyof CasinoGame,
       cell: (value: string) => (
         <div className="w-20 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
-          {value ? (
+          {value && value.trim() !== "" ? (
             <img src={value} alt="썸네일" className="max-w-full max-h-full object-contain" />
           ) : (
             <span className="text-xs text-gray-500">이미지 없음</span>
@@ -396,6 +448,158 @@ const CasinoGameManagement = () => {
     },
   ];
 
+  // 5. 모달 컨텐츠 - 게임 추가/수정 폼
+  const renderModalContent = () => {
+    return (
+      <div className="space-y-4">
+        {/* 제목 */}
+        <Input
+          label="게임 제목"
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="게임 제목을 입력하세요"
+          required
+          maxLength={100}
+          disabled={saving}
+        />
+
+        {/* 썸네일 업로드 - 상단으로 이동 */}
+        <div>
+          <FileUpload
+            label="썸네일 이미지"
+            onChange={handleThumbnailUpload}
+            preview={true}
+            value={thumbnailPreview || undefined}
+            helperText="권장 크기: 600x400px, 최대 2MB"
+            accept="image/jpeg, image/png"
+            required={!isEditing}
+            disabled={saving}
+          />
+        </div>
+
+        {/* 게임 설명 */}
+        <div>
+          <label className="label">게임 설명</label>
+          <div className="border border-gray-300 rounded-md overflow-hidden">
+            <TextEditor content={description} setContent={setDescription} showImageAndLink={true} />
+          </div>
+        </div>
+
+        {/* 별점 - 시각적 별 표시 추가 */}
+        <div>
+          <label className="label">별점 (0-5)</label>
+          <div className="flex items-center">
+            <input
+              type="number"
+              value={rating}
+              onChange={handleRatingChange}
+              min={0}
+              max={5}
+              step={0.1}
+              disabled={saving}
+              className="input w-20 mr-3"
+            />
+            <div className="flex text-xl">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <span
+                  key={star}
+                  className={star <= Math.round(rating) ? "text-yellow-400" : "text-gray-300"}
+                >
+                  ★
+                </span>
+              ))}
+            </div>
+            <span className="ml-2 text-sm text-gray-500">{rating.toFixed(1)}</span>
+          </div>
+        </div>
+
+        {/* 환수율 */}
+        <Input
+          label="환수율 (%)"
+          type="number"
+          value={returnRate}
+          onChange={handleReturnRateChange}
+          min={0}
+          max={100}
+          step={0.1}
+          disabled={saving}
+        />
+
+        {/* 바로가기 설정 */}
+        <div>
+          <label className="label">바로가기 설정</label>
+          <div className="flex items-center space-x-4 mt-1">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="directLinkEnabled"
+                checked={!isDirectLinkEnabled}
+                onChange={() => handleDirectLinkToggle(false)}
+                className="mr-2"
+                disabled={saving}
+              />
+              <span>사용 안함</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="directLinkEnabled"
+                checked={isDirectLinkEnabled}
+                onChange={() => handleDirectLinkToggle(true)}
+                className="mr-2"
+                disabled={saving}
+              />
+              <span>사용</span>
+            </label>
+          </div>
+        </div>
+
+        {/* 바로가기 URL */}
+        {isDirectLinkEnabled && (
+          <Input
+            label="바로가기 URL"
+            type="url"
+            value={directLinkUrl}
+            onChange={(e) => setDirectLinkUrl(e.target.value)}
+            placeholder="예: https://example.com/"
+            disabled={saving}
+            required={isDirectLinkEnabled}
+          />
+        )}
+
+        {/* 공개 여부 */}
+        <div>
+          <label className="label">공개 여부</label>
+          <div className="flex items-center space-x-4 mt-1">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="isPublic"
+                checked={isPublic}
+                onChange={() => setIsPublic(true)}
+                className="mr-2"
+                disabled={saving}
+              />
+              <span>공개</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="isPublic"
+                checked={!isPublic}
+                onChange={() => setIsPublic(false)}
+                className="mr-2"
+                disabled={saving}
+              />
+              <span>비공개</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
@@ -432,178 +636,18 @@ const CasinoGameManagement = () => {
         title={isEditing ? "카지노 게임 수정" : "새 카지노 게임 추가"}
         size="xl"
       >
-        <div className="space-y-5">
-          {/* 게임 타이틀 */}
-          <div>
-            <div className="mb-1 font-medium text-sm">게임 제목</div>
-            <Input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              placeholder="게임 제목을 입력하세요"
-            />
-          </div>
+        {renderModalContent()}
 
-          {/* 게임 썸네일 */}
-          <div>
-            <div className="mb-1 font-medium text-sm">
-              썸네일 이미지 {!isEditing && <span className="text-red-500">*</span>}
-            </div>
-            <div className="flex items-center">
-              {thumbnailPreview ? (
-                <div className="mr-4">
-                  <img
-                    src={thumbnailPreview}
-                    alt="썸네일 미리보기"
-                    className="object-contain h-24 w-24 border border-gray-300 rounded-md p-1"
-                  />
-                </div>
-              ) : null}
-              <div>
-                <FileUpload onFileSelect={handleThumbnailUpload} accept="image/*" label="" />
-                <div className="mt-1 text-xs text-gray-500">
-                  권장 크기: 400x300px, 최대 2MB, PNG/JPG 파일
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 게임 설명 */}
-          <div>
-            <div className="mb-1 font-medium text-sm">게임 설명</div>
-            <TextEditor
-              value={description}
-              onChange={setDescription}
-              placeholder="내용을 입력하세요..."
-            />
-          </div>
-
-          {/* 게임 정보 (별점, 환수율) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <div className="mb-1 font-medium text-sm">게임 별점</div>
-              <div className="flex items-center">
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  max="5"
-                  value={rating}
-                  onChange={handleRatingChange}
-                  className="w-24 mr-3 border border-gray-300 rounded-md px-3 py-2"
-                />
-                <div className="flex">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <span
-                      key={star}
-                      className={star <= rating ? "text-yellow-400" : "text-gray-300"}
-                    >
-                      ★
-                    </span>
-                  ))}
-                </div>
-                <span className="ml-2 text-sm">{rating.toFixed(1)}</span>
-              </div>
-            </div>
-            <div>
-              <div className="mb-1 font-medium text-sm">환수율 (%)</div>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                max="100"
-                value={returnRate}
-                onChange={handleReturnRateChange}
-                className="w-24 border border-gray-300 rounded-md px-3 py-2"
-              />
-            </div>
-          </div>
-
-          {/* 바로가기 노출 */}
-          <div className="border-t border-gray-200 pt-5">
-            <div className="flex items-center">
-              <span className="font-medium">바로가기 노출</span>
-            </div>
-
-            <div className="mt-3 flex items-center">
-              <div className="flex items-center mr-8">
-                <input
-                  type="radio"
-                  id="directLink_no"
-                  checked={!isDirectLinkEnabled}
-                  onChange={() => setIsDirectLinkEnabled(false)}
-                  className="mr-2"
-                />
-                <label htmlFor="directLink_no">미노출</label>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="directLink_yes"
-                  checked={isDirectLinkEnabled}
-                  onChange={() => setIsDirectLinkEnabled(true)}
-                  className="mr-2"
-                />
-                <label htmlFor="directLink_yes">노출</label>
-              </div>
-            </div>
-
-            {isDirectLinkEnabled && (
-              <div className="mt-3">
-                <Input
-                  value={directLinkUrl}
-                  onChange={(e) => setDirectLinkUrl(e.target.value)}
-                  placeholder="https://example.com/game"
-                  required={isDirectLinkEnabled}
-                />
-              </div>
-            )}
-          </div>
-
-          {/* 공개여부 */}
-          <div className="border-t border-gray-200 pt-5">
-            <div className="flex items-center">
-              <span className="font-medium">공개여부</span>
-            </div>
-
-            <div className="mt-3 flex items-center">
-              <div className="flex items-center mr-8">
-                <input
-                  type="radio"
-                  id="visibility_private"
-                  checked={!isPublic}
-                  onChange={() => setIsPublic(false)}
-                  className="mr-2"
-                />
-                <label htmlFor="visibility_private">비공개</label>
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="visibility_public"
-                  checked={isPublic}
-                  onChange={() => setIsPublic(true)}
-                  className="mr-2"
-                />
-                <label htmlFor="visibility_public">공개</label>
-              </div>
-            </div>
-          </div>
-
-          {/* 등록 버튼 */}
-          <div className="border-t border-gray-200 pt-5 mt-5 flex justify-center">
-            <Button
-              type="button"
-              variant="primary"
-              onClick={handleSaveGame}
-              disabled={saving}
-              className="px-8"
-            >
-              {saving ? "저장 중..." : "등록"}
-            </Button>
-          </div>
+        <div className="border-t border-gray-200 pt-5 mt-5 flex justify-center">
+          <Button
+            type="button"
+            variant="primary"
+            onClick={handleSaveGame}
+            disabled={saving}
+            className="px-8"
+          >
+            {saving ? "저장 중..." : "등록"}
+          </Button>
         </div>
       </Modal>
     </div>
