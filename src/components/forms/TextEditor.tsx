@@ -265,9 +265,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
   const currentFormats = customFormats || formats;
 
   return (
-    <div ref={editorRef} className="quill-editor-container">
+    <div ref={editorRef}>
       <ReactQuill
-        theme="snow"
         ref={quillRef}
         value={content}
         onChange={handleChange}
@@ -309,8 +308,20 @@ const TextEditor: React.FC<TextEditorProps> = ({
           "size",
           ...currentFormats,
         ]}
-        placeholder="내용을 입력하세요..."
+        placeholder=""
       />
+      <style>
+        {`
+          .ql-editor.ql-blank::before {
+            content: "내용을 입력해주세요.";
+            color: #999;
+            font-style: normal;
+          }
+          .ql-editor:focus::before {
+            content: none;
+          }
+        `}
+      </style>
     </div>
   );
 };
