@@ -171,11 +171,13 @@ const NoticeManagement = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        notice.isPublic ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                      className={`px-2 py-1 rounded text-xs ${
+                        notice.isPublic === 1
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
                       }`}
                     >
-                      {notice.isPublic ? "공개" : "비공개"}
+                      {notice.isPublic === 1 ? "공개" : "비공개"}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

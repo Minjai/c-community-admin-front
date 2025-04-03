@@ -9,6 +9,8 @@ import Input from "../../components/forms/Input";
 import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
 import { formatDate } from "../../utils/dateUtils";
+import axios from "@/api/axios";
+import { extractDataArray } from "../../api/util";
 
 // .env에서 카지노 정보 URL 접두사 가져오기
 const CASINO_INFO_URL_PREFIX =
@@ -30,26 +32,60 @@ const CasinoCompanyPage: React.FC = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 초기 상태 설정
+  const initialCompanyState: Partial<CasinoCompany> = {
+    companyName: "",
+    description: "",
+    imageUrl: "",
+    isPublic: 1,
+    displayOrder: 0,
+    linkUrl1: "",
+    linkUrl2: "",
+    rating: 0,
+  };
+
   // 카지노 업체 목록 조회
   const fetchCompanies = async () => {
     setLoading(true);
     setError(null);
 
     try {
+      // CasinoCompanyApiService 서비스를 사용하여 API 호출
       const response = await CasinoCompanyApiService.getCasinoCompanies();
+      console.log("카지노 업체 응답 구조:", response);
+
       if (response && Array.isArray(response)) {
-        // 업체를 displayOrder 기준으로 정렬
-        const sortedCompanies = [...response].sort(
+        console.log("추출된 업체 데이터:", response);
+
+        // 서버 응답을 컴포넌트에서 사용하는 형식으로 변환
+        const transformedCompanies = response.map((company: any) => ({
+          id: company.id,
+          companyName: company.companyName || company.name || "",
+          description: company.description || company.content || "",
+          imageUrl: company.imageUrl || company.logoUrl || company.logo || "",
+          linkUrl1: company.linkUrl1 || company.website || "",
+          linkUrl2: company.linkUrl2 || "",
+          rating: Number(company.rating || 0),
+          isPublic: company.isPublic === 1 || company.isPublic === true ? 1 : 0,
+          displayOrder: company.displayOrder || company.position || 0,
+          createdAt: company.createdAt || new Date().toISOString(),
+          updatedAt: company.updatedAt || company.createdAt || new Date().toISOString(),
+        })) as CasinoCompany[];
+
+        // displayOrder 기준으로 정렬
+        const sortedCompanies = [...transformedCompanies].sort(
           (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
         );
+
         setCompanies(sortedCompanies);
       } else {
+        console.log("적절한 업체 데이터를 찾지 못했습니다.");
         setCompanies([]);
-        setError("카지노 업체를 불러오는데 실패했습니다.");
+        setError("카지노 업체 목록을 불러오는데 실패했습니다.");
       }
     } catch (err) {
       console.error("Error fetching casino companies:", err);
-      setError("카지노 업체를 불러오는데 실패했습니다.");
+      setError("카지노 업체 목록을 불러오는데 실패했습니다.");
       setCompanies([]);
     } finally {
       setLoading(false);
@@ -110,7 +146,7 @@ const CasinoCompanyPage: React.FC = () => {
       companyName: "",
       description: "",
       imageUrl: "",
-      isPublic: true,
+      isPublic: 1,
       displayOrder: companies.length + 1,
       linkUrl1: "",
       linkUrl2: "",
@@ -125,13 +161,23 @@ const CasinoCompanyPage: React.FC = () => {
 
   // 업체 수정 모달 열기
   const handleEditCompany = (company: CasinoCompany) => {
-    setCurrentCompany({
+    // isPublic을 number 타입으로 통일
+    const processedCompany = {
       ...company,
-    });
-    setImageFile(null);
-    setShowModal(true);
+      isPublic:
+        typeof company.isPublic === "boolean" ? (company.isPublic ? 1 : 0) : company.isPublic,
+    };
+
+    setCurrentCompany(processedCompany);
     setIsEditing(true);
-    setPreviewUrl(company.imageUrl || null);
+    setShowModal(true);
+
+    // 이미지 URL이 있으면 미리보기 설정
+    if (company.imageUrl) {
+      setPreviewUrl(company.imageUrl);
+    } else {
+      setPreviewUrl(null);
+    }
   };
 
   // 업체 저장 전 URL 처리 함수
@@ -334,13 +380,13 @@ const CasinoCompanyPage: React.FC = () => {
     {
       header: "공개여부",
       accessor: "isPublic" as keyof CasinoCompany,
-      cell: (value: any, company: CasinoCompany) => (
+      cell: (value: number, company: CasinoCompany) => (
         <span
           className={`px-2 py-1 rounded text-xs ${
-            company.isPublic ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
           }`}
         >
-          {company.isPublic ? "공개" : "비공개"}
+          {value === 1 ? "공개" : "비공개"}
         </span>
       ),
     },
@@ -541,15 +587,22 @@ const CasinoCompanyPage: React.FC = () => {
 
             {renderCasinoInfoField()}
 
-            <div className="flex items-center">
+            <div className="flex items-center mt-4">
               <input
                 type="checkbox"
                 id="isPublic"
-                checked={currentCompany.isPublic}
+                checked={currentCompany?.isPublic === 1}
                 onChange={(e) =>
-                  setCurrentCompany({ ...currentCompany, isPublic: e.target.checked })
+                  setCurrentCompany(
+                    currentCompany
+                      ? {
+                          ...currentCompany,
+                          isPublic: e.target.checked ? 1 : 0,
+                        }
+                      : null
+                  )
                 }
-                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
               <label htmlFor="isPublic" className="ml-2 block text-sm text-gray-900">
                 공개 여부

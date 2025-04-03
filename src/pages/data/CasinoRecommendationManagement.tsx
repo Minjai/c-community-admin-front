@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
+import { extractDataArray } from "../../api/util";
 
 // 카지노 게임 추천 타입 정의
 interface CasinoRecommendation {
@@ -17,7 +18,7 @@ interface CasinoRecommendation {
   gameIds?: number[];
   startDate: string;
   endDate: string;
-  isPublic: boolean | number;
+  isPublic: number;
   position: number;
   createdAt: string;
   updatedAt: string;
@@ -53,7 +54,7 @@ const CasinoRecommendationManagement = () => {
   const [selectedGameIds, setSelectedGameIds] = useState<number[]>([]);
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
-  const [isPublic, setIsPublic] = useState<boolean>(true);
+  const [isPublic, setIsPublic] = useState<number>(1);
   const [publicSettings, setPublicSettings] = useState<"public" | "private">("public");
   const [saving, setSaving] = useState<boolean>(false);
 
@@ -66,7 +67,7 @@ const CasinoRecommendationManagement = () => {
 
   // 공개 설정 상태 관리
   useEffect(() => {
-    setIsPublic(publicSettings === "public");
+    setIsPublic(publicSettings === "public" ? 1 : 0);
   }, [publicSettings]);
 
   // 게임 추천 목록 조회
@@ -77,16 +78,45 @@ const CasinoRecommendationManagement = () => {
     try {
       // API 호출
       const response = await axios.get("/casino-recommends");
+      console.log("카지노 추천 응답 구조:", response);
 
-      if (response.data && response.data.success && Array.isArray(response.data.data)) {
+      // 유틸리티 함수를 사용하여 데이터 배열 추출
+      const recommendationData = extractDataArray(response.data, true);
+
+      if (recommendationData && recommendationData.length > 0) {
+        console.log("추출된 추천 데이터:", recommendationData);
+
         // 서버 응답을 컴포넌트에서 사용하는 형식으로 변환
-        const transformedRecommendations = response.data.data.map((item: any) => {
-          // 각 게임의 제목 추출
-          const gameTitles =
-            item.games?.map((game: any) => game.casinoGame?.title || "제목 없음") || [];
+        const transformedRecommendations = recommendationData.map((item: any) => {
+          // 각 게임의 제목 추출 - 서로 다른 구조 처리
+          let gameTitles: string[] = [];
+          let gameIds: number[] = [];
 
-          // 각 게임의 ID 추출
-          const gameIds = item.games?.map((game: any) => game.casinoGameId) || [];
+          // 1. 기존 구조: item.games 배열이 있고 각 요소에 casinoGame 객체가 있는 경우
+          if (item.games && Array.isArray(item.games)) {
+            gameTitles = item.games.map((game: any) => {
+              if (game.casinoGame) {
+                return game.casinoGame.title || "제목 없음";
+              } else if (game.title) {
+                return game.title;
+              }
+              return "제목 없음";
+            });
+
+            gameIds = item.games.map((game: any) => {
+              return game.casinoGameId || game.id || 0;
+            });
+          }
+          // 2. item.gameList 배열이 있는 경우
+          else if (item.gameList && Array.isArray(item.gameList)) {
+            gameTitles = item.gameList.map((game: any) => game.title || "제목 없음");
+            gameIds = item.gameList.map((game: any) => game.id || 0);
+          }
+          // 3. item.gameIds와 item.gameTitles가 직접 있는 경우
+          else if (item.gameIds && Array.isArray(item.gameIds)) {
+            gameIds = item.gameIds;
+            gameTitles = item.gameTitles || item.gameIds.map(() => "제목 없음");
+          }
 
           return {
             id: item.id,
@@ -94,12 +124,13 @@ const CasinoRecommendationManagement = () => {
             isMainDisplay: item.isMainDisplay === 1 || item.isMainDisplay === true,
             games: gameTitles,
             gameIds: gameIds,
-            startDate: item.startDate,
-            endDate: item.endDate,
-            isPublic: item.isPublic === 1 || item.isPublic === true,
-            position: item.displayOrder || 0,
-            createdAt: item.createdAt,
-            updatedAt: item.updatedAt,
+            startDate: item.startDate || item.start_date || "",
+            endDate: item.endDate || item.end_date || "",
+            isPublic: item.isPublic === 1 || item.isPublic === true ? 1 : 0,
+            position: item.displayOrder || item.position || 0,
+            createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+            updatedAt:
+              item.updatedAt || item.updated_at || item.createdAt || new Date().toISOString(),
           };
         });
 
@@ -110,6 +141,7 @@ const CasinoRecommendationManagement = () => {
 
         setRecommendations(sortedRecommendations);
       } else {
+        console.log("적절한 추천 데이터를 찾지 못했습니다.");
         setRecommendations([]);
         setError("게임 추천 목록을 불러오는데 실패했습니다.");
       }
@@ -125,13 +157,27 @@ const CasinoRecommendationManagement = () => {
   // 가능한 게임 목록 가져오기
   const fetchAvailableGames = async () => {
     try {
-      // 올바른 API 경로로 수정
       const response = await axios.get("/casino");
+      console.log("사용 가능한 게임 응답 구조:", response);
 
-      if (response.data && response.data.success && Array.isArray(response.data.data)) {
-        setAvailableGames(response.data.data);
-        setFilteredGames(response.data.data);
+      // 유틸리티 함수를 사용하여 데이터 배열 추출
+      const gameData = extractDataArray(response.data, true);
+
+      if (gameData && gameData.length > 0) {
+        console.log("추출된 사용 가능한 게임 데이터:", gameData);
+
+        // 필드 매핑 및 처리
+        const processedGames = gameData.map((game: any) => ({
+          id: game.id,
+          title: game.title || "",
+          imageUrl: game.imageUrl || game.thumbnailUrl || "",
+          // 필요한 경우 다른 필드도 추가
+        }));
+
+        setAvailableGames(processedGames);
+        setFilteredGames(processedGames);
       } else {
+        console.log("적절한 게임 데이터를 찾지 못했습니다.");
         setAvailableGames([]);
         setFilteredGames([]);
         setError("게임 목록을 불러오는데 실패했습니다.");
@@ -177,7 +223,7 @@ const CasinoRecommendationManagement = () => {
     weekLater.setDate(weekLater.getDate() + 7);
     setEndDate(weekLater.toISOString().substring(0, 16));
 
-    setIsPublic(true);
+    setIsPublic(1);
     setPublicSettings("public");
     setIsEditing(false);
     setShowModal(true);
@@ -191,21 +237,21 @@ const CasinoRecommendationManagement = () => {
     setSelectedGames(recommendation.games || []);
     setSelectedGameIds(recommendation.gameIds || []);
 
-    // 날짜 형식 변환
+    // 날짜 처리
     if (recommendation.startDate) {
-      const startDate = new Date(recommendation.startDate);
-      setStartDate(startDate.toISOString().substring(0, 16));
+      const startDateTime = new Date(recommendation.startDate);
+      setStartDate(startDateTime.toISOString().substring(0, 16));
     }
 
     if (recommendation.endDate) {
-      const endDate = new Date(recommendation.endDate);
-      setEndDate(endDate.toISOString().substring(0, 16));
+      const endDateTime = new Date(recommendation.endDate);
+      setEndDate(endDateTime.toISOString().substring(0, 16));
     }
 
-    setIsPublic(recommendation.isPublic === true || recommendation.isPublic === 1);
-    setPublicSettings(
-      recommendation.isPublic === true || recommendation.isPublic === 1 ? "public" : "private"
-    );
+    // isPublic 처리 - 타입을 통일해 number 형태로 처리
+    setIsPublic(recommendation.isPublic);
+    setPublicSettings(recommendation.isPublic === 1 ? "public" : "private");
+
     setIsEditing(true);
     setShowModal(true);
   };

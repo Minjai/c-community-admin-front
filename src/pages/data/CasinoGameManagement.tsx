@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import axios from "@/api/axios";
 import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
@@ -9,6 +9,7 @@ import TextEditor from "@/components/forms/TextEditor";
 import FileUpload from "@/components/forms/FileUpload";
 import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
+import { extractDataArray } from "../../api/util";
 
 // 카지노 게임 타입 정의
 interface CasinoGame {
@@ -20,7 +21,7 @@ interface CasinoGame {
   returnRate: number;
   isDirectLinkEnabled: boolean;
   directLinkUrl: string;
-  isPublic: boolean;
+  isPublic: number;
   position: number;
   createdAt: string;
   updatedAt: string;
@@ -48,7 +49,7 @@ const CasinoGameManagement = () => {
   const [returnRate, setReturnRate] = useState<number>(95);
   const [isDirectLinkEnabled, setIsDirectLinkEnabled] = useState<boolean>(false);
   const [directLinkUrl, setDirectLinkUrl] = useState<string>("");
-  const [isPublic, setIsPublic] = useState<boolean>(true);
+  const [isPublic, setIsPublic] = useState<number>(1);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
 
@@ -59,22 +60,28 @@ const CasinoGameManagement = () => {
 
     try {
       const response = await axios.get("/casino");
+      console.log("카지노 게임 응답 구조:", response);
 
-      if (response.data && response.data.success && Array.isArray(response.data.data)) {
+      // 유틸리티 함수를 사용하여 데이터 배열 추출
+      const gameData = extractDataArray(response.data, true);
+
+      if (gameData && gameData.length > 0) {
+        console.log("추출된 게임 데이터:", gameData);
+
         // 서버 응답 데이터를 클라이언트 형식으로 변환
-        const transformedGames = response.data.data.map((game: any) => ({
+        const transformedGames = gameData.map((game: any) => ({
           id: game.id,
           title: game.title,
-          description: game.content,
-          thumbnailUrl: game.imageUrl,
+          description: game.content || game.description || "",
+          thumbnailUrl: game.imageUrl || game.thumbnailUrl || "",
           rating: Number(game.rating) || 0,
-          returnRate: Number(game.payoutRate) || 0,
+          returnRate: Number(game.payoutRate || game.returnRate) || 0,
           isDirectLinkEnabled: game.isShortcut === 1 || game.isShortcut === true,
-          directLinkUrl: game.shortcutUrl || "",
-          isPublic: game.isPublic === 1 || game.isPublic === true,
-          position: game.displayOrder,
-          createdAt: game.createdAt,
-          updatedAt: game.updatedAt,
+          directLinkUrl: game.shortcutUrl || game.directLinkUrl || "",
+          isPublic: game.isPublic === 1 || game.isPublic === true ? 1 : 0,
+          position: game.displayOrder || game.position || 0,
+          createdAt: game.createdAt || new Date().toISOString(),
+          updatedAt: game.updatedAt || game.createdAt || new Date().toISOString(),
         }));
 
         // position 기준으로 정렬
@@ -83,8 +90,9 @@ const CasinoGameManagement = () => {
         );
         setGames(sortedGames);
       } else {
+        console.log("적절한 게임 데이터 배열을 찾지 못했습니다.");
         setGames([]);
-        setError("게임 목록을 불러오는데 실패했습니다.");
+        setError("게임 목록을 불러오는데 실패했습니다. 응답 구조가 변경되었습니다.");
       }
     } catch (err) {
       console.error("Error fetching casino games:", err);
@@ -114,7 +122,7 @@ const CasinoGameManagement = () => {
     setReturnRate(95);
     setIsDirectLinkEnabled(false);
     setDirectLinkUrl("");
-    setIsPublic(true);
+    setIsPublic(1);
     setThumbnailFile(null);
     setThumbnailPreview(null);
     setIsEditing(false);
@@ -133,7 +141,7 @@ const CasinoGameManagement = () => {
     setReturnRate(game.returnRate || 95);
     setIsDirectLinkEnabled(game.isDirectLinkEnabled || false);
     setDirectLinkUrl(game.directLinkUrl || "");
-    setIsPublic(game.isPublic || false);
+    setIsPublic(game.isPublic === 1 ? 1 : 0);
     setThumbnailFile(null);
 
     // 이미지 URL 처리
@@ -247,7 +255,7 @@ const CasinoGameManagement = () => {
         formData.append("shortcutUrl", directLinkUrl.trim());
       }
 
-      formData.append("isPublic", isPublic ? "1" : "0");
+      formData.append("isPublic", isPublic.toString());
 
       if (!isEditing) {
         // 새 게임 생성
@@ -414,15 +422,13 @@ const CasinoGameManagement = () => {
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof CasinoGame,
-      cell: (value: boolean | number) => (
+      cell: (value: number) => (
         <span
           className={`px-2 py-1 rounded text-xs ${
-            value === true || value === 1
-              ? "bg-green-100 text-green-800"
-              : "bg-red-100 text-red-800"
+            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
           }`}
         >
-          {value === true || value === 1 ? "공개" : "비공개"}
+          {value === 1 ? "공개" : "비공개"}
         </span>
       ),
     },
@@ -569,31 +575,35 @@ const CasinoGameManagement = () => {
         )}
 
         {/* 공개 여부 */}
-        <div>
-          <label className="label">공개 여부</label>
-          <div className="flex items-center space-x-4 mt-1">
-            <label className="flex items-center">
+        <div className="mt-4">
+          <span className="text-sm font-medium text-gray-700">공개 여부</span>
+          <div className="mt-2 space-y-2">
+            <div className="flex items-center">
               <input
                 type="radio"
+                id="public"
                 name="isPublic"
-                checked={isPublic}
-                onChange={() => setIsPublic(true)}
-                className="mr-2"
-                disabled={saving}
+                checked={isPublic === 1}
+                onChange={() => setIsPublic(1)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
               />
-              <span>공개</span>
-            </label>
-            <label className="flex items-center">
+              <label htmlFor="public" className="ml-2 block text-sm text-gray-900">
+                공개
+              </label>
+            </div>
+            <div className="flex items-center">
               <input
                 type="radio"
+                id="private"
                 name="isPublic"
-                checked={!isPublic}
-                onChange={() => setIsPublic(false)}
-                className="mr-2"
-                disabled={saving}
+                checked={isPublic === 0}
+                onChange={() => setIsPublic(0)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
               />
-              <span>비공개</span>
-            </label>
+              <label htmlFor="private" className="ml-2 block text-sm text-gray-900">
+                비공개
+              </label>
+            </div>
           </div>
         </div>
       </div>

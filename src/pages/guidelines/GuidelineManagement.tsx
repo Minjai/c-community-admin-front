@@ -59,17 +59,144 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
     try {
       const response = await GuidelineApiService.getGuidelines(boardId);
+      console.log("가이드라인 응답 전체 구조:", response); // 전체 응답 구조 확인
 
+      // 응답 구조를 더 자세히 확인
+      if (response?.data) {
+        console.log("response.data 구조:", response.data);
+      }
+      if (response?.data?.data) {
+        console.log("response.data.data 구조:", response.data.data);
+        // 중요: 첫 번째 객체의 구조를 자세히 로그
+        if (Array.isArray(response.data.data) && response.data.data.length > 0) {
+          console.log("첫 번째 데이터 객체 구조:", response.data.data[0]);
+          console.log("모든 키:", Object.keys(response.data.data[0]));
+        }
+      }
+
+      // 페이지네이션 정보 확인
+      if (response?.data?.pagination) {
+        console.log("페이지네이션 정보:", response.data.pagination);
+      }
+
+      // 가이드라인 데이터 추출 시도
+      let dataArray = null;
+      let extractedData = null;
+
+      // 1. response.data가 배열인 경우
       if (response?.data && Array.isArray(response.data)) {
-        // displayOrder 또는 position 필드를 기준으로 정렬
-        const sortedGuidelines = [...response.data].sort(
-          (
-            a: GuidelineWithOrder,
-            b: GuidelineWithOrder // 타입 명시
-          ) => (a.position || a.displayOrder || 0) - (b.position || b.displayOrder || 0)
+        dataArray = response.data;
+        console.log("case 1: response.data는 배열입니다");
+      }
+      // 2. response.data.data가 배열인 경우
+      else if (response?.data?.data && Array.isArray(response.data.data)) {
+        dataArray = response.data.data;
+        console.log("case 2: response.data.data는 배열입니다");
+      }
+      // 3. response.data.data가 객체이고 내부에 배열 필드가 있는 경우
+      else if (response?.data?.data && typeof response.data.data === "object") {
+        console.log("case 3: response.data.data는 객체입니다");
+        // 가능한 배열 필드 이름들
+        const possibleArrayFields = ["guidelines", "posts", "items", "list", "results", "posts"];
+
+        for (const field of possibleArrayFields) {
+          if (Array.isArray(response.data.data[field])) {
+            dataArray = response.data.data[field];
+            console.log(`데이터 배열 필드 발견: ${field}`, dataArray);
+            break;
+          }
+        }
+
+        // 직접 객체 내용 확인
+        if (!dataArray) {
+          console.log("객체 내 모든 키 확인:", Object.keys(response.data.data));
+          // 첫 번째 배열 형태의 값을 찾아 사용
+          for (const key in response.data.data) {
+            if (Array.isArray(response.data.data[key])) {
+              dataArray = response.data.data[key];
+              console.log(`배열 형태의 데이터 발견(${key}):`, dataArray);
+              break;
+            }
+          }
+        }
+      }
+      // 4. response.success가 true이고 response.data 자체가 가이드라인 데이터인 경우
+      else if (response?.success === true && response?.data) {
+        console.log("case 4: response.success가 true이고 data가 있습니다");
+        // response.data가 가이드라인 객체 자체일 수 있음
+        extractedData = response.data;
+      }
+
+      // 페이지네이션이 있는 경우 별도 처리
+      if (response?.data?.pagination && response?.data?.posts) {
+        console.log("페이지네이션 구조 데이터 발견:", response.data.posts);
+        dataArray = response.data.posts;
+      }
+
+      // 데이터가 객체이고 posts 속성을 가진 경우
+      if (!dataArray && extractedData && extractedData.posts) {
+        console.log("posts 속성을 가진 객체 발견:", extractedData.posts);
+        dataArray = extractedData.posts;
+      }
+
+      // response.data에 items 배열이 있는 경우 (로그에서 확인된 실제 구조)
+      if (!dataArray && response?.data?.items && Array.isArray(response.data.items)) {
+        console.log("response.data.items 배열 발견:", response.data.items);
+        dataArray = response.data.items;
+      }
+
+      // 데이터가 객체이고 posts 속성을 가진 경우
+      if (!dataArray && extractedData && extractedData.posts) {
+        console.log("posts 속성을 가진 객체 발견:", extractedData.posts);
+        dataArray = extractedData.posts;
+      }
+
+      // extractedData에 items 배열이 있는 경우
+      if (
+        !dataArray &&
+        extractedData &&
+        extractedData.items &&
+        Array.isArray(extractedData.items)
+      ) {
+        console.log("extractedData.items 배열 발견:", extractedData.items);
+        dataArray = extractedData.items;
+      }
+
+      // 추출된 데이터 배열이 있으면 정렬하여 표시
+      if (dataArray && dataArray.length > 0) {
+        console.log("추출된 데이터 배열:", dataArray);
+
+        // 데이터 매핑 - 필드명이 다를 수 있으므로 확인
+        const mappedData = dataArray.map((item: any) => {
+          console.log("매핑 전 항목:", item);
+          // 필수 필드가 없는 경우 로그
+          if (!item.id || !item.title) {
+            console.warn("주요 필드가 없는 항목:", item);
+          }
+
+          return {
+            id: item.id,
+            title: item.title || "제목 없음",
+            content: item.content || "",
+            createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+            isPublic: item.isPublic !== undefined ? item.isPublic : item.is_public || 1,
+            imageUrl: item.imageUrl || item.image_url || "",
+            position: item.position || item.displayOrder || 0,
+            displayOrder: item.displayOrder || item.position || 0,
+          };
+        });
+
+        console.log("매핑된 데이터:", mappedData);
+
+        // 정렬
+        const sortedGuidelines = [...mappedData].sort(
+          (a: GuidelineWithOrder, b: GuidelineWithOrder) =>
+            (a.position || a.displayOrder || 0) - (b.position || b.displayOrder || 0)
         );
+
         setGuidelines(sortedGuidelines);
       } else {
+        console.log("적절한 데이터 배열을 찾지 못했습니다.");
         setGuidelines([]);
         setError(`${title} 가이드라인을 불러오는데 실패했습니다.`);
       }
@@ -115,7 +242,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       title: "",
       content: "",
       boardId: boardId,
-      isPublic: true,
+      isPublic: 1, // boolean true 대신 number 1 사용
       position: guidelines.length + 1, // 기본 순서
       imageUrl: "",
     });
@@ -127,8 +254,12 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
   // 모달 열기 (수정)
   const handleEditGuideline = (guideline: GuidelineWithOrder) => {
-    // GuidelineWithOrder 사용
-    setCurrentGuideline({ ...guideline });
+    // Boolean 타입인 isPublic을 Number 타입으로 변환
+    const convertedGuideline = {
+      ...guideline,
+      isPublic: guideline.isPublic === true || guideline.isPublic === 1 ? 1 : 0,
+    };
+    setCurrentGuideline(convertedGuideline);
     setImageFile(null);
     setShowModal(true);
     setIsEditing(true);
@@ -145,11 +276,15 @@ const GuidelineManagement = ({ boardId = 3 }) => {
         return;
       }
 
+      // isPublic 값을 확실히 number로 변환
+      const isPublicValue =
+        currentGuideline.isPublic === true || currentGuideline.isPublic === 1 ? 1 : 0;
+
       const dataToSend = {
         title: currentGuideline.title,
         content: currentGuideline.content,
         boardId: boardId,
-        isPublic: currentGuideline.isPublic,
+        isPublic: isPublicValue, // 변환된 값 사용
         position: currentGuideline.position,
         image: imageFile || undefined,
         // tags: currentGuideline.tags // 태그 필드가 있다면 추가

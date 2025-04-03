@@ -72,7 +72,7 @@ export interface Banner {
   mUrl: string;
   startDate: string;
   endDate: string;
-  isPublic: boolean;
+  isPublic: number;
   position: number;
   bannerType: "main" | "company" | "bottom" | "mini";
   companyDetailPath?: string;
@@ -90,7 +90,7 @@ export interface CasinoCompany {
   companyName: string; // 업체명
   description: string; // 업체소개
   imageUrl: string; // 이미지 URL
-  isPublic: boolean; // 공개여부
+  isPublic: number; // boolean에서 number로 변경
   displayOrder: number; // 순서 (서버에서는 displayOrder)
   linkUrl1?: string; // 링크 URL 1
   linkUrl2?: string; // 링크 URL 2

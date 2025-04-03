@@ -14,7 +14,7 @@ const NoticeDetail = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isPublic, setIsPublic] = useState(true);
+  const [isPublic, setIsPublic] = useState<number>(1);
   const [tags, setTags] = useState("");
   const isNewPost = id === "new";
   const isEditMode = !isNewPost;
@@ -35,10 +35,6 @@ const NoticeDetail = () => {
     setSaving(true);
     setError(null);
 
-    // 디버깅: 서버로 전송할 값 확인
-    console.log("현재 isPublic 상태(boolean):", isPublic);
-    console.log("서버로 전송될 isPublic 값(숫자):", isPublic ? 1 : 0);
-
     try {
       if (isEditMode) {
         // 기존 공지사항 수정
@@ -46,11 +42,9 @@ const NoticeDetail = () => {
           title,
           content,
           boardId: 1, // 공지사항
-          isPublic: isPublic ? 1 : 0, // boolean 값을 1 또는 0으로 변환
+          isPublic: isPublic.toString(),
           tags: tags.trim() ? tags : undefined,
         };
-
-        console.log("서버로 전송되는 데이터:", requestData);
 
         const response = await axios.put<Post>(`/post/${id}`, requestData);
 
@@ -66,11 +60,9 @@ const NoticeDetail = () => {
           title,
           content,
           boardId: 1, // 공지사항
-          isPublic: isPublic ? 1 : 0, // boolean 값을 1 또는 0으로 변환
+          isPublic: isPublic.toString(),
           tags: tags.trim() ? tags : undefined,
         };
-
-        console.log("서버로 전송되는 데이터:", requestData);
 
         const response = await axios.post<Post>("/post", requestData);
 
@@ -109,30 +101,17 @@ const NoticeDetail = () => {
 
     setLoading(true);
     try {
-      // API 응답 처리를 위한 로그 추가
-      console.log(`공지사항 데이터 요청 중: /post/${id}`);
-
       const response = await axios.get(`/post/${id}`);
 
-      console.log("공지사항 API 응답:", response.data);
-
-      // 게시물 데이터 처리: 다양한 응답 형식 지원
       let postData = null;
       if (response.data) {
-        // 직접 데이터 객체인 경우
         if (response.data.id && response.data.title) {
           postData = response.data;
-        }
-        // success/data 형식인 경우
-        else if (response.data.success && response.data.data) {
+        } else if (response.data.success && response.data.data) {
           postData = response.data.data;
-        }
-        // result 필드에 데이터가 있는 경우
-        else if (response.data.result) {
+        } else if (response.data.result) {
           postData = response.data.result;
-        }
-        // post 필드에 데이터가 있는 경우
-        else if (response.data.post) {
+        } else if (response.data.post) {
           postData = response.data.post;
         }
       }
@@ -140,22 +119,13 @@ const NoticeDetail = () => {
       if (postData) {
         setPost(postData);
         setTitle(postData.title || "");
-
-        // 안전하게 content 설정
         setTimeout(() => {
           setContent(postData.content || "");
         }, 0);
-
-        // 서버에서 받은 isPublic 값 디버깅
-        console.log("서버에서 받은 원본 isPublic 값:", postData.isPublic);
-        console.log("typeof isPublic:", typeof postData.isPublic);
-
-        // isPublic 값을 boolean으로 변환 (1 또는 true는 true로, 0 또는 false는 false로)
-        setIsPublic(postData.isPublic === 1 || postData.isPublic === true);
+        setIsPublic(postData.isPublic === 1 || postData.isPublic === true ? 1 : 0);
         setTags(postData.tags || "");
       } else {
         setError("공지사항을 찾을 수 없습니다.");
-        console.error("공지사항 조회 실패: 데이터 없음");
       }
     } catch (error) {
       console.error("공지사항 조회 오류:", error);
@@ -169,7 +139,6 @@ const NoticeDetail = () => {
     getPostDetail();
   }, [id]);
 
-  // 에디터 컨테이너 참조가 변경되면 스크롤을 최상단으로 이동
   useEffect(() => {
     if (editorContainerRef.current) {
       editorContainerRef.current.scrollIntoView({ behavior: "auto", block: "nearest" });
@@ -239,21 +208,20 @@ const NoticeDetail = () => {
           <p className="mt-1 text-xs text-gray-500">예시: 중요,공지,업데이트</p>
         </div>
 
-        <div>
-          <label className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={isPublic}
-              onChange={(e) => {
-                const newValue = e.target.checked;
-                console.log("체크박스 변경:", newValue);
-                setIsPublic(newValue);
-              }}
-              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-            />
-            <span className="text-sm font-medium text-gray-700">공개 여부</span>
+        <div className="flex items-center mt-4">
+          <input
+            type="checkbox"
+            id="isPublic"
+            checked={isPublic === 1}
+            onChange={(e) => {
+              const newValue = e.target.checked ? 1 : 0;
+              setIsPublic(newValue);
+            }}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label htmlFor="isPublic" className="ml-2 block text-sm text-gray-900">
+            공개 상태
           </label>
-          <p className="mt-1 text-xs text-gray-500">체크하면 사용자에게 공지사항이 표시됩니다.</p>
         </div>
 
         <div className="flex justify-end space-x-3">

@@ -26,6 +26,7 @@ import SportsManagement from "./pages/data/SportsManagement";
 import UserManagement from "./pages/users/UserManagement";
 import UserRankManagement from "./pages/users/UserRankManagement";
 import AdminManagement from "./pages/users/AdminManagement";
+import NewsManagementListPage from "./pages/news/NewsManagementListPage";
 
 // 추후 구현할 페이지들을 위한 임시 컴포넌트
 const NotImplemented = ({ pageName }: { pageName: string }) => (
@@ -86,6 +87,16 @@ function App() {
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
                     <CasinoCompanyPage />
+                  </RoleBasedRoute>
+                }
+              />
+
+              {/* 뉴스 관리 */}
+              <Route
+                path="news/list"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <NewsManagementListPage />
                   </RoleBasedRoute>
                 }
               />

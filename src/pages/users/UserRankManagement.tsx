@@ -8,6 +8,7 @@ import Input from "@/components/forms/Input";
 import FileUpload from "@/components/forms/FileUpload";
 import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
+import { extractDataArray } from "../../api/util";
 
 // 회원 등급 타입 정의
 interface UserRank {
@@ -42,20 +43,33 @@ const UserRankManagement: React.FC = () => {
 
     try {
       const response = await axios.get("/admin/ranks");
+      console.log("회원 등급 응답 구조:", response);
 
-      if (response.data && Array.isArray(response.data.ranks)) {
+      // 유틸리티 함수를 사용하여 데이터 배열 추출
+      const rankData = extractDataArray(response.data, true);
+
+      if (rankData && rankData.length > 0) {
+        console.log("추출된 등급 데이터:", rankData);
+
+        // 필드 매핑 및 처리
+        const processedRanks = rankData.map((rank: any) => ({
+          id: rank.id,
+          rankName: rank.rankName || rank.name || "",
+          image: rank.image || rank.imageUrl || "",
+          score: rank.score || 0,
+          position: rank.position || rank.displayOrder || 0,
+          createdAt: rank.createdAt || new Date().toISOString(),
+          updatedAt: rank.updatedAt || rank.createdAt || "",
+        }));
+
         // 등급을 position 기준으로 정렬
-        const sortedRanks = [...response.data.ranks].sort(
+        const sortedRanks = [...processedRanks].sort(
           (a, b) => (a.position || 0) - (b.position || 0)
         );
-        setRanks(sortedRanks);
-      } else if (response.data && Array.isArray(response.data)) {
-        // response.data가 배열인 경우
-        const sortedRanks = [...response.data].sort(
-          (a, b) => (a.position || 0) - (b.position || 0)
-        );
+
         setRanks(sortedRanks);
       } else {
+        console.log("적절한 등급 데이터를 찾지 못했습니다.");
         setRanks([]);
         setError("회원 등급을 불러오는데 실패했습니다.");
       }

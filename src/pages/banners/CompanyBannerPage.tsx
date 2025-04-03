@@ -9,6 +9,7 @@ import Input from "../../components/forms/Input";
 import DatePicker from "../../components/forms/DatePicker";
 import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
+import { addDays } from "date-fns";
 
 const CompanyBannerPage: React.FC = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -23,6 +24,17 @@ const CompanyBannerPage: React.FC = () => {
   } | null>(null);
   const [pcImageFile, setPcImageFile] = useState<File | null>(null);
   const [mobileImageFile, setMobileImageFile] = useState<File | null>(null);
+
+  // 배너 초기 상태 - isPublic을 1로 설정
+  const initialBannerState = {
+    title: "",
+    bannerType: "COMPANY",
+    url: "",
+    startDate: new Date().toISOString().substring(0, 10),
+    endDate: addDays(new Date(), 30).toISOString().substring(0, 10),
+    isPublic: 1,
+    position: 0,
+  };
 
   // 날짜 포맷 변환 함수
   const formatDate = (dateStr: string) => {
@@ -77,9 +89,9 @@ const CompanyBannerPage: React.FC = () => {
       title: "",
       pUrl: "",
       mUrl: "",
-      startDate: "",
-      endDate: "",
-      isPublic: true,
+      startDate: new Date().toISOString().substring(0, 10),
+      endDate: addDays(new Date(), 30).toISOString().substring(0, 10),
+      isPublic: 1,
       position: banners.length + 1, // 현재 배너 개수 + 1
       bannerType: "company",
       linkUrl: "",
@@ -93,41 +105,9 @@ const CompanyBannerPage: React.FC = () => {
 
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
-    // ISO 날짜 문자열을 datetime-local 형식으로 변환
-    const formattedStartDate = banner.startDate
-      ? (() => {
-          // UTC 시간을 로컬 시간으로 변환
-          const date = new Date(banner.startDate);
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, "0");
-          const day = String(date.getDate()).padStart(2, "0");
-          const hours = String(date.getHours()).padStart(2, "0");
-          const minutes = String(date.getMinutes()).padStart(2, "0");
-          const formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
-          console.log("원본 시작일(업체):", banner.startDate, "변환된 시작일:", formattedDate);
-          return formattedDate;
-        })()
-      : "";
-
-    const formattedEndDate = banner.endDate
-      ? (() => {
-          // UTC 시간을 로컬 시간으로 변환
-          const date = new Date(banner.endDate);
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, "0");
-          const day = String(date.getDate()).padStart(2, "0");
-          const hours = String(date.getHours()).padStart(2, "0");
-          const minutes = String(date.getMinutes()).padStart(2, "0");
-          const formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
-          console.log("원본 종료일(업체):", banner.endDate, "변환된 종료일:", formattedDate);
-          return formattedDate;
-        })()
-      : "";
-
     setCurrentBanner({
       ...banner,
-      startDate: formattedStartDate,
-      endDate: formattedEndDate,
+      isPublic: banner.isPublic === 1 ? 1 : 0,
     });
     setPcImageFile(null);
     setMobileImageFile(null);
@@ -445,33 +425,15 @@ const CompanyBannerPage: React.FC = () => {
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof Banner,
-      cell: (value: boolean, row: Banner) => {
-        // 공개 여부가 false인 경우 단순히 "비공개"로 표시
-        if (!value) {
-          return (
-            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">비공개</span>
-          );
-        }
-
-        // 현재 시간과 시작일/종료일 비교
-        const now = new Date();
-        const startDate = row.startDate ? new Date(row.startDate) : null;
-        const endDate = row.endDate ? new Date(row.endDate) : null;
-
-        // 공개 상태 결정
-        let status = "공개";
-        let colorClass = "bg-green-100 text-green-800";
-
-        if (startDate && now < startDate) {
-          status = "공개 전";
-          colorClass = "bg-gray-100 text-gray-800";
-        } else if (endDate && now > endDate) {
-          status = "공개 종료";
-          colorClass = "bg-gray-100 text-gray-800";
-        }
-
-        return <span className={`px-2 py-1 rounded-full text-xs ${colorClass}`}>{status}</span>;
-      },
+      cell: (value: number) => (
+        <span
+          className={`px-2 py-1 rounded text-xs ${
+            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+          }`}
+        >
+          {value === 1 ? "공개" : "비공개"}
+        </span>
+      ),
     },
     {
       header: "관리",
@@ -630,12 +592,17 @@ const CompanyBannerPage: React.FC = () => {
               />
             </div>
 
-            <div className="flex items-center">
+            <div className="flex items-center mt-4">
               <input
                 type="checkbox"
                 id="isPublic"
-                checked={currentBanner.isPublic}
-                onChange={(e) => setCurrentBanner({ ...currentBanner, isPublic: e.target.checked })}
+                checked={currentBanner.isPublic === 1}
+                onChange={(e) =>
+                  setCurrentBanner({
+                    ...currentBanner,
+                    isPublic: e.target.checked ? 1 : 0,
+                  })
+                }
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
               <label htmlFor="isPublic" className="ml-2 block text-sm text-gray-900">
