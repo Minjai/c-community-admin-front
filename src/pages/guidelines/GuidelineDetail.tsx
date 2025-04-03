@@ -345,7 +345,39 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
           <div className="min-h-[400px] border border-gray-300 rounded-md">
-            <TextEditor content={content} setContent={setContent} />
+            <TextEditor
+              content={content}
+              setContent={setContent}
+              showImageAndLink={true}
+              customFormats={[
+                "header",
+                "bold",
+                "italic",
+                "underline",
+                "strike",
+                "blockquote",
+                "list",
+                "bullet",
+                "indent",
+                "link",
+                "image",
+                "align",
+                "color",
+                "background",
+                "font",
+                "size",
+              ]}
+              customModules={{
+                toolbar: [
+                  [{ header: [1, 2, 3, false] }],
+                  ["bold", "italic", "underline", "strike"],
+                  [{ list: "ordered" }, { list: "bullet" }],
+                  [{ align: [] }],
+                  ["link", "image"],
+                  ["clean"],
+                ],
+              }}
+            />
           </div>
         </div>
 

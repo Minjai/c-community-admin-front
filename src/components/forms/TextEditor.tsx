@@ -6,6 +6,8 @@ interface TextEditorProps {
   content: string;
   setContent: (content: string) => void;
   showImageAndLink?: boolean;
+  customModules?: any;
+  customFormats?: string[];
 }
 
 const MAX_IMAGE_SIZE_MB = 1; // 1MB 이미지 크기 제한
@@ -14,9 +16,28 @@ const TextEditor: React.FC<TextEditorProps> = ({
   content,
   setContent,
   showImageAndLink = true,
+  customModules,
+  customFormats,
 }) => {
   const quillRef = useRef<ReactQuill>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+
+  // HTML 내용이 변경될 때 Delta로 변환하여 에디터에 설정
+  useEffect(() => {
+    if (quillRef.current && content) {
+      const editor = quillRef.current.getEditor();
+      const delta = editor.clipboard.convert(content);
+      editor.setContents(delta, "silent");
+    }
+  }, [content]);
+
+  // 에디터 내용이 변경될 때 HTML로 변환하여 상위 컴포넌트에 전달
+  const handleChange = (content: string, delta: any, source: string, editor: any) => {
+    if (source === "user") {
+      const html = editor.root.innerHTML;
+      setContent(html);
+    }
+  };
 
   // 에디터에 이미지 삽입
   const insertToEditor = useCallback((url: string) => {
@@ -207,7 +228,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
   }, [insertBase64Image]);
 
   // 기본 툴바 옵션
-  const modules = {
+  const defaultModules = {
     toolbar: {
       container: [
         [{ header: [1, 2, false] }],
@@ -221,6 +242,9 @@ const TextEditor: React.FC<TextEditorProps> = ({
       },
     },
   };
+
+  // 커스텀 모듈이 제공된 경우 이를 사용, 그렇지 않으면 기본 모듈 사용
+  const modules = customModules || defaultModules;
 
   const formats = [
     "header",
@@ -237,15 +261,54 @@ const TextEditor: React.FC<TextEditorProps> = ({
     "image",
   ];
 
+  // 커스텀 formats가 제공된 경우 이를 사용, 그렇지 않으면 기본 형식 사용
+  const currentFormats = customFormats || formats;
+
   return (
     <div ref={editorRef} className="quill-editor-container">
       <ReactQuill
         theme="snow"
         ref={quillRef}
         value={content}
-        onChange={setContent}
-        modules={modules}
-        formats={formats}
+        onChange={handleChange}
+        modules={{
+          toolbar: showImageAndLink
+            ? [
+                [{ header: [1, 2, 3, false] }],
+                ["bold", "italic", "underline", "strike"],
+                [{ list: "ordered" }, { list: "bullet" }],
+                [{ align: [] }],
+                ["link", "image"],
+                ["clean"],
+              ]
+            : [
+                [{ header: [1, 2, 3, false] }],
+                ["bold", "italic", "underline", "strike"],
+                [{ list: "ordered" }, { list: "bullet" }],
+                [{ align: [] }],
+                ["clean"],
+              ],
+          ...modules,
+        }}
+        formats={[
+          "header",
+          "bold",
+          "italic",
+          "underline",
+          "strike",
+          "blockquote",
+          "list",
+          "bullet",
+          "indent",
+          "link",
+          "image",
+          "align",
+          "color",
+          "background",
+          "font",
+          "size",
+          ...currentFormats,
+        ]}
         placeholder="내용을 입력하세요..."
       />
     </div>
