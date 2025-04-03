@@ -253,16 +253,16 @@ export class GuidelineApiService {
       console.log("가이드라인 위치 변경 요청 매개변수:", { id, position });
       console.log("id 타입:", typeof id, "position 타입:", typeof position);
 
-      // 서버에 전송할 데이터
+      // 서버에 전송할 데이터 - 서버 요구사항에 맞게 수정
       const data = {
-        id: parseInt(String(id)), // 확실하게 숫자로 변환
-        position: parseInt(String(position)), // 확실하게 숫자로 변환
-        guidelineId: parseInt(String(id)), // 서버에서 다른 이름으로 매개변수를 기대할 수 있음
+        id: Number(id), // 명시적으로 숫자로 변환
+        position: Number(position), // 명시적으로 숫자로 변환
       };
 
       console.log("서버로 전송되는 데이터:", data);
 
-      const response = await axios.put("/guidelines/position", data);
+      // 기존 /guidelines/position 엔드포인트가 아닌 일반 가이드라인 업데이트 엔드포인트 사용
+      const response = await axios.put(`/guidelines/${id}`, data);
 
       return response.data;
     } catch (error) {
