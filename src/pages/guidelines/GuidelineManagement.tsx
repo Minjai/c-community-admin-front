@@ -188,12 +188,11 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
         console.log("매핑된 데이터:", mappedData);
 
-        // 정렬
+        // position 값이 높은 순서대로 내림차순 정렬
         const sortedGuidelines = [...mappedData].sort(
           (a: GuidelineWithOrder, b: GuidelineWithOrder) =>
-            (a.position || a.displayOrder || 0) - (b.position || b.displayOrder || 0)
+            (b.position || b.displayOrder || 0) - (a.position || a.displayOrder || 0)
         );
-
         setGuidelines(sortedGuidelines);
       } else {
         console.log("적절한 데이터 배열을 찾지 못했습니다.");
@@ -368,15 +367,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
   // DataTable 컬럼 정의
   const columns = [
-    {
-      header: "순서",
-      accessor: "position" as keyof GuidelineWithOrder, // GuidelineWithOrder 사용
-      cell: (value: any, row: GuidelineWithOrder) => (
-        <div className="text-center">
-          <span className="font-medium">{row.position ?? row.displayOrder ?? "-"}</span>
-        </div>
-      ),
-    },
+    { header: "제목", accessor: "title" as keyof GuidelineWithOrder },
     {
       header: "썸네일",
       accessor: "imageUrl" as keyof GuidelineWithOrder,
@@ -390,7 +381,6 @@ const GuidelineManagement = ({ boardId = 3 }) => {
         </div>
       ),
     },
-    { header: "제목", accessor: "title" as keyof GuidelineWithOrder },
     {
       header: "등록일자",
       accessor: "createdAt" as keyof GuidelineWithOrder,

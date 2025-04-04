@@ -20,6 +20,7 @@ const GuidelineDetail = ({ boardId = 3 }) => {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [positionCount, setPositionCount] = useState(0);
+  const [maxPosition, setMaxPosition] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isNewPost = id === "new";
   const isEditMode = !isNewPost;
@@ -38,13 +39,32 @@ const GuidelineDetail = ({ boardId = 3 }) => {
     }
   };
 
-  // 현재 게시판의 게시물 개수 가져오기
+  // 현재 게시판의 게시물 개수와 최대 position 값 가져오기
   const getGuidelineCount = async () => {
     try {
-      const response = await GuidelineApiService.getGuidelines(boardId, 1, 1);
-      if (response && response.count !== undefined) {
-        setPositionCount(response.count);
-        console.log(`현재 가이드라인 카테고리(boardId: ${boardId})의 게시물 개수:`, response.count);
+      // 게시물 목록을 모두 가져와서 최대 position 값을 찾음
+      const response = await GuidelineApiService.getGuidelines(boardId, 1, 100);
+
+      if (response && response.data) {
+        // 게시물 개수 설정
+        const count = response.data.length || 0;
+        setPositionCount(count);
+
+        // 최대 position 값 찾기
+        let maxPos = 0;
+        if (Array.isArray(response.data) && response.data.length > 0) {
+          response.data.forEach((item: any) => {
+            const itemPosition = item.position || item.displayOrder || 0;
+            if (itemPosition > maxPos) {
+              maxPos = itemPosition;
+            }
+          });
+        }
+
+        setMaxPosition(maxPos);
+        console.log(
+          `현재 카테고리(boardId: ${boardId})의 게시물 개수: ${count}, 최대 position: ${maxPos}`
+        );
       }
     } catch (error) {
       console.error("가이드라인 개수 조회 오류:", error);
@@ -70,6 +90,13 @@ const GuidelineDetail = ({ boardId = 3 }) => {
     setTags(tags.filter((tag) => tag !== tagToRemove));
   };
 
+  // 마운트 시 가이드라인 카운트 가져오기
+  useEffect(() => {
+    if (isNewPost) {
+      getGuidelineCount();
+    }
+  }, [boardId]);
+
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -92,12 +119,31 @@ const GuidelineDetail = ({ boardId = 3 }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!title.trim()) {
+    // 디버깅을 위한 로그 추가
+    console.log(
+      "제출 시 제목:",
+      title,
+      "길이:",
+      title.length,
+      "trimmed 길이:",
+      title.trim().length
+    );
+    console.log("제출 시 내용:", content);
+    console.log("제출 시 내용 길이:", content ? content.length : 0);
+    console.log("제출 시 내용 HTML:", content);
+
+    // 빈 HTML인지 확인 (ReactQuill은 빈 내용일 때도 <p><br></p>와 같은 HTML을 생성함)
+    const isContentEmpty = !content || content === "<p><br></p>" || content.trim() === "";
+
+    const trimmedTitle = title.trim();
+    const trimmedContent = isContentEmpty ? "" : content;
+
+    if (!trimmedTitle) {
       setError("제목을 입력해주세요.");
       return;
     }
 
-    if (!content.trim()) {
+    if (isContentEmpty) {
       setError("내용을 입력해주세요.");
       return;
     }
@@ -114,15 +160,26 @@ const GuidelineDetail = ({ boardId = 3 }) => {
     try {
       if (isEditMode) {
         // 기존 가이드라인 수정
-        const response = await GuidelineApiService.updateGuideline(parseInt(id as string), {
-          title,
-          content,
+        const requestData = {
+          title: trimmedTitle,
+          content: trimmedContent,
           boardId: boardId,
           image: imageFile || undefined,
           tags: tags.length > 0 ? JSON.stringify(tags) : undefined,
           isPublic: getPublicValue(), // 1 또는 0으로 전송
           position: post?.position || 0,
-        });
+        };
+
+        // 요청 데이터 로깅
+        console.log("가이드라인 수정 요청 데이터:", requestData);
+
+        const response = await GuidelineApiService.updateGuideline(
+          parseInt(id as string),
+          requestData
+        );
+
+        // 응답 로깅
+        console.log("가이드라인 수정 응답:", response);
 
         alert("가이드라인이 수정되었습니다.");
         navigate(getNavigationPath());
@@ -134,28 +191,34 @@ const GuidelineDetail = ({ boardId = 3 }) => {
           return;
         }
 
-        const response = await GuidelineApiService.createGuideline({
-          title,
-          content,
+        const requestData = {
+          title: trimmedTitle,
+          content: trimmedContent,
           boardId: boardId,
           image: imageFile,
           tags: tags.length > 0 ? JSON.stringify(tags) : undefined,
           isPublic: getPublicValue(), // 1 또는 0으로 전송
-          position: positionCount + 1, // 현재 게시물 개수 + 1
-        });
+          position: maxPosition + 1, // 최대 position 값 + 1
+        };
+
+        // 요청 데이터 로깅
+        console.log("가이드라인 생성 요청 데이터:", requestData);
+
+        const response = await GuidelineApiService.createGuideline(requestData);
+
+        // 응답 로깅
+        console.log("가이드라인 생성 응답:", response);
 
         alert("가이드라인이 작성되었습니다.");
         navigate(getNavigationPath());
       }
     } catch (error: any) {
       console.error("가이드라인 저장 오류:", error);
+      console.error("에러 응답 데이터:", error.response?.data);
 
       // 인증 오류 처리
       if (error.response?.status === 401 || error.response?.status === 403) {
         setError("권한이 없습니다. 로그인이 필요합니다.");
-        setTimeout(() => {
-          navigate("/login");
-        }, 1500);
       } else {
         setError(
           "가이드라인을 저장하는 중 오류가 발생했습니다: " +
@@ -169,6 +232,8 @@ const GuidelineDetail = ({ boardId = 3 }) => {
 
   const getPostDetail = async () => {
     if (isNewPost) {
+      // 새 글 작성인 경우, 가이드라인 카운트 조회
+      await getGuidelineCount();
       setLoading(false);
       return;
     }
@@ -349,6 +414,7 @@ const GuidelineDetail = ({ boardId = 3 }) => {
               content={content}
               setContent={setContent}
               showImageAndLink={true}
+              height="500px"
               customFormats={[
                 "header",
                 "bold",

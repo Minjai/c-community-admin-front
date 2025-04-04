@@ -16,15 +16,14 @@ export class GuidelineApiService {
    * @param pageSize 페이지 크기
    * @returns 가이드라인 목록 응답
    */
-  static async getGuidelines(boardId: number, page = 1, pageSize = 10) {
+  static async getGuidelines(boardId: number, page = 1, pageSize = 100) {
     try {
       console.log("가이드라인 목록 API 요청:", { boardId, page, pageSize });
 
-      const response = await axios.get("/guidelines", {
+      // 모든 가이드라인을 한 번에 가져오기 위해 /guidelines/all 엔드포인트 사용
+      const response = await axios.get("/guidelines/all", {
         params: {
           boardId,
-          page,
-          pageSize,
         },
       });
 

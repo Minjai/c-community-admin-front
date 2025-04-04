@@ -26,12 +26,18 @@ const PostDetail = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!title.trim()) {
+    // 빈 HTML인지 확인 (ReactQuill은 빈 내용일 때도 <p><br></p>와 같은 HTML을 생성함)
+    const isContentEmpty = !content || content === "<p><br></p>" || content.trim() === "";
+
+    const trimmedTitle = title.trim();
+    const trimmedContent = isContentEmpty ? "" : content;
+
+    if (!trimmedTitle) {
       setError("제목을 입력해주세요.");
       return;
     }
 
-    if (!content.trim()) {
+    if (isContentEmpty) {
       setError("내용을 입력해주세요.");
       return;
     }
@@ -42,13 +48,15 @@ const PostDetail = () => {
     try {
       if (isEditMode) {
         // 기존 게시물 수정
-        const response = await axios.put<Post>(`/post/${id}`, {
-          title,
-          content,
+        const requestData = {
+          title: trimmedTitle,
+          content: trimmedContent,
           tags: tags || undefined,
           boardId: post?.boardId || 2, // 기본값 설정 (자유게시판)
           isPopular: isPopular ? 1 : 0, // 인기 게시물 여부 (1 또는 0)
-        });
+        };
+
+        const response = await axios.put<Post>(`/post/${id}`, requestData);
 
         if (response.status === 200) {
           alert("게시물이 수정되었습니다.");
@@ -58,13 +66,15 @@ const PostDetail = () => {
         }
       } else {
         // 새 게시물 작성
-        const response = await axios.post<Post>("/post", {
-          title,
-          content,
+        const requestData = {
+          title: trimmedTitle,
+          content: trimmedContent,
           tags: tags || undefined,
           boardId: 2, // 기본 자유게시판으로 설정
           isPopular: isPopular ? 1 : 0, // 인기 게시물 여부 (1 또는 0)
-        });
+        };
+
+        const response = await axios.post<Post>("/post", requestData);
 
         if (response.status === 201 || response.status === 200) {
           alert("게시물이 작성되었습니다.");
@@ -74,14 +84,9 @@ const PostDetail = () => {
         }
       }
     } catch (error: any) {
-      console.error("게시물 저장 오류:", error);
-
       // 인증 오류 처리
       if (error.response?.status === 401 || error.response?.status === 403) {
         setError("권한이 없습니다. 로그인이 필요합니다.");
-        setTimeout(() => {
-          navigate("/login");
-        }, 1500);
       } else {
         setError(
           "게시물을 저장하는 중 오류가 발생했습니다: " +
@@ -101,17 +106,10 @@ const PostDetail = () => {
 
     setLoading(true);
     try {
-      // API 응답 처리를 위한 로그 추가
-      console.log(`게시물 데이터 요청 중: /post/${id}`);
-      console.log(`댓글 데이터 요청 중: /comment/${id}`);
-
       const [postResponse, commentsResponse] = await Promise.all([
         axios.get(`/post/${id}`),
         axios.get(`/comment/${id}`),
       ]);
-
-      console.log("게시물 API 응답:", postResponse.data);
-      console.log("댓글 API 응답:", commentsResponse.data);
 
       // 게시물 데이터 처리: 다양한 응답 형식 지원
       let postData = null;
@@ -152,7 +150,6 @@ const PostDetail = () => {
         }, 0);
       } else {
         setError("게시물을 찾을 수 없습니다.");
-        console.error("게시물 조회 실패: 데이터 없음");
       }
 
       // 댓글 데이터 처리: 다양한 응답 형식 지원
@@ -179,7 +176,6 @@ const PostDetail = () => {
           for (const key in commentsResponse.data) {
             if (Array.isArray(commentsResponse.data[key])) {
               commentsData = commentsResponse.data[key];
-              console.log(`댓글 데이터를 '${key}' 필드에서 찾음:`, commentsData);
               break;
             }
           }
@@ -188,14 +184,6 @@ const PostDetail = () => {
 
       // 댓글 데이터 유효성 검사 및 처리
       commentsData = commentsData.map((comment: any) => {
-        // 필수 필드 확인
-        if (!comment.id) {
-          console.warn("경고: 댓글에 ID가 없습니다", comment);
-        }
-        if (!comment.content) {
-          console.warn("경고: 댓글에 내용이 없습니다", comment);
-        }
-
         return {
           id: comment.id,
           content: comment.content || "",
@@ -209,7 +197,6 @@ const PostDetail = () => {
 
       setComments(commentsData);
     } catch (error) {
-      console.error("게시물/댓글 조회 오류:", error);
       setError("게시물을 불러오는 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
@@ -223,9 +210,7 @@ const PostDetail = () => {
     }
 
     try {
-      console.log(`댓글 삭제 요청: /comment/${commentId}`);
       const response = await axios.delete(`/comment/${commentId}`);
-      console.log("댓글 삭제 응답:", response.data);
 
       if (response.status === 200 || response.status === 204) {
         alert("댓글이 삭제되었습니다.");
@@ -234,7 +219,6 @@ const PostDetail = () => {
         alert("댓글 삭제에 실패했습니다.");
       }
     } catch (error: any) {
-      console.error("댓글 삭제 오류:", error);
       if (error.response?.status === 401 || error.response?.status === 403) {
         alert("권한이 없습니다. 로그인이 필요합니다.");
         navigate("/login");
@@ -257,13 +241,10 @@ const PostDetail = () => {
     }
 
     try {
-      console.log(`댓글 추가 요청: /comment/${id}`);
       const response = await axios.post(`/comment`, {
         content: newComment,
         postId: Number(id),
       });
-
-      console.log("댓글 추가 응답:", response.data);
 
       if (response.status === 201 || response.status === 200) {
         alert("댓글이 추가되었습니다.");
@@ -273,7 +254,6 @@ const PostDetail = () => {
         alert("댓글 추가에 실패했습니다.");
       }
     } catch (error: any) {
-      console.error("댓글 추가 오류:", error);
       alert(
         "댓글을 추가하는 중 오류가 발생했습니다: " +
           (error.response?.data?.error || "알 수 없는 오류")
@@ -301,12 +281,9 @@ const PostDetail = () => {
     }
 
     try {
-      console.log(`댓글 수정 요청: /comment/${commentId}`);
       const response = await axios.put(`/comment/${commentId}`, {
         content: editCommentContent,
       });
-
-      console.log("댓글 수정 응답:", response.data);
 
       if (response.status === 200) {
         alert("댓글이 수정되었습니다.");
@@ -317,7 +294,6 @@ const PostDetail = () => {
         alert("댓글 수정에 실패했습니다.");
       }
     } catch (error: any) {
-      console.error("댓글 수정 오류:", error);
       alert(
         "댓글을 수정하는 중 오류가 발생했습니다: " +
           (error.response?.data?.error || "알 수 없는 오류")

@@ -22,12 +22,18 @@ const NoticeDetail = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!title.trim()) {
+    // 빈 HTML인지 확인 (ReactQuill은 빈 내용일 때도 <p><br></p>와 같은 HTML을 생성함)
+    const isContentEmpty = !content || content === "<p><br></p>" || content.trim() === "";
+
+    const trimmedTitle = title.trim();
+    const trimmedContent = isContentEmpty ? "" : content;
+
+    if (!trimmedTitle) {
       setError("제목을 입력해주세요.");
       return;
     }
 
-    if (!content.trim()) {
+    if (isContentEmpty) {
       setError("내용을 입력해주세요.");
       return;
     }
@@ -39,8 +45,8 @@ const NoticeDetail = () => {
       if (isEditMode) {
         // 기존 공지사항 수정
         const requestData = {
-          title,
-          content,
+          title: trimmedTitle,
+          content: trimmedContent,
           boardId: 1, // 공지사항
           isPublic: isPublic.toString(),
           tags: tags.trim() ? tags : undefined,
@@ -57,8 +63,8 @@ const NoticeDetail = () => {
       } else {
         // 새 공지사항 작성
         const requestData = {
-          title,
-          content,
+          title: trimmedTitle,
+          content: trimmedContent,
           boardId: 1, // 공지사항
           isPublic: isPublic.toString(),
           tags: tags.trim() ? tags : undefined,
@@ -74,14 +80,9 @@ const NoticeDetail = () => {
         }
       }
     } catch (error: any) {
-      console.error("공지사항 저장 오류:", error);
-
       // 인증 오류 처리
       if (error.response?.status === 401 || error.response?.status === 403) {
         setError("권한이 없습니다. 관리자 로그인이 필요합니다.");
-        setTimeout(() => {
-          navigate("/login");
-        }, 1500);
       } else {
         setError(
           "공지사항을 저장하는 중 오류가 발생했습니다: " +
@@ -128,7 +129,6 @@ const NoticeDetail = () => {
         setError("공지사항을 찾을 수 없습니다.");
       }
     } catch (error) {
-      console.error("공지사항 조회 오류:", error);
       setError("공지사항을 불러오는 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);

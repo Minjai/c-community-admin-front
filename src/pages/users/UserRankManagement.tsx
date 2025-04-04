@@ -62,9 +62,9 @@ const UserRankManagement: React.FC = () => {
           updatedAt: rank.updatedAt || rank.createdAt || "",
         }));
 
-        // 등급을 position 기준으로 정렬
+        // 등급을 position 기준으로 내림차순 정렬 (높은 값이 위로)
         const sortedRanks = [...processedRanks].sort(
-          (a, b) => (a.position || 0) - (b.position || 0)
+          (a, b) => (b.position || 0) - (a.position || 0)
         );
 
         setRanks(sortedRanks);
@@ -289,19 +289,14 @@ const UserRankManagement: React.FC = () => {
   // DataTable 컬럼 정의
   const columns = [
     {
-      header: "순서",
-      accessor: "position" as keyof UserRank,
-      cell: (value: number, row: UserRank, index: number) => (
-        <div className="flex items-center justify-center">
-          <span className="font-medium">{value || index + 1}</span>
-        </div>
-      ),
+      header: "등급명",
+      accessor: "rankName" as keyof UserRank,
     },
     {
       header: "이미지",
       accessor: "image" as keyof UserRank,
       cell: (value: string) => (
-        <div className="flex justify-center">
+        <div className="flex justify-start">
           {value ? (
             <img
               src={
@@ -320,10 +315,6 @@ const UserRankManagement: React.FC = () => {
           )}
         </div>
       ),
-    },
-    {
-      header: "등급명",
-      accessor: "rankName" as keyof UserRank,
     },
     {
       header: "필요 포인트",

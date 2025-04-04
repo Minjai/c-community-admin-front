@@ -83,9 +83,9 @@ const SportsManagement = () => {
       const response = await axios.get("/sports");
 
       if (response.data && Array.isArray(response.data)) {
-        // position 기준으로 정렬
+        // position 기준으로 내림차순 정렬 (높은 값이 위로)
         const sortedSports = [...response.data].sort(
-          (a, b) => (a.position || 0) - (b.position || 0)
+          (a, b) => (b.position || 0) - (a.position || 0)
         );
         setSports(sortedSports);
       } else {
@@ -255,35 +255,6 @@ const SportsManagement = () => {
 
   // DataTable 컬럼 정의
   const columns = [
-    {
-      header: "순서",
-      accessor: "position" as keyof Sport,
-      cell: (value: any, row: Sport, index: number) => (
-        <div className="flex items-center space-x-1 justify-center">
-          <span className="font-medium">{value || index + 1}</span>
-          <div className="flex flex-col">
-            <button
-              onClick={() => handleMoveUp(index)}
-              disabled={index === 0}
-              className={`p-1 ${
-                index === 0 ? "text-gray-300" : "text-blue-500 hover:text-blue-700"
-              }`}
-            >
-              ▲
-            </button>
-            <button
-              onClick={() => handleMoveDown(index)}
-              disabled={index === sports.length - 1}
-              className={`p-1 ${
-                index === sports.length - 1 ? "text-gray-300" : "text-blue-500 hover:text-blue-700"
-              }`}
-            >
-              ▼
-            </button>
-          </div>
-        </div>
-      ),
-    },
     {
       header: "종목명",
       accessor: "name" as keyof Sport,

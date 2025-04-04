@@ -84,9 +84,9 @@ const CasinoGameManagement = () => {
           updatedAt: game.updatedAt || game.createdAt || new Date().toISOString(),
         }));
 
-        // position 기준으로 정렬
+        // position 기준으로 내림차순 정렬 (높은 값이 위로)
         const sortedGames = [...transformedGames].sort(
-          (a, b) => (a.position || 0) - (b.position || 0)
+          (a, b) => (b.position || 0) - (a.position || 0)
         );
         setGames(sortedGames);
       } else {
@@ -378,15 +378,6 @@ const CasinoGameManagement = () => {
 
   // DataTable 컬럼 정의
   const columns = [
-    {
-      header: "순서",
-      accessor: "position" as keyof CasinoGame,
-      cell: (value: any, row: CasinoGame, index: number) => (
-        <div className="flex items-center justify-center">
-          <span className="font-medium">{value || index + 1}</span>
-        </div>
-      ),
-    },
     {
       header: "썸네일",
       accessor: "thumbnailUrl" as keyof CasinoGame,

@@ -50,8 +50,8 @@ const MiniBannerPage: React.FC = () => {
       const response = await BannerApiService.getMiniBanners();
       // API 응답의 형식에 맞게 데이터를 추출합니다
       if (response && Array.isArray(response)) {
-        // 배너를 position 기준으로 정렬
-        const sortedBanners = [...response].sort((a, b) => (a.position || 0) - (b.position || 0));
+        // 배너를 position 기준으로 내림차순 정렬 (높은 값이 위로)
+        const sortedBanners = [...response].sort((a, b) => (b.position || 0) - (a.position || 0));
         setBanners(sortedBanners);
       } else {
         setBanners([]);
@@ -411,10 +411,9 @@ const MiniBannerPage: React.FC = () => {
 
   // 테이블 컬럼 정의
   const columns = [
-    { header: "순서", accessor: "position" as keyof Banner },
     { header: "제목", accessor: "title" as keyof Banner },
     {
-      header: "PC 이미지",
+      header: "이미지",
       accessor: "pUrl" as keyof Banner,
       cell: (value: string) => (
         <div className="w-20 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">

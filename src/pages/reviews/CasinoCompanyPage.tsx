@@ -72,9 +72,9 @@ const CasinoCompanyPage: React.FC = () => {
           updatedAt: company.updatedAt || company.createdAt || new Date().toISOString(),
         })) as CasinoCompany[];
 
-        // displayOrder 기준으로 정렬
+        // displayOrder 기준으로 내림차순 정렬 (높은 값이 위로)
         const sortedCompanies = [...transformedCompanies].sort(
-          (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
+          (a, b) => (b.displayOrder || 0) - (a.displayOrder || 0)
         );
 
         setCompanies(sortedCompanies);
@@ -339,15 +339,6 @@ const CasinoCompanyPage: React.FC = () => {
 
   // DataTable 컬럼 정의
   const columns = [
-    {
-      header: "순서",
-      accessor: "displayOrder" as keyof CasinoCompany,
-      cell: (value: any, company: CasinoCompany, index: number) => (
-        <div className="text-center">
-          <span className="font-medium">{company.displayOrder}</span>
-        </div>
-      ),
-    },
     {
       header: "이미지",
       accessor: "imageUrl" as keyof CasinoCompany,
