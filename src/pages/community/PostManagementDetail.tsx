@@ -4,13 +4,49 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Post, Comment } from "@/types";
 import axios from "@/api/axios";
 
+// replaceAsync 유틸리티 함수 추가
+const replaceAsync = async (
+  str: string,
+  regex: RegExp,
+  asyncFn: (match: string, ...args: any[]) => Promise<string>
+): Promise<string> => {
+  const promises: Promise<string>[] = [];
+  str.replace(regex, (match, ...args) => {
+    const promise = asyncFn(match, ...args);
+    promises.push(promise);
+    return match; // 이 반환값은 실제로 사용되지 않음
+  });
+  const data = await Promise.all(promises);
+  return str.replace(regex, () => data.shift() || "");
+};
+
+// S3에 이미지 업로드 함수
+const uploadBase64ImageToS3 = async (
+  base64Data: string,
+  userId: number,
+  folder: string,
+  postId: number
+): Promise<string> => {
+  try {
+    const response = await axios.post("/upload/image", {
+      image: base64Data,
+      userId,
+      folder,
+      postId,
+    });
+    return response.data.imageUrl;
+  } catch (error) {
+    console.error("이미지 업로드 오류:", error);
+    throw error;
+  }
+};
+
 const PostDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [tags, setTags] = useState("");
   const [isPopular, setIsPopular] = useState(false);
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -65,10 +101,39 @@ const PostDetail = () => {
     setError(null);
 
     try {
+      // 현재 로그인한 사용자 ID 가져오기
+      const userData = JSON.parse(localStorage.getItem("admin_user") || "{}");
+      const userId = userData.id || 0;
+
+      // 이미지 URL 저장 배열
+      const imageUrls = [];
+
+      // 게시물 ID (새 게시물인 경우 임시 ID 사용)
+      const postId = isEditMode ? Number(id) : Date.now();
+
+      // 이미지 처리
+      const imageRegex = /<img[^>]+src="data:image\/[^>]+"[^>]*>/g;
+      const srcRegex = /src="(data:image\/[^"]+)"/;
+      let processedContent = await replaceAsync(content, imageRegex, async (match) => {
+        const src = match.match(srcRegex)[1];
+        const imageUrl = await uploadBase64ImageToS3(src, userId, "posts", postId);
+        imageUrls.push(imageUrl);
+        return match.replace(src, imageUrl);
+      });
+
+      // 유튜브 링크 변환
+      const youtubeRegex =
+        /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
+      const paragraphRegex =
+        /<p>(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[a-zA-Z0-9_-]{11})<\/p>/g;
+      processedContent = processedContent.replace(paragraphRegex, (match, p1) => {
+        const videoId = p1.match(youtubeRegex)[0].match(/([a-zA-Z0-9_-]{11})/)[1];
+        return `<div class="video-container"><iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe></div>`;
+      });
+
       const requestData = {
         title: trimmedTitle,
-        content: content,
-        tags: tags || undefined,
+        content: processedContent, // 처리된 컨텐츠 사용
         boardId: isEditMode ? post?.boardId || 2 : 2, // boardId를 숫자로 유지
         isPopular: isPopular ? 1 : 0, // 인기 게시물 여부 (1 또는 0)
       };
@@ -131,8 +196,14 @@ const PostDetail = () => {
           errorMessage = "잘못된 요청입니다. 입력 내용을 확인해주세요.";
         } else if (error.response.status === 401) {
           errorMessage = "인증이 필요합니다. 다시 로그인해주세요.";
+          setTimeout(() => {
+            navigate("/login");
+          }, 1500);
         } else if (error.response.status === 403) {
           errorMessage = "이 작업을 수행할 권한이 없습니다.";
+          setTimeout(() => {
+            navigate("/login");
+          }, 1500);
         }
       } else if (error.message && error.message.includes("Network")) {
         errorMessage = "네트워크 연결 오류가 발생했습니다. 연결 상태를 확인해주세요.";
@@ -188,11 +259,6 @@ const PostDetail = () => {
       if (postData) {
         setPost(postData);
         setTitle(postData.title || "");
-
-        // 태그 설정
-        if (postData.tags) {
-          setTags(typeof postData.tags === "string" ? postData.tags : "");
-        }
 
         // 인기 게시물 상태 설정
         setIsPopular(postData.isPopular === 1 || postData.isPopular === true);
@@ -431,21 +497,6 @@ const PostDetail = () => {
           <p className="mt-1 text-xs text-gray-500">
             이미지는 에디터에 직접 드래그 앤 드롭하여 첨부할 수 있습니다.
           </p>
-        </div>
-
-        <div>
-          <label htmlFor="tags" className="block text-sm font-medium text-gray-700">
-            태그
-          </label>
-          <input
-            type="text"
-            id="tags"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="태그는 쉼표(,)로 구분하여 입력해주세요"
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          />
-          <p className="mt-1 text-xs text-gray-500">예시: 자유게시판,질문,정보</p>
         </div>
 
         <div className="flex items-center">

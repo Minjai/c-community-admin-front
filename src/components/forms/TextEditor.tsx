@@ -111,6 +111,10 @@ VideoBlot.className = "ql-video";
 // 글로벌 등록은 한 번만 수행
 Quill.register(VideoBlot, true);
 
+// 유튜브 링크 인식 패턴
+const YOUTUBE_REGEX =
+  /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)(?:&[^\ ]*)?/g;
+
 const TextEditor: React.FC<TextEditorProps> = ({
   content,
   setContent,
@@ -135,11 +139,67 @@ const TextEditor: React.FC<TextEditorProps> = ({
           const delta = editor.clipboard.convert(content);
           editor.setContents(delta, "silent");
         }
+
+        // 자동 유튜브 링크 감지 설정
+        setupYouTubeLinkDetection(editor);
       } catch (error) {
         // 오류 발생 시 조용히 처리
       }
     }
   }, []);
+
+  // 유튜브 링크 자동 감지 및 변환 설정
+  const setupYouTubeLinkDetection = (editor: any) => {
+    editor.on("text-change", function (delta: any, oldContents: any, source: string) {
+      if (source !== "user") return;
+
+      try {
+        const text = editor.getText();
+        let match;
+
+        // 새로 추가된 텍스트에서 YouTube URL 찾기
+        while ((match = YOUTUBE_REGEX.exec(text)) !== null) {
+          const url = match[0];
+          const matchIndex = match.index;
+
+          // URL의 위치 확인
+          const urlPosition = editor.getText().indexOf(url);
+          if (urlPosition < 0) continue;
+
+          // 주변 내용 확인 (이미 변환된 URL인지 확인)
+          const surroundingDelta = editor.getContents(urlPosition - 1, url.length + 2);
+          const ops = surroundingDelta.ops;
+
+          // URL이 텍스트로만 구성되어 있는지 확인 (이미 변환되지 않았는지)
+          let isPlainText = true;
+          for (const op of ops) {
+            if (typeof op.insert !== "string") {
+              isPlainText = false;
+              break;
+            }
+          }
+
+          if (isPlainText) {
+            // 링크를 영상으로 변환
+            setTimeout(() => {
+              try {
+                editor.deleteText(urlPosition, url.length);
+                editor.insertEmbed(urlPosition, "video", url);
+                editor.insertText(urlPosition + 1, "\n");
+              } catch (err) {
+                console.error("유튜브 링크 변환 오류:", err);
+              }
+            }, 100);
+          }
+        }
+
+        // 정규식 객체 초기화 (다음 실행을 위해)
+        YOUTUBE_REGEX.lastIndex = 0;
+      } catch (error) {
+        console.error("유튜브 링크 감지 오류:", error);
+      }
+    });
+  };
 
   // 내용 변경시 에디터 업데이트 (초기 로딩 이후에만 실행)
   useEffect(() => {
@@ -586,6 +646,36 @@ const TextEditor: React.FC<TextEditorProps> = ({
             width: 100%;
             height: 315px;
             margin: 10px 0;
+          }
+          /* 툴바 버튼들의 정렬 수정 */
+          .ql-toolbar.ql-snow .ql-formats {
+            display: inline-flex;
+            align-items: center;
+            vertical-align: middle;
+            margin-right: 8px;
+          }
+          .ql-toolbar.ql-snow button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 24px;
+            vertical-align: middle;
+          }
+          .ql-toolbar.ql-snow button svg {
+            width: 18px;
+            height: 18px;
+          }
+          /* 특히 이미지와 링크 버튼 정렬 수정 */
+          .ql-toolbar.ql-snow .ql-formats button.ql-link,
+          .ql-toolbar.ql-snow .ql-formats button.ql-image,
+          .ql-toolbar.ql-snow .ql-formats button.ql-video {
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 24px;
+            width: 28px;
+            vertical-align: middle;
           }
         `}
       </style>
