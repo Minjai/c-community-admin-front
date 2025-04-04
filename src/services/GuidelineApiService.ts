@@ -162,6 +162,15 @@ export class GuidelineApiService {
         content: data.content ? data.content.substring(0, 100) + "..." : undefined,
         boardId: data.boardId,
         hasImage: !!data.image,
+        imageInfo: data.image
+          ? {
+              name: data.image.name,
+              type: data.image.type,
+              size: `${(data.image.size / 1024 / 1024).toFixed(2)}MB`,
+              isGif:
+                data.image.type === "image/gif" || data.image.name.toLowerCase().endsWith(".gif"),
+            }
+          : null,
         tags: data.tags,
         isPublic: data.isPublic,
         displayOrder: data.displayOrder,
@@ -175,6 +184,14 @@ export class GuidelineApiService {
         if (data.title) formData.append("title", data.title);
         if (data.content) formData.append("content", data.content);
         if (data.boardId) formData.append("boardId", String(data.boardId));
+
+        // 이미지 파일 추가 및 디버깅 정보 출력
+        console.log("수정 시 이미지 파일 정보:", {
+          name: data.image.name,
+          type: data.image.type,
+          size: `${(data.image.size / 1024 / 1024).toFixed(2)}MB`,
+          lastModified: new Date(data.image.lastModified).toISOString(),
+        });
         formData.append("image", data.image);
 
         if (data.tags && data.tags.length > 0) {
@@ -197,7 +214,9 @@ export class GuidelineApiService {
         console.log(`FormData로 가이드라인(ID: ${id}) 수정 필드:`);
         for (let [key, value] of formData.entries()) {
           if (key === "image") {
-            console.log(`${key}: [File 객체]`);
+            console.log(
+              `${key}: [File 객체: ${(value as File).name}, 타입: ${(value as File).type}]`
+            );
           } else if (key === "content") {
             console.log(`${key}: ${String(value).substring(0, 100)}...`);
           } else {

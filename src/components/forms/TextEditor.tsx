@@ -26,7 +26,7 @@ interface TextEditorProps {
   height?: string;
 }
 
-const MAX_IMAGE_SIZE_MB = 10; // GIF 파일은 크기가 클 수 있으므로 최대 크기 증가
+const MAX_IMAGE_SIZE_MB = 20; // GIF 파일은 크기가 클 수 있으므로 최대 크기 증가
 const SUPPORTED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
@@ -168,20 +168,36 @@ const TextEditor: React.FC<TextEditorProps> = ({
   const insertBase64Image = useCallback(
     (file: File) => {
       try {
-        // 파일 정보 출력
-        console.log("처리 중인 이미지:", {
+        // 파일 정보 출력 (디버깅용 상세 정보)
+        console.log("처리 중인 이미지 상세 정보:", {
           name: file.name,
           type: file.type,
-          size: file.size,
+          size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+          lastModified: new Date(file.lastModified).toISOString(),
         });
 
         // MIME 타입이 없으면 확장자로 확인
         const isValidMime = SUPPORTED_IMAGE_TYPES.includes(file.type);
         const isValidExt = isValidImageExtension(file.name);
 
+        console.log("이미지 유효성 검증:", {
+          isValidMime,
+          isValidExt,
+          acceptedType: isValidMime
+            ? file.type
+            : isValidExt
+            ? `확장자: ${file.name.split(".").pop()}`
+            : "지원되지 않음",
+        });
+
         if (!isValidMime && !isValidExt) {
           alert(`지원하지 않는 이미지 형식입니다. 지원 형식: JPG, PNG, GIF, WebP, SVG`);
           return;
+        }
+
+        // GIF 파일 특별 처리 (디버깅용)
+        if (file.type === "image/gif" || file.name.toLowerCase().endsWith(".gif")) {
+          console.log("GIF 파일 감지됨:", file.name);
         }
 
         // 이미지 크기 체크
@@ -194,16 +210,23 @@ const TextEditor: React.FC<TextEditorProps> = ({
         reader.onload = () => {
           try {
             const base64Image = reader.result as string;
+            console.log("이미지 변환 성공:", {
+              sizeKB: Math.round(base64Image.length / 1024),
+              preview: base64Image.substring(0, 50) + "...", // 데이터 일부만 표시
+            });
             insertToEditor(base64Image);
           } catch (e) {
+            console.error("이미지 변환 오류:", e);
             alert("이미지 변환 중 오류가 발생했습니다.");
           }
         };
-        reader.onerror = () => {
+        reader.onerror = (error) => {
+          console.error("FileReader 오류:", error);
           alert("파일을 읽는 중 오류가 발생했습니다.");
         };
         reader.readAsDataURL(file);
       } catch (error) {
+        console.error("이미지 처리 오류:", error);
         alert("이미지 처리 중 오류가 발생했습니다.");
       }
     },

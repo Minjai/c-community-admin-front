@@ -3,6 +3,11 @@ import axios from "axios";
 // 환경 변수에서 API URL 가져오기
 const API_URL = import.meta.env.VITE_API_BASE_URL;
 
+// 어드민 로컬 스토리지 키 (일반 사용자와 구분)
+const ADMIN_USER_KEY = "admin_user";
+const ADMIN_TOKEN_KEY = "admin_token";
+const ADMIN_REFRESH_TOKEN_KEY = "admin_refreshToken";
+
 export interface LoginCredentials {
   username: string;
   password: string;
@@ -30,9 +35,13 @@ export const authService = {
 
       const response = await axios.post(loginUrl, credentials);
       if (response.data.success) {
-        // 로그인 성공 시 토큰을 localStorage에 저장
-        localStorage.setItem("token", response.data.token);
-        localStorage.setItem("user", JSON.stringify(response.data.user));
+        // 로그인 성공 시 어드민 전용 스토리지에 토큰 저장
+        localStorage.setItem(ADMIN_TOKEN_KEY, response.data.token);
+        localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(response.data.user));
+
+        // 만약 기존 사용자 토큰이 있다면 제거 (충돌 방지)
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
       }
       return response.data;
     } catch (error: any) {
@@ -44,12 +53,15 @@ export const authService = {
   },
 
   logout() {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    // 어드민 로컬 스토리지에서 인증 정보 제거
+    localStorage.removeItem(ADMIN_TOKEN_KEY);
+    localStorage.removeItem(ADMIN_USER_KEY);
+    localStorage.removeItem(ADMIN_REFRESH_TOKEN_KEY);
   },
 
   getCurrentUser() {
-    const userStr = localStorage.getItem("user");
+    // 어드민 사용자 정보 가져오기
+    const userStr = localStorage.getItem(ADMIN_USER_KEY);
     if (userStr) {
       return JSON.parse(userStr);
     }
@@ -57,6 +69,7 @@ export const authService = {
   },
 
   getToken() {
-    return localStorage.getItem("token");
+    // 어드민 토큰 가져오기
+    return localStorage.getItem(ADMIN_TOKEN_KEY);
   },
 };

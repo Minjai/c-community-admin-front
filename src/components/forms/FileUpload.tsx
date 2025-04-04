@@ -1,4 +1,4 @@
-import React, { useState, useRef, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useRef, forwardRef, useImperativeHandle, useEffect } from "react";
 import { CloudArrowUpIcon, XCircleIcon } from "@heroicons/react/24/outline";
 
 interface FileUploadProps {
@@ -28,7 +28,7 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
       required = false,
       disabled = false,
       className = "",
-      accept = "image/png, image/jpeg",
+      accept = "image/png, image/jpeg, image/gif, image/webp",
       preview = true,
       value,
     },
@@ -40,6 +40,10 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useImperativeHandle(ref, () => fileInputRef.current as HTMLInputElement);
+
+    useEffect(() => {
+      setPreviewUrl(value || null);
+    }, [value]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFile = e.target.files?.[0] || null;
@@ -196,7 +200,7 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
                 <span className="font-medium text-primary-600">파일 업로드</span>
                 <p className="text-gray-500">또는 드래그 앤 드롭</p>
               </div>
-              <p className="text-xs text-gray-500">PNG, JPG 파일만 지원</p>
+              <p className="text-xs text-gray-500">PNG, JPG, GIF, WEBP 파일 지원</p>
             </div>
           </div>
         )}

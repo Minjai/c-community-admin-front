@@ -3,6 +3,59 @@ import TextEditor from "../../components/forms/TextEditor";
 import { useParams, useNavigate } from "react-router-dom";
 import { Post } from "@/types";
 import GuidelineApiService from "@/services/GuidelineApiService";
+import ImageApiService from "@/services/ImageApiService";
+
+// Base64 이미지 추출 및 변환 함수
+const extractBase64Images = (htmlContent: string): { dataURLs: string[]; newHtml: string } => {
+  const result: { dataURLs: string[]; newHtml: string } = {
+    dataURLs: [],
+    newHtml: htmlContent,
+  };
+
+  // Base64 이미지 패턴 찾기 (data:image/...)
+  const imgRegex = /<img[^>]+src="(data:image\/[^"]+)"[^>]*>/g;
+  let match;
+  let index = 0;
+
+  // 모든 Base64 이미지 찾기
+  while ((match = imgRegex.exec(htmlContent)) !== null) {
+    const fullImgTag = match[0];
+    const dataURL = match[1];
+
+    // 찾은 Base64 이미지 저장
+    result.dataURLs.push(dataURL);
+
+    // 임시 플레이스홀더로 대체 (나중에 실제 URL로 바꿀 예정)
+    result.newHtml = result.newHtml.replace(
+      fullImgTag,
+      fullImgTag.replace(dataURL, `__BASE64_IMAGE_${index++}__`)
+    );
+  }
+
+  return result;
+};
+
+// Base64를 Blob으로 변환
+const dataURLtoBlob = (dataURL: string): Blob => {
+  const arr = dataURL.split(",");
+  const mime = arr[0].match(/:(.*?);/)![1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+
+  return new Blob([u8arr], { type: mime });
+};
+
+// File 객체 생성
+const createFileFromDataURL = (dataURL: string, index: number): File => {
+  const blob = dataURLtoBlob(dataURL);
+  const extension = dataURL.substring(dataURL.indexOf("/") + 1, dataURL.indexOf(";"));
+  return new File([blob], `inline-image-${index}.${extension}`, { type: blob.type });
+};
 
 const GuidelineDetail = ({ boardId = 3 }) => {
   // 기본값은 카지노(3)
@@ -24,6 +77,19 @@ const GuidelineDetail = ({ boardId = 3 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isNewPost = id === "new";
   const isEditMode = !isNewPost;
+
+  // 마운트 시 상태 초기화하기
+  useEffect(() => {
+    // 새 게시물인 경우 상태 초기화
+    if (isNewPost) {
+      setTitle("");
+      setContent("");
+      setTags([]);
+      setImageFile(null);
+      setImagePreview(null);
+      setIsPublic(true);
+    }
+  }, [id]);
 
   // boardId에 따라 네비게이션 경로 결정
   const getNavigationPath = () => {
@@ -136,7 +202,7 @@ const GuidelineDetail = ({ boardId = 3 }) => {
     const isContentEmpty = !content || content === "<p><br></p>" || content.trim() === "";
 
     const trimmedTitle = title.trim();
-    const trimmedContent = isContentEmpty ? "" : content;
+    let trimmedContent = isContentEmpty ? "" : content;
 
     if (!trimmedTitle) {
       setError("제목을 입력해주세요.");
@@ -158,6 +224,63 @@ const GuidelineDetail = ({ boardId = 3 }) => {
     setError(null);
 
     try {
+      // HTML 내용에서 Base64 이미지 추출
+      const { dataURLs, newHtml } = extractBase64Images(trimmedContent);
+
+      // Base64 이미지가 발견된 경우 처리
+      if (dataURLs.length > 0) {
+        console.log(`HTML 내용에서 ${dataURLs.length}개의 Base64 이미지를 발견했습니다.`);
+
+        // 각 Base64 이미지를 파일로 변환
+        const imageFiles = dataURLs.map((dataURL, index) => createFileFromDataURL(dataURL, index));
+
+        // GIF 파일 디버깅 로그
+        imageFiles.forEach((file) => {
+          if (file.type === "image/gif" || file.name.endsWith(".gif")) {
+            console.log(
+              "GIF 파일 발견:",
+              file.name,
+              file.type,
+              `${(file.size / 1024 / 1024).toFixed(2)}MB`
+            );
+          }
+        });
+
+        // 각 이미지 파일을 서버에 개별적으로 업로드
+        const uploadedUrls = [];
+        for (let i = 0; i < imageFiles.length; i++) {
+          try {
+            const file = imageFiles[i];
+            console.log(
+              `인라인 이미지 ${i + 1}/${imageFiles.length} 업로드 중:`,
+              file.name,
+              file.type
+            );
+
+            // 실제 서버 API 호출
+            const imageUrl = await ImageApiService.uploadInlineImage(file);
+            uploadedUrls.push(imageUrl);
+
+            // 업로드 진행 상황 로그
+            console.log(`인라인 이미지 ${i + 1}/${imageFiles.length} 업로드 완료:`, imageUrl);
+          } catch (err) {
+            console.error(`인라인 이미지 ${i + 1} 업로드 실패:`, err);
+            // 오류 발생 시 임시 URL 사용 (실패해도 계속 진행)
+            uploadedUrls.push(`https://via.placeholder.com/300x200?text=Image+Upload+Failed`);
+          }
+        }
+
+        // HTML 내 이미지 플레이스홀더를 실제 URL로 대체
+        let finalHtml = newHtml;
+        for (let i = 0; i < uploadedUrls.length; i++) {
+          finalHtml = finalHtml.replace(`__BASE64_IMAGE_${i}__`, uploadedUrls[i]);
+        }
+
+        // 최종 처리된 HTML 사용
+        trimmedContent = finalHtml;
+        console.log("최종 처리된 HTML:", trimmedContent.substring(0, 100) + "...");
+      }
+
       if (isEditMode) {
         // 기존 가이드라인 수정
         const requestData = {
@@ -171,7 +294,10 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         };
 
         // 요청 데이터 로깅
-        console.log("가이드라인 수정 요청 데이터:", requestData);
+        console.log("가이드라인 수정 요청 데이터:", {
+          ...requestData,
+          content: requestData.content.substring(0, 100) + "...", // 너무 길지 않게 자름
+        });
 
         const response = await GuidelineApiService.updateGuideline(
           parseInt(id as string),
@@ -202,7 +328,10 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         };
 
         // 요청 데이터 로깅
-        console.log("가이드라인 생성 요청 데이터:", requestData);
+        console.log("가이드라인 생성 요청 데이터:", {
+          ...requestData,
+          content: requestData.content.substring(0, 100) + "...", // 너무 길지 않게 자름
+        });
 
         const response = await GuidelineApiService.createGuideline(requestData);
 
@@ -509,7 +638,12 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         <div className="flex justify-end space-x-3">
           <button
             type="button"
-            onClick={() => navigate(getNavigationPath())}
+            onClick={() => {
+              // 취소 시 상태 초기화
+              setImageFile(null);
+              setImagePreview(null);
+              navigate(getNavigationPath());
+            }}
             className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
           >
             취소
