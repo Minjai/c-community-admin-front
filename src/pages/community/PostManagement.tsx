@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 const PostManagement = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [selectedPosts, setSelectedPosts] = useState<number[]>([]);
   const navigate = useNavigate();
   const [pagination, setPagination] = useState({
     page: 1,
@@ -105,6 +106,58 @@ const PostManagement = () => {
     }
   };
 
+  // 선택된 게시물 일괄 삭제
+  const handleDeleteSelected = async () => {
+    if (selectedPosts.length === 0) {
+      alert("삭제할 게시물을 선택해주세요.");
+      return;
+    }
+
+    if (!window.confirm(`선택한 ${selectedPosts.length}개의 게시물을 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      // 선택된 모든 게시물에 대해 삭제 요청 병렬 처리
+      const deletePromises = selectedPosts.map((id) => axios.delete(`/post/${id}`));
+      const results = await Promise.allSettled(deletePromises);
+
+      // 성공 및 실패 건수 계산
+      const successful = results.filter((result) => result.status === "fulfilled").length;
+
+      if (successful > 0) {
+        alert(`${successful}개의 게시물이 삭제되었습니다.`);
+        setSelectedPosts([]); // 선택 목록 초기화
+        getAllPost(pagination.page); // 목록 새로고침
+      } else {
+        alert("게시물 삭제에 실패했습니다.");
+      }
+    } catch (error: any) {
+      console.error("선택 게시물 삭제 오류:", error);
+      alert("게시물을 삭제하는 중 오류가 발생했습니다.");
+    }
+  };
+
+  // 체크박스 선택 처리
+  const handleSelectPost = (id: number) => {
+    setSelectedPosts((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((postId) => postId !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  // 전체 선택/해제 처리
+  const handleSelectAll = () => {
+    if (selectedPosts.length === posts.length) {
+      setSelectedPosts([]);
+    } else {
+      setSelectedPosts(posts.map((post) => post.id));
+    }
+  };
+
   // 게시물 수정 페이지로 이동
   const handleEdit = (id: number, e: React.MouseEvent) => {
     e.stopPropagation(); // 이벤트 버블링 방지
@@ -130,7 +183,18 @@ const PostManagement = () => {
     <div className="p-6 bg-white rounded-xl shadow-md">
       <h2 className="text-xl font-semibold mb-4">게시물 목록</h2>
 
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex justify-between">
+        <button
+          onClick={handleDeleteSelected}
+          disabled={selectedPosts.length === 0}
+          className={`px-4 py-2 rounded-md transition-colors ${
+            selectedPosts.length === 0
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : "bg-red-600 text-white hover:bg-red-700"
+          }`}
+        >
+          선택 삭제 ({selectedPosts.length})
+        </button>
         <button
           onClick={() => navigate("/community/posts/new")}
           className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
@@ -143,11 +207,18 @@ const PostManagement = () => {
         <table className="min-w-full text-sm text-left border border-gray-200">
           <thead className="bg-gray-100 text-gray-600 uppercase text-xs font-semibold">
             <tr>
-              <th className="px-4 py-3">ID</th>
+              <th className="px-4 py-3 w-12">
+                <input
+                  type="checkbox"
+                  checked={selectedPosts.length === posts.length && posts.length > 0}
+                  onChange={handleSelectAll}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+              </th>
               <th className="px-4 py-3">제목</th>
               <th className="px-4 py-3">작성자</th>
               <th className="px-4 py-3">작성일</th>
-              <th className="px-4 py-3 text-center">조회수</th>
+              <th className="px-4 py-3 text-center">조회/댓글/추천</th>
               <th className="px-4 py-3 text-right">관리</th>
             </tr>
           </thead>
@@ -155,16 +226,28 @@ const PostManagement = () => {
             {posts.length > 0 ? (
               posts.map((post) => (
                 <tr key={post.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">{post.id}</td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedPosts.includes(post.id)}
+                      onChange={() => handleSelectPost(post.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                  </td>
                   <td
                     className="px-4 py-3 font-medium text-blue-600 cursor-pointer"
                     onClick={() => handleClick(post.id)}
                   >
-                    {post.title}
+                    <div className="truncate max-w-xs" title={post.title}>
+                      {post.title}
+                    </div>
                   </td>
                   <td className="px-4 py-3">{post.author?.nickname || "알 수 없음"}</td>
                   <td className="px-4 py-3">{new Date(post.createdAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-center">{post.viewCount}</td>
+                  <td className="px-4 py-3 text-center">
+                    {post.viewCount || 0}/{post.comments?.length || 0}/{post.likes?.length || 0}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={(e) => handleEdit(post.id, e)}

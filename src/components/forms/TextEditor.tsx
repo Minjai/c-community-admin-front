@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback } from "react";
-import ReactQuill from "react-quill";
+import ReactQuill, { Quill } from "react-quill";
 import "react-quill/dist/quill.snow.css";
 
 // React의 findDOMNode 경고 억제
@@ -26,7 +26,7 @@ interface TextEditorProps {
   height?: string;
 }
 
-const MAX_IMAGE_SIZE_MB = 20; // GIF 파일은 크기가 클 수 있으므로 최대 크기 증가
+const MAX_IMAGE_SIZE_MB = 20; // 이미지 크기 제한 20MB
 const SUPPORTED_IMAGE_TYPES = [
   "image/jpeg",
   "image/png",
@@ -61,6 +61,55 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     return this.props.children;
   }
 }
+
+// YouTube 비디오 블롯 정의 및 등록
+// Quill을 외부에서 가져와서 한 번만 등록
+const BlockEmbed = Quill.import("blots/block/embed");
+
+class VideoBlot extends BlockEmbed {
+  static create(value: string) {
+    const node = super.create();
+    // YouTube 비디오 ID를 추출하여 iframe으로 삽입
+    node.setAttribute("frameborder", "0");
+    node.setAttribute("allowfullscreen", true);
+    node.setAttribute("src", this.transformVideoUrl(value));
+    return node;
+  }
+
+  static value(node: HTMLElement) {
+    return node.getAttribute("src");
+  }
+
+  // YouTube 비디오 URL을 임베드 URL로 변환
+  static transformVideoUrl(url: string) {
+    // YouTube URL 패턴 지원 (여러 형태의 URL 처리)
+    let videoId = "";
+    if (url.includes("youtube.com/watch?v=")) {
+      videoId = url.split("v=")[1];
+      const ampersandPosition = videoId.indexOf("&");
+      if (ampersandPosition !== -1) {
+        videoId = videoId.substring(0, ampersandPosition);
+      }
+    } else if (url.includes("youtube.com/embed/")) {
+      videoId = url.split("embed/")[1];
+    } else if (url.includes("youtu.be/")) {
+      videoId = url.split("youtu.be/")[1];
+    } else {
+      // 직접 비디오 ID를 입력한 경우 또는 URL이 인식되지 않는 경우
+      videoId = url;
+    }
+
+    // 임베드 URL 생성
+    return `https://www.youtube.com/embed/${videoId}?showinfo=0`;
+  }
+}
+
+VideoBlot.blotName = "video";
+VideoBlot.tagName = "iframe";
+VideoBlot.className = "ql-video";
+
+// 글로벌 등록은 한 번만 수행
+Quill.register(VideoBlot, true);
 
 const TextEditor: React.FC<TextEditorProps> = ({
   content,
@@ -114,19 +163,14 @@ const TextEditor: React.FC<TextEditorProps> = ({
   const handleChange = (value: string, delta: any, source: string, editor: any) => {
     try {
       if (source === "user") {
-        const hasText = editor && editor.getText && editor.getText().trim().length > 0;
-        let html = "";
-
-        if (hasText && editor && editor.getHTML) {
-          html = editor.getHTML();
-        } else if (hasText && editor && editor.root) {
-          html = editor.root.innerHTML;
-        } else if (value && typeof value === "string") {
-          html = value;
-        }
-
-        if (html) {
+        if (editor && editor.getHTML) {
+          const html = editor.getHTML();
           setContent(html);
+        } else if (editor && editor.root) {
+          const html = editor.root.innerHTML;
+          setContent(html);
+        } else if (value && typeof value === "string") {
+          setContent(value);
         }
       }
     } catch (error) {
@@ -148,6 +192,25 @@ const TextEditor: React.FC<TextEditorProps> = ({
       }
     } catch (error) {
       // 오류 발생 시 조용히 처리
+    }
+  }, []);
+
+  // YouTube 비디오 삽입 핸들러
+  const videoHandler = useCallback(() => {
+    try {
+      const editor = quillRef.current?.getEditor();
+      if (!editor) return;
+
+      const url = prompt("YouTube 동영상 URL을 입력하세요:");
+      if (!url) return;
+
+      // 현재 선택 위치에 비디오 삽입
+      const range = editor.getSelection() || { index: 0, length: 0 };
+      editor.insertEmbed(range.index, "video", url);
+      editor.setSelection(range.index + 1, 0);
+    } catch (error) {
+      console.error("비디오 삽입 중 오류:", error);
+      alert("동영상 삽입 중 오류가 발생했습니다.");
     }
   }, []);
 
@@ -404,8 +467,36 @@ const TextEditor: React.FC<TextEditorProps> = ({
     }
   }, [insertBase64Image]);
 
+  // 에디터가 마운트된 후 컨테이너에 클릭 이벤트 추가
+  useEffect(() => {
+    const container = editorRef.current;
+    if (!container) return;
+
+    const handleContainerClick = (e: MouseEvent) => {
+      try {
+        // 여백 클릭 시 에디터에 포커스
+        const editorElement = quillRef.current?.getEditor().root;
+        if (!editorElement) return;
+
+        // 클릭한 요소가 에디터 자체가 아닌 경우만 포커스 설정
+        const target = e.target as Node;
+        if (container.contains(target) && !editorElement.contains(target)) {
+          editorElement.focus();
+        }
+      } catch (error) {
+        // 오류 발생 시 조용히 처리
+      }
+    };
+
+    container.addEventListener("click", handleContainerClick as EventListener);
+
+    return () => {
+      container.removeEventListener("click", handleContainerClick as EventListener);
+    };
+  }, []);
+
   return (
-    <div ref={editorRef}>
+    <div ref={editorRef} className="quill-editor-container">
       <ErrorBoundary>
         <ReactQuill
           ref={quillRef}
@@ -419,7 +510,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
                     ["bold", "italic", "underline", "strike"],
                     [{ list: "ordered" }, { list: "bullet" }],
                     [{ align: [] }],
-                    ["link", "image"],
+                    ["link", "image", "video"],
                     ["clean"],
                   ]
                 : [
@@ -431,6 +522,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
                   ],
               handlers: {
                 image: imageHandler,
+                video: videoHandler,
               },
             },
             clipboard: {
@@ -450,19 +542,25 @@ const TextEditor: React.FC<TextEditorProps> = ({
             "link",
             "image",
             "align",
+            "video",
           ]}
-          placeholder="내용을 입력해주세요."
         />
       </ErrorBoundary>
       <style>
         {`
-          .ql-editor.ql-blank::before {
-            content: "내용을 입력해주세요.";
-            color: #999;
-            font-style: normal;
+          .quill-editor-container {
+            border-radius: 0.375rem;
+            overflow: hidden;
           }
-          .ql-editor:focus::before {
-            content: none;
+          .ql-toolbar.ql-snow {
+            border-top-left-radius: 0.375rem;
+            border-top-right-radius: 0.375rem;
+            background-color: #f9fafb;
+          }
+          .ql-container.ql-snow {
+            border-bottom-left-radius: 0.375rem;
+            border-bottom-right-radius: 0.375rem;
+            background-color: #ffffff;
           }
           .ql-editor {
             min-height: ${height};
@@ -470,6 +568,24 @@ const TextEditor: React.FC<TextEditorProps> = ({
             overflow-y: auto;
             direction: ltr; /* 명시적으로 왼쪽에서 오른쪽으로 텍스트 방향 설정 */
             text-align: left;
+            background-color: #ffffff;
+            cursor: text;
+          }
+          .ql-editor.ql-blank::before {
+            content: "";
+            left: 0;
+            right: 0;
+            color: transparent;
+            pointer-events: none;
+          }
+          .ql-editor:focus {
+            outline: none;
+          }
+          .ql-video {
+            display: block;
+            width: 100%;
+            height: 315px;
+            margin: 10px 0;
           }
         `}
       </style>

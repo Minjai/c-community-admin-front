@@ -65,13 +65,39 @@ const UserManagement = () => {
 
     try {
       const response = await axios.get("/admin/users");
+      console.log("회원 정보 API 응답:", response.data);
 
-      if (response.data && response.data.users) {
-        const data: UserResponse = response.data;
-        setUsers(data.users);
-        setTotalCount(data.totalCount);
-        setCurrentPage(data.currentPage);
-        setTotalPages(data.totalPages);
+      if (response.data) {
+        // 서버 응답 구조에 따라 데이터 추출
+        // 1. 응답이 { users, totalCount, currentPage, totalPages } 형식인 경우
+        if (response.data.users && Array.isArray(response.data.users)) {
+          const data = response.data;
+          setUsers(data.users);
+          setTotalCount(data.totalCount || data.users.length);
+          setCurrentPage(data.currentPage || 1);
+          setTotalPages(data.totalPages || Math.ceil((data.totalCount || data.users.length) / 10));
+        }
+        // 2. 응답이 배열인 경우
+        else if (Array.isArray(response.data)) {
+          setUsers(response.data);
+          setTotalCount(response.data.length);
+          setCurrentPage(1);
+          setTotalPages(Math.ceil(response.data.length / 10));
+        }
+        // 3. 응답이 { data: users[] } 형식인 경우
+        else if (response.data.data && Array.isArray(response.data.data)) {
+          const users = response.data.data;
+          setUsers(users);
+          setTotalCount(users.length);
+          setCurrentPage(1);
+          setTotalPages(Math.ceil(users.length / 10));
+        }
+        // 응답 구조가 예상과 다른 경우
+        else {
+          console.error("회원 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
+          setUsers([]);
+          setError("회원 데이터 형식이 올바르지 않습니다.");
+        }
       } else {
         setUsers([]);
         setError("회원 데이터 형식이 올바르지 않습니다.");

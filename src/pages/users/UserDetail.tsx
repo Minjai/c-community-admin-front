@@ -90,33 +90,54 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
       // API 응답 구조 디버깅
       console.log("User detail API response:", response.data);
 
-      if (response.data && response.data.success && response.data.data) {
-        // 사용자 정보는 response.data.data에 있음
-        const userData = response.data.data;
+      // 다양한 응답 구조 처리
+      let userData;
 
-        // rank 필드와 activities 필드를 User 인터페이스 형식에 맞게 변환
-        const formattedUser = {
-          ...userData,
-          // score 값이 없으면 0으로 설정
-          score: userData.score || 0,
-          // rank 필드 매핑
-          rank: {
-            id: 0, // 서버 응답에 id가 없으므로 임의의 값 지정
-            name: userData.rank?.rankName || "등급 없음",
-          },
-          // activities 필드가 있으면 그대로 사용
-          activities: userData.activities || [],
-        };
+      // 1. response.data.data가 존재하는 경우 (중첩된 data 객체)
+      if (response.data && response.data.data) {
+        userData = response.data.data;
+      }
+      // 2. response.data가 직접 사용자 데이터인 경우
+      else if (response.data && response.data.id) {
+        userData = response.data;
+      }
+      // 3. response.data.user가 존재하는 경우
+      else if (response.data && response.data.user) {
+        userData = response.data.user;
+      }
+      // 유효한 사용자 데이터가 없는 경우
+      else {
+        throw new Error("유효한 사용자 데이터가 없습니다");
+      }
 
-        console.log("Formatted user data:", formattedUser);
-        setUser(formattedUser);
+      console.log("Extracted user data:", userData);
 
-        // rank ID가 있으면 selectedRank 설정
-        if (userData.rank) {
-          setSelectedRank(0); // 서버 응답에 rank ID가 없어서 임의의 값 지정
-        }
-      } else {
-        setError("회원 정보를 불러오는데 실패했습니다.");
+      // 사용자 정보 형식 변환
+      const formattedUser = {
+        ...userData,
+        // score 값이 없으면 0으로 설정
+        score: userData.score || 0,
+        // rank 필드 매핑
+        rank: userData.rank
+          ? {
+              id: userData.rank.rankId || userData.rank.id || 0,
+              name: userData.rank.rankName || userData.rank.name || "등급 없음",
+            }
+          : { id: 0, name: "등급 없음" },
+        // activities 필드가 있으면 그대로 사용
+        activities: userData.activities || [],
+        // 필수 필드 보장
+        nickname: userData.nickname || "알 수 없음",
+        email: userData.email || "",
+        status: userData.status || "오프라인",
+      };
+
+      console.log("Formatted user data:", formattedUser);
+      setUser(formattedUser);
+
+      // rank ID가 있으면 selectedRank 설정
+      if (userData.rank) {
+        setSelectedRank(userData.rank.rankId || userData.rank.id || 0);
       }
     } catch (err) {
       console.error("Error fetching user details:", err);

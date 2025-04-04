@@ -26,19 +26,38 @@ const PostDetail = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 빈 HTML인지 확인 (ReactQuill은 빈 내용일 때도 <p><br></p>와 같은 HTML을 생성함)
-    const isContentEmpty = !content || content === "<p><br></p>" || content.trim() === "";
+    // HTML 내용 정제 함수
+    const sanitizeHtml = (html: string) => {
+      // 빈 p 태그 및 br 태그만 있는 경우를 감지
+      const isEmptyHtml =
+        !html ||
+        html === "<p><br></p>" ||
+        html.trim() === "" ||
+        html.replace(/<p><br><\/p>/g, "").trim() === "";
+
+      return {
+        isEmpty: isEmptyHtml,
+        html: html,
+      };
+    };
+
+    // 내용 분석
+    const contentAnalysis = sanitizeHtml(content);
+
+    // 이미지 포함 여부 확인 (이미지만 있는 경우에도 유효하도록)
+    const hasImage = content.includes("<img");
 
     const trimmedTitle = title.trim();
-    const trimmedContent = isContentEmpty ? "" : content;
 
+    // 제목 체크
     if (!trimmedTitle) {
       setError("제목을 입력해주세요.");
       return;
     }
 
-    if (isContentEmpty) {
-      setError("내용을 입력해주세요.");
+    // 내용이 비어있고 이미지도 없는 경우
+    if (contentAnalysis.isEmpty && !hasImage) {
+      setError("내용을 입력하거나 이미지를 첨부해주세요.");
       return;
     }
 
@@ -46,53 +65,80 @@ const PostDetail = () => {
     setError(null);
 
     try {
+      const requestData = {
+        title: trimmedTitle,
+        content: content,
+        tags: tags || undefined,
+        boardId: isEditMode ? post?.boardId || 2 : 2, // boardId를 숫자로 유지
+        isPopular: isPopular ? 1 : 0, // 인기 게시물 여부 (1 또는 0)
+      };
+
+      console.log("저장 요청 데이터:", requestData);
+
       if (isEditMode) {
         // 기존 게시물 수정
-        const requestData = {
-          title: trimmedTitle,
-          content: trimmedContent,
-          tags: tags || undefined,
-          boardId: post?.boardId || 2, // 기본값 설정 (자유게시판)
-          isPopular: isPopular ? 1 : 0, // 인기 게시물 여부 (1 또는 0)
-        };
-
         const response = await axios.put<Post>(`/post/${id}`, requestData);
 
         if (response.status === 200) {
           alert("게시물이 수정되었습니다.");
           navigate("/community/posts");
         } else {
-          setError("게시물 수정 중 오류가 발생했습니다.");
+          // 상세 오류 메시지 설정
+          const errorMessage =
+            (response.data as any)?.error ||
+            (response.data as any)?.message ||
+            "게시물 수정 중 오류가 발생했습니다.";
+          setError(errorMessage);
         }
       } else {
         // 새 게시물 작성
-        const requestData = {
-          title: trimmedTitle,
-          content: trimmedContent,
-          tags: tags || undefined,
-          boardId: 2, // 기본 자유게시판으로 설정
-          isPopular: isPopular ? 1 : 0, // 인기 게시물 여부 (1 또는 0)
-        };
-
         const response = await axios.post<Post>("/post", requestData);
 
         if (response.status === 201 || response.status === 200) {
           alert("게시물이 작성되었습니다.");
           navigate("/community/posts");
         } else {
-          setError("게시물 작성 중 오류가 발생했습니다.");
+          // 상세 오류 메시지 설정
+          const errorMessage =
+            (response.data as any)?.error ||
+            (response.data as any)?.message ||
+            "게시물 작성 중 오류가 발생했습니다.";
+          setError(errorMessage);
         }
       }
     } catch (error: any) {
-      // 인증 오류 처리
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        setError("권한이 없습니다. 로그인이 필요합니다.");
-      } else {
-        setError(
-          "게시물을 저장하는 중 오류가 발생했습니다: " +
-            (error.response?.data?.error || "알 수 없는 오류")
-        );
+      console.error("게시물 저장 오류:", error);
+
+      // 오류 상세 정보 분석
+      let errorMessage = "게시물을 저장하는 중 오류가 발생했습니다.";
+
+      if (error.response) {
+        // 서버 응답이 있는 경우 상세 오류 메시지 표시
+        if (error.response.data) {
+          if (error.response.data.error) {
+            errorMessage = `저장 오류: ${error.response.data.error}`;
+          } else if (error.response.data.message) {
+            errorMessage = `저장 오류: ${error.response.data.message}`;
+          } else if (typeof error.response.data === "string") {
+            errorMessage = `저장 오류: ${error.response.data}`;
+          }
+        }
+
+        // 특정 상태 코드별 메시지
+        if (error.response.status === 413) {
+          errorMessage = "업로드한 이미지 크기가 너무 큽니다. 이미지 크기를 줄여주세요.";
+        } else if (error.response.status === 400) {
+          errorMessage = "잘못된 요청입니다. 입력 내용을 확인해주세요.";
+        } else if (error.response.status === 401) {
+          errorMessage = "인증이 필요합니다. 다시 로그인해주세요.";
+        } else if (error.response.status === 403) {
+          errorMessage = "이 작업을 수행할 권한이 없습니다.";
+        }
+      } else if (error.message && error.message.includes("Network")) {
+        errorMessage = "네트워크 연결 오류가 발생했습니다. 연결 상태를 확인해주세요.";
       }
+
+      setError(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -106,10 +152,17 @@ const PostDetail = () => {
 
     setLoading(true);
     try {
+      // API 응답 처리를 위한 로그 추가
+      console.log(`게시물 데이터 요청 중: /post/${id}`);
+      console.log(`댓글 데이터 요청 중: /comment/${id}`);
+
       const [postResponse, commentsResponse] = await Promise.all([
         axios.get(`/post/${id}`),
         axios.get(`/comment/${id}`),
       ]);
+
+      console.log("게시물 API 응답:", postResponse.data);
+      console.log("댓글 API 응답:", commentsResponse.data);
 
       // 게시물 데이터 처리: 다양한 응답 형식 지원
       let postData = null;
@@ -150,6 +203,7 @@ const PostDetail = () => {
         }, 0);
       } else {
         setError("게시물을 찾을 수 없습니다.");
+        console.error("게시물 조회 실패: 데이터 없음");
       }
 
       // 댓글 데이터 처리: 다양한 응답 형식 지원
@@ -176,6 +230,7 @@ const PostDetail = () => {
           for (const key in commentsResponse.data) {
             if (Array.isArray(commentsResponse.data[key])) {
               commentsData = commentsResponse.data[key];
+              console.log(`댓글 데이터를 '${key}' 필드에서 찾음:`, commentsData);
               break;
             }
           }
@@ -184,6 +239,14 @@ const PostDetail = () => {
 
       // 댓글 데이터 유효성 검사 및 처리
       commentsData = commentsData.map((comment: any) => {
+        // 필수 필드 확인
+        if (!comment.id) {
+          console.warn("경고: 댓글에 ID가 없습니다", comment);
+        }
+        if (!comment.content) {
+          console.warn("경고: 댓글에 내용이 없습니다", comment);
+        }
+
         return {
           id: comment.id,
           content: comment.content || "",
@@ -197,6 +260,7 @@ const PostDetail = () => {
 
       setComments(commentsData);
     } catch (error) {
+      console.error("게시물/댓글 조회 오류:", error);
       setError("게시물을 불러오는 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
@@ -210,7 +274,9 @@ const PostDetail = () => {
     }
 
     try {
+      console.log(`댓글 삭제 요청: /comment/${commentId}`);
       const response = await axios.delete(`/comment/${commentId}`);
+      console.log("댓글 삭제 응답:", response.data);
 
       if (response.status === 200 || response.status === 204) {
         alert("댓글이 삭제되었습니다.");
@@ -219,6 +285,7 @@ const PostDetail = () => {
         alert("댓글 삭제에 실패했습니다.");
       }
     } catch (error: any) {
+      console.error("댓글 삭제 오류:", error);
       if (error.response?.status === 401 || error.response?.status === 403) {
         alert("권한이 없습니다. 로그인이 필요합니다.");
         navigate("/login");
@@ -241,10 +308,13 @@ const PostDetail = () => {
     }
 
     try {
+      console.log(`댓글 추가 요청: /comment/${id}`);
       const response = await axios.post(`/comment`, {
         content: newComment,
         postId: Number(id),
       });
+
+      console.log("댓글 추가 응답:", response.data);
 
       if (response.status === 201 || response.status === 200) {
         alert("댓글이 추가되었습니다.");
@@ -254,6 +324,7 @@ const PostDetail = () => {
         alert("댓글 추가에 실패했습니다.");
       }
     } catch (error: any) {
+      console.error("댓글 추가 오류:", error);
       alert(
         "댓글을 추가하는 중 오류가 발생했습니다: " +
           (error.response?.data?.error || "알 수 없는 오류")
@@ -281,9 +352,12 @@ const PostDetail = () => {
     }
 
     try {
+      console.log(`댓글 수정 요청: /comment/${commentId}`);
       const response = await axios.put(`/comment/${commentId}`, {
         content: editCommentContent,
       });
+
+      console.log("댓글 수정 응답:", response.data);
 
       if (response.status === 200) {
         alert("댓글이 수정되었습니다.");
@@ -294,6 +368,7 @@ const PostDetail = () => {
         alert("댓글 수정에 실패했습니다.");
       }
     } catch (error: any) {
+      console.error("댓글 수정 오류:", error);
       alert(
         "댓글을 수정하는 중 오류가 발생했습니다: " +
           (error.response?.data?.error || "알 수 없는 오류")
@@ -350,8 +425,8 @@ const PostDetail = () => {
 
         <div ref={editorContainerRef}>
           <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
-          <div className="min-h-[400px] border border-gray-300 rounded-md">
-            <TextEditor content={content} setContent={setContent} />
+          <div className="min-h-[400px] border border-gray-300 rounded-md bg-white">
+            <TextEditor content={content} setContent={setContent} height="400px" />
           </div>
           <p className="mt-1 text-xs text-gray-500">
             이미지는 에디터에 직접 드래그 앤 드롭하여 첨부할 수 있습니다.
