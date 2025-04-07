@@ -36,8 +36,8 @@ export default function SportRecommendationsManagement() {
     null
   );
 
-  // 스포츠 영문-한글 매핑
-  const sportMapping: Record<string, string[]> = {
+  // 동적으로 생성될 스포츠 매핑
+  const [sportMapping, setSportMapping] = useState<Record<string, string[]>>({
     football: ["풋볼", "축구"],
     soccer: ["축구", "풋볼"],
     basketball: ["농구", "바스켓볼"],
@@ -45,16 +45,10 @@ export default function SportRecommendationsManagement() {
     hockey: ["하키"],
     tennis: ["테니스"],
     volleyball: ["배구"],
-  };
+  });
 
   // 한글-영문 매핑 생성
-  const korToEngMapping: Record<string, string[]> = {};
-  Object.entries(sportMapping).forEach(([eng, korArr]) => {
-    korArr.forEach((kor) => {
-      if (!korToEngMapping[kor]) korToEngMapping[kor] = [];
-      korToEngMapping[kor].push(eng);
-    });
-  });
+  const [korToEngMapping, setKorToEngMapping] = useState<Record<string, string[]>>({});
 
   // 폼 데이터
   const [formData, setFormData] = useState({
@@ -95,6 +89,9 @@ export default function SportRecommendationsManagement() {
       const result = await getSportGames({});
       setSportGames(result.data);
 
+      // 스포츠 종목 목록 자동 수집 (동적 매핑 생성)
+      updateSportMappings(result.data);
+
       // 검색어가 있을 경우에만 클라이언트 측에서 필터링
       if (searchQuery.trim()) {
         filterGamesBySearchTerm(result.data, searchQuery.trim());
@@ -105,6 +102,36 @@ export default function SportRecommendationsManagement() {
       console.error("Error fetching sport games:", err);
     }
   }, [searchQuery]);
+
+  // 스포츠 종목 매핑 자동 생성
+  const updateSportMappings = (games: SportGame[]) => {
+    // 새로운 매핑 객체 생성 (기존 매핑 유지)
+    const newMapping = { ...sportMapping };
+
+    // 게임 데이터에서 모든 종목 수집
+    games.forEach((game) => {
+      if (!game || !game.sport) return;
+
+      const sportName = game.sport.toLowerCase();
+      if (!newMapping[sportName]) {
+        newMapping[sportName] = [];
+      }
+    });
+
+    // 매핑 업데이트
+    setSportMapping(newMapping);
+
+    // 한글-영문 매핑 업데이트
+    const newKorToEngMapping: Record<string, string[]> = {};
+    Object.entries(newMapping).forEach(([eng, korArr]) => {
+      korArr.forEach((kor) => {
+        if (!newKorToEngMapping[kor]) newKorToEngMapping[kor] = [];
+        newKorToEngMapping[kor].push(eng);
+      });
+    });
+
+    setKorToEngMapping(newKorToEngMapping);
+  };
 
   // 검색어에 따른 게임 필터링 함수
   const filterGamesBySearchTerm = (games: SportGame[], query: string) => {
@@ -129,38 +156,15 @@ export default function SportRecommendationsManagement() {
     const allSearchTerms = [normalizedQuery, ...alternativeTerms];
     console.log("Searching for terms:", allSearchTerms);
 
+    // 내용 검색 대신 모든 필드에서 포괄적 검색
     const filtered = games.filter((game) => {
       if (!game) return false;
 
-      // 게임 데이터의 모든 필드를 소문자로 변환하여 검색
-      const sportLower = (game.sport || "").toLowerCase();
-      const leagueLower = (game.league || "").toLowerCase();
-      const matchNameLower = (game.matchName || "").toLowerCase();
-      const homeTeamLower = (game.homeTeam || "").toLowerCase();
-      const awayTeamLower = (game.awayTeam || "").toLowerCase();
+      // 게임 객체를 JSON 문자열로 변환하여 검색
+      const gameStr = JSON.stringify(game).toLowerCase();
 
-      // 디버깅 정보: 체크 대상 필드
-      if (process.env.NODE_ENV === "development") {
-        if (
-          sportLower.includes(normalizedQuery) ||
-          leagueLower.includes(normalizedQuery) ||
-          matchNameLower.includes(normalizedQuery) ||
-          homeTeamLower.includes(normalizedQuery) ||
-          awayTeamLower.includes(normalizedQuery)
-        ) {
-          console.log("Match found:", game);
-        }
-      }
-
-      // 어떤 검색어라도 일치하면 포함
-      return allSearchTerms.some(
-        (term) =>
-          sportLower.includes(term) ||
-          leagueLower.includes(term) ||
-          matchNameLower.includes(term) ||
-          homeTeamLower.includes(term) ||
-          awayTeamLower.includes(term)
-      );
+      // 검색어가 JSON 문자열 내에 포함되어 있는지 확인
+      return allSearchTerms.some((term) => gameStr.includes(term));
     });
 
     console.log("Filtered games count:", filtered.length);
