@@ -130,3 +130,45 @@ export interface ApiResponse<T> {
   error?: string;
   pagination?: PaginationParams;
 }
+
+// 스포츠 종목 관련 타입
+export interface SportGame {
+  id: number;
+  sport: string;
+  dateTime: string;
+  league: string;
+  matchName: string;
+  homeTeam: string;
+  awayTeam: string;
+  isPublic?: number;
+  position?: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// 스포츠 추천 관련 타입
+export interface SportRecommendation {
+  id: number;
+  title: string;
+  description?: string;
+  sportGames: SportGame[] | number[];
+  sportGameIds?: number[];
+  isPublic: number;
+  position: number;
+  startDate: string;
+  endDate: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// 스포츠 종목 카테고리 관련 타입
+export interface SportCategory {
+  id: number;
+  sportName: string;
+  displayName?: string;
+  icon?: string;
+  isPublic: number; // 1: 공개, 0: 비공개
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}

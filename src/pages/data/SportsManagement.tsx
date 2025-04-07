@@ -1,300 +1,298 @@
-import React, { useState, useEffect } from "react";
-import axios from "@/api/axios";
-import DataTable from "@/components/DataTable";
+import React, { useEffect, useState, useCallback } from "react";
+import {
+  getAllSportCategoriesAdmin,
+  createSportCategory,
+  updateSportCategory,
+  deleteSportCategory,
+  bulkUpdateSportCategories,
+} from "@/api";
+import { SportCategory } from "@/types";
+import Alert from "@/components/Alert";
+import Modal from "@/components/Modal";
 import Button from "@/components/Button";
 import ActionButton from "@/components/ActionButton";
-import Modal from "@/components/Modal";
-import Input from "@/components/forms/Input";
-import Alert from "@/components/Alert";
+import DataTable from "@/components/DataTable";
 import { formatDate } from "@/utils/dateUtils";
 
-// 스포츠 종목 타입 정의
-interface Sport {
-  id: number;
-  name: string;
-  isPublic: boolean;
-  position: number;
-  games: string[];
-  createdAt: string;
-  updatedAt: string;
-}
+// 스포츠 이름 매핑 객체 추가
+const sportNameMapping: Record<string, string> = {
+  // 기본 매핑 (이미 우리가 사용하는 것)
+  축구: "FOOTBALL",
+  테니스: "TENNIS",
+  농구: "BASKETBALL",
+  "미식 축구": "AMERICAN_FOOTBALL",
+  하키: "HOCKEY",
+  배구: "VOLLEYBALL",
+  크리켓: "CRICKET",
 
-// 스포츠 종목 선택을 위한 상수
-const AVAILABLE_GAMES = [
-  "e스포츠",
-  "겨울스포츠",
-  "경마",
-  "골프",
-  "농구",
-  "럭비",
-  "모터스포츠",
-  "미식 축구",
-  "배구",
-  "배드민턴",
-  "복싱",
-  "사이클",
-  "수구",
-  "야구",
-  "양궁",
-  "육상",
-  "크리켓",
-  "탁구",
-  "테니스",
-  "하키",
-  "핸드볼",
-  "축구",
-  "데니스",
-  "하키",
-];
+  // 추가 매핑
+  e스포츠: "ESPORTS",
+  겨울스포츠: "WINTER_SPORTS",
+  경마: "HORSE_RACING",
+  골프: "GOLF",
+  권투: "BOXING",
+  넷볼: "NETBALL",
+  다트: "DARTS",
+  럭비: "RUGBY",
+  "럭비 리그": "RUGBY_LEAGUE",
+  모터스포츠: "MOTORSPORTS",
+  배드민턴: "BADMINTON",
+  밴디: "BANDY",
+  "비치 발리볼": "BEACH_VOLLEYBALL",
+  "비치 사커": "BEACH_SOCCER",
+  빼시발로: "PESAPALLO",
+  사이클: "CYCLING",
+  수구: "WATER_POLO",
+  스누커: "SNOOKER",
+  야구: "BASEBALL",
+  "이종 격투기": "MMA",
+  카바디: "KABADDI",
+  탁구: "TABLE_TENNIS",
+  풋살: "FUTSAL",
+  풀로어볼: "FLOORBALL",
+  "필드 하키": "FIELD_HOCKEY",
+  핸드볼: "HANDBALL",
+  "호주식 축구": "AUSTRALIAN_FOOTBALL",
+};
 
-const SportsManagement = () => {
-  const [sports, setSports] = useState<Sport[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+// 역방향 매핑 생성 (영문 코드 -> 한글 이름)
+const reverseSportNameMapping: { [key: string]: string } = {};
+Object.entries(sportNameMapping).forEach(([koreanName, englishCode]) => {
+  reverseSportNameMapping[englishCode] = koreanName;
+});
+
+// 한글 이름을 영문 코드로 변환하는 함수
+const getEnglishSportCode = (koreanName: string): string => {
+  return sportNameMapping[koreanName] || koreanName;
+};
+
+// 영문 코드를 한글 이름으로 변환하는 함수
+const getKoreanSportName = (englishCode: string): string => {
+  return reverseSportNameMapping[englishCode] || englishCode;
+};
+
+export default function SportsManagement() {
+  const [categories, setCategories] = useState<SportCategory[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [alertMessage, setAlertMessage] = useState<{
-    type: "success" | "error" | "info";
-    message: string;
-  } | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
-  // 모달 관련 상태
-  const [showModal, setShowModal] = useState<boolean>(false);
-  const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [currentSport, setCurrentSport] = useState<Sport | null>(null);
-  const [saving, setSaving] = useState<boolean>(false);
+  // 모달 상태
+  const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState<"add" | "edit">("add");
+  const [currentCategory, setCurrentCategory] = useState<SportCategory | null>(null);
+  const [formData, setFormData] = useState({
+    sportName: "",
+    displayName: "",
+    icon: "",
+    isPublic: 1, // 기본값 공개
+  });
 
-  // 스포츠 데이터 상태
-  const [name, setName] = useState<string>("");
-  const [selectedGames, setSelectedGames] = useState<string[]>([]);
-  const [isPublic, setIsPublic] = useState<boolean>(true);
-  const [publicSettings, setPublicSettings] = useState<"public" | "private">("public");
+  // 종목 경기 편성 옵션들
+  const sportOptions = [
+    "e스포츠",
+    "겨울스포츠",
+    "경마",
+    "골프",
+    "권투",
+    "넷볼",
+    "농구",
+    "다트",
+    "럭비",
+    "레이싱",
+    "배구",
+    "배드민턴",
+    "밴디",
+    "비치 발리볼",
+    "사이클",
+    "스누커",
+    "수구",
+    "아이스 하키",
+    "야구",
+    "축구",
+    "테니스",
+    "카바디",
+    "크리켓",
+    "탁구",
+    "하키",
+    "핸드볼",
+    "호주식 축구",
+  ];
 
-  // 공개 설정 상태 관리
+  // 선택된 종목 경기
+  const [selectedSport, setSelectedSport] = useState<string>("");
+
   useEffect(() => {
-    setIsPublic(publicSettings === "public");
-  }, [publicSettings]);
+    fetchSportCategories();
+  }, []);
 
-  // 종목 목록 조회
-  const fetchSports = async () => {
+  const fetchSportCategories = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // API 경로는 실제 환경에 맞게 수정 필요
-      const response = await axios.get("/sports");
+      const data = await getAllSportCategoriesAdmin();
+      // 서버에서 받은 데이터의 영문 코드를 한글 이름으로 변환하여 표시
+      const processedData = data.map((category) => ({
+        ...category,
+        displayName: category.displayName || getKoreanSportName(category.sportName),
+      }));
+      setCategories(processedData);
+    } catch (err: any) {
+      console.error("Error fetching sport categories:", err);
+      setError("스포츠 카테고리를 불러오는 중 오류가 발생했습니다.");
+      // 토스트 대신 성공 메시지 상태 업데이트
+      setSuccess(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-      if (response.data && Array.isArray(response.data)) {
-        // position 기준으로 내림차순 정렬 (높은 값이 위로)
-        const sortedSports = [...response.data].sort(
-          (a, b) => (b.position || 0) - (a.position || 0)
-        );
-        setSports(sortedSports);
+  const handleAddCategory = () => {
+    setModalType("add");
+    setFormData({
+      sportName: "",
+      displayName: "",
+      icon: "",
+      isPublic: 1,
+    });
+    setSelectedSport("");
+    setShowModal(true);
+  };
+
+  const handleEditCategory = (category: SportCategory) => {
+    setModalType("edit");
+    setCurrentCategory(category);
+    setFormData({
+      sportName: getKoreanSportName(category.sportName),
+      displayName: category.displayName || "",
+      icon: category.icon || "",
+      isPublic: category.isPublic,
+    });
+    setSelectedSport(category.sportName);
+    setShowModal(true);
+  };
+
+  const handleDeleteCategory = async (id: number) => {
+    if (!confirm("정말 삭제하시겠습니까?")) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const success = await deleteSportCategory(id);
+
+      if (success) {
+        setSuccess("스포츠 카테고리가 삭제되었습니다.");
+        // 삭제 후 목록 다시 불러오기
+        fetchSportCategories();
       } else {
-        setSports([]);
-        setError("종목 목록을 불러오는데 실패했습니다.");
+        setError("스포츠 카테고리 삭제에 실패했습니다.");
       }
     } catch (err) {
-      console.error("Error fetching sports:", err);
-      setError("종목 목록을 불러오는데 실패했습니다.");
-      setSports([]);
+      setError("스포츠 카테고리 삭제에 실패했습니다.");
+      console.error("Error deleting sport category:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchSports();
-  }, []);
-
-  // 모달 닫기
-  const handleCloseModal = () => {
-    setShowModal(false);
-  };
-
-  // 종목 추가 모달 열기
-  const handleAddSport = () => {
-    setCurrentSport(null);
-    // 초기화
-    setName("");
-    setSelectedGames([]);
-    setIsPublic(true);
-    setPublicSettings("public");
-    setIsEditing(false);
-    setShowModal(true);
-  };
-
-  // 종목 수정 모달 열기
-  const handleEditSport = (sport: Sport) => {
-    setCurrentSport(sport);
-    setName(sport.name || "");
-    setSelectedGames(sport.games || []);
-    setIsPublic(sport.isPublic === true || sport.isPublic === 1);
-    setPublicSettings(sport.isPublic === true || sport.isPublic === 1 ? "public" : "private");
-    setIsEditing(true);
-    setShowModal(true);
-  };
-
-  // 종목 삭제
-  const handleDeleteSport = async (id: number) => {
-    if (!window.confirm("정말로 이 종목을 삭제하시겠습니까?")) {
+  const handleSaveCategory = async () => {
+    if (!selectedSport) {
+      setError("종목 경기를 선택해주세요.");
       return;
     }
+
+    setLoading(true);
+    setError(null);
 
     try {
-      await axios.delete(`/sports/${id}`);
-      setAlertMessage({ type: "success", message: "종목이 삭제되었습니다." });
-      fetchSports(); // 목록 새로고침
-    } catch (err) {
-      console.error("Error deleting sport:", err);
-      setAlertMessage({ type: "error", message: "종목 삭제 중 오류가 발생했습니다." });
-    }
-  };
+      if (modalType === "add") {
+        await createSportCategory({
+          ...formData,
+          sportName: getEnglishSportCode(selectedSport),
+          displayOrder:
+            categories.length > 0 ? Math.max(...categories.map((c) => c.displayOrder)) + 1 : 1,
+        });
 
-  // 종목 체크박스 핸들러
-  const handleGameToggle = (game: string) => {
-    setSelectedGames((prev) => {
-      if (prev.includes(game)) {
-        return prev.filter((g) => g !== game);
-      } else {
-        return [...prev, game];
+        setSuccess("새 스포츠 카테고리가 추가되었습니다.");
+        setShowModal(false);
+        // 추가 후 목록 다시 불러오기
+        fetchSportCategories();
+      } else if (currentCategory) {
+        await updateSportCategory(currentCategory.id, {
+          ...formData,
+          sportName: getEnglishSportCode(selectedSport),
+        });
+
+        setSuccess("스포츠 카테고리가 업데이트되었습니다.");
+        setShowModal(false);
+        // 수정 후 목록 다시 불러오기
+        fetchSportCategories();
       }
-    });
-  };
-
-  // 종목 저장 처리
-  const handleSaveSport = async () => {
-    if (!name.trim()) {
-      setAlertMessage({ type: "error", message: "종목명을 입력해주세요." });
-      return;
-    }
-
-    if (selectedGames.length === 0) {
-      setAlertMessage({ type: "error", message: "하나 이상의 경기를 선택해주세요." });
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      const sportData = {
-        name,
-        games: selectedGames,
-        isPublic,
-      };
-
-      if (!isEditing) {
-        // 새 종목 생성
-        await axios.post("/sports", sportData);
-        setAlertMessage({ type: "success", message: "종목이 성공적으로 추가되었습니다." });
-      } else if (currentSport) {
-        // 기존 종목 수정
-        await axios.put(`/sports/${currentSport.id}`, sportData);
-        setAlertMessage({ type: "success", message: "종목 정보가 수정되었습니다." });
-      }
-
-      // 모달 닫기 및 목록 새로고침
-      setShowModal(false);
-      fetchSports();
     } catch (err) {
-      console.error("Error saving sport:", err);
-      setAlertMessage({
-        type: "error",
-        message: !isEditing
-          ? "종목 추가 중 오류가 발생했습니다."
-          : "종목 정보 수정 중 오류가 발생했습니다.",
-      });
+      setError(modalType === "add" ? "카테고리 추가 실패" : "카테고리 수정 실패");
+      console.error("Error saving sport category:", err);
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  // 종목 순서 위로 이동
-  const handleMoveUp = async (index: number) => {
-    if (index <= 0) return; // 이미 첫 번째 항목이면 이동하지 않음
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target as HTMLInputElement;
 
-    try {
-      const sportToMove = sports[index];
-      const sportAbove = sports[index - 1];
-
-      // 위치 교환
-      const newPosition = sportAbove.position;
-      const oldPosition = sportToMove.position;
-
-      await axios.patch(`/sports/${sportToMove.id}`, { position: newPosition });
-      await axios.patch(`/sports/${sportAbove.id}`, { position: oldPosition });
-
-      setAlertMessage({ type: "success", message: "종목 순서가 변경되었습니다." });
-      fetchSports(); // 목록 새로고침
-    } catch (err) {
-      console.error("Error moving sport up:", err);
-      setAlertMessage({ type: "error", message: "종목 순서 변경 중 오류가 발생했습니다." });
-    }
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "radio" ? parseInt(value) : value,
+    }));
   };
 
-  // 종목 순서 아래로 이동
-  const handleMoveDown = async (index: number) => {
-    if (index >= sports.length - 1) return; // 이미 마지막 항목이면 이동하지 않음
-
-    try {
-      const sportToMove = sports[index];
-      const sportBelow = sports[index + 1];
-
-      // 위치 교환
-      const newPosition = sportBelow.position;
-      const oldPosition = sportToMove.position;
-
-      await axios.patch(`/sports/${sportToMove.id}`, { position: newPosition });
-      await axios.patch(`/sports/${sportBelow.id}`, { position: oldPosition });
-
-      setAlertMessage({ type: "success", message: "종목 순서가 변경되었습니다." });
-      fetchSports(); // 목록 새로고침
-    } catch (err) {
-      console.error("Error moving sport down:", err);
-      setAlertMessage({ type: "error", message: "종목 순서 변경 중 오류가 발생했습니다." });
-    }
+  const handleSportSelect = (sport: string) => {
+    setSelectedSport(sport);
   };
 
-  // DataTable 컬럼 정의
+  // 데이터 테이블 컬럼 정의
   const columns = [
     {
       header: "종목명",
-      accessor: "name" as keyof Sport,
+      accessor: (category: SportCategory) => getKoreanSportName(category.sportName),
+    },
+    {
+      header: "표시 이름",
+      accessor: (category: SportCategory) =>
+        category.displayName || getKoreanSportName(category.sportName),
     },
     {
       header: "등록일자",
-      accessor: "createdAt" as keyof Sport,
-      cell: (value: string) => formatDate(value),
+      accessor: (category: SportCategory) => formatDate(category.createdAt),
     },
     {
-      header: "공개 여부",
-      accessor: "isPublic" as keyof Sport,
-      cell: (value: boolean | number) => (
+      header: "공개여부",
+      accessor: (category: SportCategory) => (
         <span
-          className={`px-2 py-1 rounded text-xs ${
-            value === true || value === 1
-              ? "bg-green-100 text-green-800"
-              : "bg-red-100 text-red-800"
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            category.isPublic ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
           }`}
         >
-          {value === true || value === 1 ? "공개" : "비공개"}
+          {category.isPublic ? "공개" : "비공개"}
         </span>
       ),
     },
     {
       header: "관리",
-      accessor: "id" as keyof Sport,
-      cell: (value: number, row: Sport) => (
-        <div className="flex items-center space-x-2">
+      accessor: (category: SportCategory) => (
+        <div className="flex space-x-2">
           <ActionButton
             label="수정"
-            onClick={() => handleEditSport(row)}
-            color="blue"
             action="edit"
+            size="sm"
+            onClick={() => handleEditCategory(category)}
           />
           <ActionButton
             label="삭제"
-            onClick={() => handleDeleteSport(value)}
-            color="red"
             action="delete"
+            size="sm"
+            onClick={() => handleDeleteCategory(category.id)}
           />
         </div>
       ),
@@ -302,122 +300,139 @@ const SportsManagement = () => {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">스포츠 종목 관리</h1>
-        <Button onClick={handleAddSport} variant="primary">
-          종목 추가
+    <div className="mb-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">스포츠 종목 관리</h1>
+        <p className="text-sm text-gray-600">
+          스포츠 종목을 관리하고 공개 여부를 설정할 수 있습니다.
+        </p>
+      </div>
+
+      {(error || success) && (
+        <div className="mb-4">
+          <Alert
+            type={error ? "error" : "success"}
+            message={error || success || ""}
+            onClose={() => {
+              setError(null);
+              setSuccess(null);
+            }}
+          />
+        </div>
+      )}
+
+      <div className="flex justify-end mb-4">
+        <Button onClick={handleAddCategory}>
+          <div className="flex items-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span>새 종목 추가</span>
+          </div>
         </Button>
       </div>
 
-      {alertMessage && (
-        <Alert
-          type={alertMessage.type}
-          message={alertMessage.message}
-          onClose={() => setAlertMessage(null)}
-          className="mb-4"
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={categories}
+          loading={loading}
+          emptyMessage="등록된 스포츠 종목이 없습니다."
         />
-      )}
+      </div>
 
-      {error && (
-        <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
-      )}
-
-      <DataTable
-        columns={columns}
-        data={sports}
-        loading={loading}
-        emptyMessage="등록된 종목이 없습니다."
-      />
-
-      {/* 종목 추가/수정 모달 */}
       <Modal
         isOpen={showModal}
-        onClose={handleCloseModal}
-        title={isEditing ? "스포츠 종목 수정" : "새 스포츠 종목 추가"}
-        size="lg"
+        onClose={() => setShowModal(false)}
+        title={modalType === "add" ? "새 종목 추가" : "종목 수정"}
+        size="md"
+        footer={
+          <div className="flex justify-end space-x-3">
+            <Button variant="outline" onClick={() => setShowModal(false)}>
+              취소
+            </Button>
+            <Button onClick={handleSaveCategory}>저장</Button>
+          </div>
+        }
       >
         <div className="space-y-6">
-          {/* 스포츠 종목명 */}
           <div>
-            <Input
-              label="스포츠 종목명"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              placeholder="종목명을 입력하세요"
+            <label className="block text-sm font-medium text-gray-700 mb-1">스포츠 종목명</label>
+            <input
+              type="text"
+              name="sportName"
+              value={formData.sportName}
+              onChange={handleChange}
+              className="w-full p-2 border border-gray-300 rounded-md"
+              placeholder="종목명 입력"
             />
           </div>
 
-          {/* 경기 종류 선택 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              경기 종류 <span className="text-red-500">*</span>
-            </label>
-            <div className="h-64 overflow-y-auto border border-gray-300 rounded-md p-3">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {AVAILABLE_GAMES.map((game) => (
-                  <div key={game} className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id={`game-${game}`}
-                      checked={selectedGames.includes(game)}
-                      onChange={() => handleGameToggle(game)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <label
-                      htmlFor={`game-${game}`}
-                      className="ml-2 block text-sm text-gray-900 truncate"
-                    >
-                      {game}
-                    </label>
-                  </div>
-                ))}
+            <label className="block text-sm font-medium text-gray-700 mb-3">종목 경기 편성</label>
+            <div className="grid grid-cols-4 gap-3">
+              {sportOptions.map((sport) => (
+                <div key={sport} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`sport-${sport}`}
+                    checked={selectedSport === sport}
+                    onChange={() => handleSportSelect(sport)}
+                    className="form-checkbox h-4 w-4 text-blue-600 mr-2"
+                  />
+                  <label htmlFor={`sport-${sport}`} className="text-sm">
+                    {sport}
+                  </label>
+                </div>
+              ))}
+              <div className="col-span-4 text-xs text-gray-500 mt-1">※ flashscore 기준 종목</div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">공개여부</label>
+            <div className="flex space-x-5">
+              <div className="flex items-center">
+                <input
+                  type="radio"
+                  id="visibility-public"
+                  name="isPublic"
+                  value="1"
+                  checked={formData.isPublic === 1}
+                  onChange={handleChange}
+                  className="form-radio h-4 w-4 text-blue-600"
+                />
+                <label htmlFor="visibility-public" className="ml-2 text-sm">
+                  공개
+                </label>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="radio"
+                  id="visibility-private"
+                  name="isPublic"
+                  value="0"
+                  checked={formData.isPublic === 0}
+                  onChange={handleChange}
+                  className="form-radio h-4 w-4 text-blue-600"
+                />
+                <label htmlFor="visibility-private" className="ml-2 text-sm">
+                  비공개
+                </label>
               </div>
             </div>
-            <p className="mt-1 text-xs text-gray-500">선택된 경기 종류: {selectedGames.length}개</p>
-          </div>
-
-          {/* 공개 여부 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">공개 여부</label>
-            <div className="flex items-center space-x-4">
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  value="public"
-                  checked={publicSettings === "public"}
-                  onChange={() => setPublicSettings("public")}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <span className="ml-2 text-sm text-gray-900">공개</span>
-              </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  value="private"
-                  checked={publicSettings === "private"}
-                  onChange={() => setPublicSettings("private")}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <span className="ml-2 text-sm text-gray-900">비공개</span>
-              </label>
-            </div>
-          </div>
-
-          {/* 버튼 영역 */}
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="secondary" onClick={handleCloseModal} disabled={saving}>
-              취소
-            </Button>
-            <Button type="button" variant="primary" onClick={handleSaveSport} disabled={saving}>
-              {saving ? "저장 중..." : isEditing ? "수정" : "등록"}
-            </Button>
           </div>
         </div>
       </Modal>
     </div>
   );
-};
-
-export default SportsManagement;
+}

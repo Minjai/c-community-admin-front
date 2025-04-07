@@ -23,6 +23,7 @@ import CasinoCompanyPage from "./pages/reviews/CasinoCompanyPage";
 import CasinoGameManagement from "./pages/data/CasinoGameManagement";
 import CasinoRecommendationManagement from "./pages/data/CasinoRecommendationManagement";
 import SportsManagement from "./pages/data/SportsManagement";
+import SportRecommendationsManagement from "./pages/data/SportRecommendationsManagement";
 import UserManagement from "./pages/users/UserManagement";
 import UserRankManagement from "./pages/users/UserRankManagement";
 import AdminManagement from "./pages/users/AdminManagement";
@@ -78,7 +79,7 @@ function App() {
               <Route path="data/sports" element={<SportsManagement />} />
               <Route
                 path="data/sports-recommendations"
-                element={<NotImplemented pageName="스포츠 종목 추천" />}
+                element={<SportRecommendationsManagement />}
               />
 
               {/* 리뷰 업체 관리 - 관리자 권한 필요 */}
