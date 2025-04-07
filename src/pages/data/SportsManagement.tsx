@@ -137,7 +137,12 @@ export default function SportsManagement() {
         ...category,
         displayName: category.displayName || getKoreanSportName(category.sportName),
       }));
-      setCategories(processedData);
+
+      // displayOrder 기준으로 내림차순 정렬 (높은 값이 위에 표시)
+      const sortedData = processedData.sort(
+        (a, b) => (b.displayOrder || 0) - (a.displayOrder || 0)
+      );
+      setCategories(sortedData);
     } catch (err: any) {
       console.error("Error fetching sport categories:", err);
       setError("스포츠 카테고리를 불러오는 중 오류가 발생했습니다.");
@@ -251,48 +256,162 @@ export default function SportsManagement() {
     setSelectedSport(sport);
   };
 
+  // 순서 변경 - 위로 이동
+  const handleMoveUp = async (index: number) => {
+    if (index <= 0) return;
+
+    const newCategories = [...categories];
+
+    // 현재 카테고리와 위의 카테고리
+    const currentCategory = newCategories[index];
+    const targetCategory = newCategories[index - 1];
+
+    // displayOrder 값 교환
+    const currentDisplayOrder = currentCategory.displayOrder;
+    const targetDisplayOrder = targetCategory.displayOrder;
+
+    // displayOrder 값 교환
+    currentCategory.displayOrder = targetDisplayOrder;
+    targetCategory.displayOrder = currentDisplayOrder;
+
+    // 배열 내 위치 교환
+    newCategories[index] = targetCategory;
+    newCategories[index - 1] = currentCategory;
+
+    try {
+      // 로컬 상태 먼저 업데이트
+      setCategories(newCategories);
+
+      // API를 통해 카테고리 업데이트
+      await updateSportCategory(currentCategory.id, {
+        displayOrder: currentCategory.displayOrder,
+      });
+
+      await updateSportCategory(targetCategory.id, {
+        displayOrder: targetCategory.displayOrder,
+      });
+
+      // 변경 성공 메시지
+      setSuccess("카테고리 순서가 변경되었습니다.");
+
+      // 서버에서 최신 데이터 다시 불러오기
+      fetchSportCategories();
+    } catch (err) {
+      console.error("Error updating category order:", err);
+      setError("카테고리 순서 변경 중 오류가 발생했습니다.");
+      // 오류 발생 시 원래 순서로 복구
+      fetchSportCategories();
+    }
+  };
+
+  // 순서 변경 - 아래로 이동
+  const handleMoveDown = async (index: number) => {
+    if (index >= categories.length - 1) return;
+
+    const newCategories = [...categories];
+
+    // 현재 카테고리와 아래 카테고리
+    const currentCategory = newCategories[index];
+    const targetCategory = newCategories[index + 1];
+
+    // displayOrder 값 교환
+    const currentDisplayOrder = currentCategory.displayOrder;
+    const targetDisplayOrder = targetCategory.displayOrder;
+
+    // displayOrder 값 교환
+    currentCategory.displayOrder = targetDisplayOrder;
+    targetCategory.displayOrder = currentDisplayOrder;
+
+    // 배열 내 위치 교환
+    newCategories[index] = targetCategory;
+    newCategories[index + 1] = currentCategory;
+
+    try {
+      // 로컬 상태 먼저 업데이트
+      setCategories(newCategories);
+
+      // API를 통해 카테고리 업데이트
+      await updateSportCategory(currentCategory.id, {
+        displayOrder: currentCategory.displayOrder,
+      });
+
+      await updateSportCategory(targetCategory.id, {
+        displayOrder: targetCategory.displayOrder,
+      });
+
+      // 변경 성공 메시지
+      setSuccess("카테고리 순서가 변경되었습니다.");
+
+      // 서버에서 최신 데이터 다시 불러오기
+      fetchSportCategories();
+    } catch (err) {
+      console.error("Error updating category order:", err);
+      setError("카테고리 순서 변경 중 오류가 발생했습니다.");
+      // 오류 발생 시 원래 순서로 복구
+      fetchSportCategories();
+    }
+  };
+
   // 데이터 테이블 컬럼 정의
   const columns = [
     {
       header: "종목명",
-      accessor: (category: SportCategory) => getKoreanSportName(category.sportName),
+      accessor: "sportName",
+      cell: (value: string, row: SportCategory) => getKoreanSportName(value),
     },
     {
       header: "표시 이름",
-      accessor: (category: SportCategory) =>
-        category.displayName || getKoreanSportName(category.sportName),
+      accessor: "displayName",
+      cell: (value: string, row: SportCategory) => value || getKoreanSportName(row.sportName),
     },
     {
       header: "등록일자",
-      accessor: (category: SportCategory) => formatDate(category.createdAt),
+      accessor: "createdAt",
+      cell: (value: string) => formatDate(value),
     },
     {
       header: "공개여부",
-      accessor: (category: SportCategory) => (
+      accessor: "isPublic",
+      cell: (value: number) => (
         <span
           className={`px-2 py-1 rounded-full text-xs font-medium ${
-            category.isPublic ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
           }`}
         >
-          {category.isPublic ? "공개" : "비공개"}
+          {value ? "공개" : "비공개"}
         </span>
       ),
     },
     {
       header: "관리",
-      accessor: (category: SportCategory) => (
+      accessor: "id",
+      cell: (value: number, row: SportCategory, index: number) => (
         <div className="flex space-x-2">
+          <ActionButton
+            label="위로"
+            action="up"
+            size="sm"
+            onClick={() => handleMoveUp(index)}
+            disabled={index === 0}
+          />
+          <ActionButton
+            label="아래로"
+            action="down"
+            size="sm"
+            onClick={() => handleMoveDown(index)}
+            disabled={index === categories.length - 1}
+          />
           <ActionButton
             label="수정"
             action="edit"
             size="sm"
-            onClick={() => handleEditCategory(category)}
+            onClick={() => handleEditCategory(row)}
           />
           <ActionButton
             label="삭제"
             action="delete"
             size="sm"
-            onClick={() => handleDeleteCategory(category.id)}
+            onClick={() => handleDeleteCategory(row.id)}
           />
         </div>
       ),

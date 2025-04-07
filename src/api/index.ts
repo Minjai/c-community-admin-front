@@ -468,3 +468,120 @@ export const bulkUpdateSportCategories = async (data: {
     throw error;
   }
 };
+
+// 스포츠 종목 추천 관련 API 함수
+export const getSportRecommendations = async (params = {}): Promise<{ data: any[]; meta: any }> => {
+  try {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const response = await axios.get(`/sport-recommendations/admin?${queryParams.toString()}`);
+
+    if (response.data && response.data.success) {
+      return {
+        data: response.data.data || [],
+        meta: response.data.pagination || {},
+      };
+    }
+
+    return { data: [], meta: { total: 0 } };
+  } catch (error) {
+    console.error("Error fetching sport recommendations:", error);
+    throw error;
+  }
+};
+
+export const getSportRecommendationById = async (id: number): Promise<any> => {
+  try {
+    const response = await axios.get(`/sport-recommendations/admin/${id}`);
+
+    if (response.data && response.data.success) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Error fetching sport recommendation with id ${id}:`, error);
+    throw error;
+  }
+};
+
+export const createSportRecommendation = async (data: {
+  title: string;
+  sportGameId?: number;
+  sportGameIds?: number[];
+  description?: string;
+  startTime?: string;
+  endTime?: string;
+  isPublic: number;
+  displayOrder?: number;
+}): Promise<any> => {
+  try {
+    const response = await axios.post("/sport-recommendations/admin", data);
+
+    if (response.data && response.data.success) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error creating sport recommendation:", error);
+    throw error;
+  }
+};
+
+export const updateSportRecommendation = async (
+  id: number,
+  data: {
+    sportGameId?: number;
+    sportGameIds?: number[];
+    title?: string;
+    description?: string;
+    startTime?: string;
+    endTime?: string;
+    isPublic?: number;
+    displayOrder?: number;
+  }
+): Promise<any> => {
+  try {
+    const response = await axios.put(`/sport-recommendations/admin/${id}`, data);
+
+    if (response.data && response.data.success) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Error updating sport recommendation with id ${id}:`, error);
+    throw error;
+  }
+};
+
+export const deleteSportRecommendation = async (id: number): Promise<boolean> => {
+  try {
+    const response = await axios.delete(`/sport-recommendations/admin/${id}`);
+
+    return response.data && response.data.success;
+  } catch (error) {
+    console.error(`Error deleting sport recommendation with id ${id}:`, error);
+    throw error;
+  }
+};
+
+export const bulkUpdateSportRecommendations = async (data: {
+  ids: number[];
+  isPublic: number;
+}): Promise<any> => {
+  try {
+    const response = await axios.post("/sport-recommendations/admin/bulk-update", data);
+
+    return response.data && response.data.success ? response.data : null;
+  } catch (error) {
+    console.error("Error bulk updating sport recommendations:", error);
+    throw error;
+  }
+};

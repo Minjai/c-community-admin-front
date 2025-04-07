@@ -149,16 +149,18 @@ export interface SportGame {
 // 스포츠 추천 관련 타입
 export interface SportRecommendation {
   id: number;
+  sportGameId: number;
+  sportGameIds?: number[];
   title: string;
   description?: string;
-  sportGames: SportGame[] | number[];
-  sportGameIds?: number[];
   isPublic: number;
-  position: number;
-  startDate: string;
-  endDate: string;
-  createdAt?: string;
-  updatedAt?: string;
+  displayOrder: number;
+  startTime: string;
+  endTime: string;
+  sportGame?: SportGame;
+  games?: SportGame[];
+  createdAt: string;
+  updatedAt: string;
 }
 
 // 스포츠 종목 카테고리 관련 타입
@@ -167,7 +169,7 @@ export interface SportCategory {
   sportName: string;
   displayName?: string;
   icon?: string;
-  isPublic: number; // 1: 공개, 0: 비공개
+  isPublic: number;
   displayOrder: number;
   createdAt: string;
   updatedAt: string;

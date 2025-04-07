@@ -1,740 +1,849 @@
-import React, { useState, useEffect, useRef } from "react";
-import axios from "@/api/axios";
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  getSportRecommendations,
+  createSportRecommendation,
+  updateSportRecommendation,
+  deleteSportRecommendation,
+  getSportGames,
+  getSportRecommendationById,
+} from "@/api";
+import { SportGame, SportRecommendation } from "@/types";
 import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
 import ActionButton from "@/components/ActionButton";
 import Modal from "@/components/Modal";
-import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
-import { SportGame, SportRecommendation } from "@/types";
-import { extractDataArray } from "@/api/util";
 
-const SportRecommendationsManagement = () => {
+// 스포츠 종목 추천 관리 컴포넌트
+export default function SportRecommendationsManagement() {
+  // 상태 관리
   const [recommendations, setRecommendations] = useState<SportRecommendation[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [sportGames, setSportGames] = useState<SportGame[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [alertMessage, setAlertMessage] = useState<{
-    type: "success" | "error" | "info";
-    message: string;
-  } | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   // 페이지네이션 상태
-  const [page, setPage] = useState<number>(1);
-  const [limit, setLimit] = useState<number>(10);
-  const [total, setTotal] = useState<number>(0);
-  const [totalPages, setTotalPages] = useState<number>(1);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
 
-  // 모달 관련 상태
-  const [showModal, setShowModal] = useState<boolean>(false);
-  const [isEditing, setIsEditing] = useState<boolean>(false);
+  // 모달 상태
+  const [showModal, setShowModal] = useState(false);
+  const [modalType, setModalType] = useState<"add" | "edit">("add");
   const [currentRecommendation, setCurrentRecommendation] = useState<SportRecommendation | null>(
     null
   );
-  const [saving, setSaving] = useState<boolean>(false);
+
+  // 스포츠 영문-한글 매핑
+  const sportMapping: Record<string, string[]> = {
+    football: ["풋볼", "축구"],
+    soccer: ["축구", "풋볼"],
+    basketball: ["농구", "바스켓볼"],
+    baseball: ["야구", "베이스볼"],
+    hockey: ["하키"],
+    tennis: ["테니스"],
+    volleyball: ["배구"],
+  };
+
+  // 한글-영문 매핑 생성
+  const korToEngMapping: Record<string, string[]> = {};
+  Object.entries(sportMapping).forEach(([eng, korArr]) => {
+    korArr.forEach((kor) => {
+      if (!korToEngMapping[kor]) korToEngMapping[kor] = [];
+      korToEngMapping[kor].push(eng);
+    });
+  });
 
   // 폼 데이터
   const [formData, setFormData] = useState({
     title: "",
-    description: "",
-    startDate: "",
-    endDate: "",
+    sportGameIds: [] as number[],
+    startTime: "",
+    endTime: "",
     isPublic: 1,
+    displayOrder: 0,
   });
 
-  // 스포츠 경기 관련 상태
-  const [availableSportGames, setAvailableSportGames] = useState<SportGame[]>([]);
-  const [selectedSportGames, setSelectedSportGames] = useState<number[]>([]);
-  const [selectedSportGameDetails, setSelectedSportGameDetails] = useState<SportGame[]>([]);
-  const [searchQuery, setSearchQuery] = useState<string>("");
-  const [filteredSportGames, setFilteredSportGames] = useState<SportGame[]>([]);
-  const [showSportGameSelector, setShowSportGameSelector] = useState<boolean>(false);
+  // 스포츠 게임 선택 관련 상태
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredGames, setFilteredGames] = useState<SportGame[]>([]);
+  const [selectedGames, setSelectedGames] = useState<SportGame[]>([]);
 
   // 추천 목록 조회
-  const fetchRecommendations = async () => {
+  const fetchRecommendations = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // 실제 API 엔드포인트로 수정 필요
-      const response = await axios.get("/api/sports/recommendations", {
-        params: { page, limit },
-      });
-
-      if (response.data && response.data.success) {
-        setRecommendations(response.data.data || []);
-        setTotal(response.data.meta?.total || 0);
-        setTotalPages(response.data.meta?.totalPages || 1);
-      } else {
-        setRecommendations([]);
-        setError("스포츠 추천 목록을 불러오는데 실패했습니다.");
-      }
+      const result = await getSportRecommendations({ page, limit });
+      setRecommendations(result.data);
+      setTotal(result.meta.total || 0);
     } catch (err) {
       console.error("Error fetching sport recommendations:", err);
-      // 개발 중이므로 샘플 데이터 사용
-      const sampleData = [
-        {
-          id: 1,
-          title: "이번 주 축구 추천 경기",
-          description: "유럽 리그 주요 경기 모음",
-          isPublic: 1,
-          position: 100,
-          startDate: "2023-04-01T00:00:00",
-          endDate: "2023-04-30T23:59:59",
-          sportGames: [1, 2, 3],
-          createdAt: "2023-03-15T10:00:00",
-          updatedAt: "2023-03-15T10:00:00",
-        },
-        {
-          id: 2,
-          title: "NBA 하이라이트 경기",
-          description: "농구 팬을 위한 추천 경기",
-          isPublic: 1,
-          position: 90,
-          startDate: "2023-04-05T00:00:00",
-          endDate: "2023-05-05T23:59:59",
-          sportGames: [4, 5, 6],
-          createdAt: "2023-03-20T14:30:00",
-          updatedAt: "2023-03-20T14:30:00",
-        },
-      ];
-      setRecommendations(sampleData);
-      setTotal(sampleData.length);
-      setTotalPages(1);
+      setError("스포츠 종목 추천 목록을 불러오는데 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, limit]);
+
+  // 스포츠 게임 목록 조회
+  const fetchSportGames = useCallback(async () => {
+    try {
+      // 서버에서 모든 데이터를 가져옴 (검색어는 클라이언트에서만 처리)
+      const result = await getSportGames({});
+      setSportGames(result.data);
+
+      // 검색어가 있을 경우에만 클라이언트 측에서 필터링
+      if (searchQuery.trim()) {
+        filterGamesBySearchTerm(result.data, searchQuery.trim());
+      } else {
+        setFilteredGames(result.data);
+      }
+    } catch (err) {
+      console.error("Error fetching sport games:", err);
+    }
+  }, [searchQuery]);
+
+  // 검색어에 따른 게임 필터링 함수
+  const filterGamesBySearchTerm = (games: SportGame[], query: string) => {
+    console.log("Filtering games with query:", query);
+    console.log("Total games before filter:", games.length);
+
+    const normalizedQuery = query.toLowerCase();
+
+    // 검색어에 해당하는 다른 언어 키워드 가져오기
+    let alternativeTerms: string[] = [];
+
+    // 영문 검색어인 경우 한글 동의어 추가
+    if (sportMapping[normalizedQuery]) {
+      alternativeTerms = sportMapping[normalizedQuery];
+    }
+    // 한글 검색어인 경우 영문 동의어 추가
+    else if (korToEngMapping[normalizedQuery]) {
+      alternativeTerms = korToEngMapping[normalizedQuery];
+    }
+
+    // 모든 검색어 (원본 + 동의어)
+    const allSearchTerms = [normalizedQuery, ...alternativeTerms];
+    console.log("Searching for terms:", allSearchTerms);
+
+    const filtered = games.filter((game) => {
+      if (!game) return false;
+
+      // 게임 데이터의 모든 필드를 소문자로 변환하여 검색
+      const sportLower = (game.sport || "").toLowerCase();
+      const leagueLower = (game.league || "").toLowerCase();
+      const matchNameLower = (game.matchName || "").toLowerCase();
+      const homeTeamLower = (game.homeTeam || "").toLowerCase();
+      const awayTeamLower = (game.awayTeam || "").toLowerCase();
+
+      // 디버깅 정보: 체크 대상 필드
+      if (process.env.NODE_ENV === "development") {
+        if (
+          sportLower.includes(normalizedQuery) ||
+          leagueLower.includes(normalizedQuery) ||
+          matchNameLower.includes(normalizedQuery) ||
+          homeTeamLower.includes(normalizedQuery) ||
+          awayTeamLower.includes(normalizedQuery)
+        ) {
+          console.log("Match found:", game);
+        }
+      }
+
+      // 어떤 검색어라도 일치하면 포함
+      return allSearchTerms.some(
+        (term) =>
+          sportLower.includes(term) ||
+          leagueLower.includes(term) ||
+          matchNameLower.includes(term) ||
+          homeTeamLower.includes(term) ||
+          awayTeamLower.includes(term)
+      );
+    });
+
+    console.log("Filtered games count:", filtered.length);
+    setFilteredGames(filtered);
+  };
+
+  // 컴포넌트 마운트 시 데이터 로드
+  useEffect(() => {
+    fetchRecommendations();
+    fetchSportGames(); // 초기 로드 시 전체 데이터 가져오기
+  }, [fetchRecommendations, fetchSportGames]);
+
+  // 검색어 변경 시 게임 데이터 필터링
+  useEffect(() => {
+    // 이미 데이터가 있는 경우 로컬 필터링만 수행
+    if (sportGames.length > 0) {
+      if (searchQuery.trim()) {
+        filterGamesBySearchTerm(sportGames, searchQuery.trim());
+      } else {
+        setFilteredGames(sportGames);
+      }
+    }
+  }, [searchQuery]);
+
+  // 추천 추가 모달 열기
+  const handleAddRecommendation = () => {
+    const today = new Date();
+    const nextWeek = new Date(today);
+    nextWeek.setDate(today.getDate() + 7);
+
+    const formatDateForInput = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}T00:00`;
+    };
+
+    setModalType("add");
+    setCurrentRecommendation(null);
+    setFormData({
+      title: "",
+      sportGameIds: [],
+      startTime: formatDateForInput(today),
+      endTime: formatDateForInput(nextWeek),
+      isPublic: 1,
+      displayOrder:
+        recommendations.length > 0
+          ? Math.max(...recommendations.map((rec) => rec.displayOrder || 0)) + 1
+          : 1,
+    });
+    setSelectedGames([]);
+    setShowModal(true);
+  };
+
+  // 추천 수정 모달 열기
+  const handleEditRecommendation = async (recommendation: SportRecommendation) => {
+    setModalType("edit");
+    setCurrentRecommendation(recommendation);
+
+    // ISO 형식의 날짜를 input datetime-local 형식으로 변환
+    const formatDateForInput = (dateString: string) => {
+      if (!dateString) return "";
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const hours = String(date.getHours()).padStart(2, "0");
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    };
+
+    try {
+      // 상세 정보 가져오기
+      const detailData = await getSportRecommendationById(recommendation.id);
+
+      // 서버에서 반환된 games 배열 사용
+      if (detailData.games && Array.isArray(detailData.games)) {
+        setSelectedGames(detailData.games);
+
+        // 게임 ID 배열 생성
+        const gameIds = detailData.games.map((game) => game.id);
+
+        setFormData({
+          title: detailData.title,
+          sportGameIds: gameIds,
+          startTime: formatDateForInput(detailData.startTime),
+          endTime: formatDateForInput(detailData.endTime),
+          isPublic: detailData.isPublic,
+          displayOrder: detailData.displayOrder,
+        });
+      } else {
+        // 서버에서 games 배열이 없는 경우, 기존 방식 사용
+        const gameIds = detailData.sportGameIds || [detailData.sportGameId];
+        const games = sportGames.filter((g) => gameIds.includes(g.id));
+        setSelectedGames(games);
+
+        setFormData({
+          title: detailData.title,
+          sportGameIds: gameIds,
+          startTime: formatDateForInput(detailData.startTime),
+          endTime: formatDateForInput(detailData.endTime),
+          isPublic: detailData.isPublic,
+          displayOrder: detailData.displayOrder,
+        });
+      }
+    } catch (err) {
+      console.error("Error loading recommendation details:", err);
+      // 기본 데이터로 폴백
+      const gameIds = recommendation.sportGameIds || [recommendation.sportGameId];
+      const games = sportGames.filter((g) => gameIds.includes(g.id));
+      setSelectedGames(games);
+
+      setFormData({
+        title: recommendation.title,
+        sportGameIds: gameIds,
+        startTime: formatDateForInput(recommendation.startTime),
+        endTime: formatDateForInput(recommendation.endTime),
+        isPublic: recommendation.isPublic,
+        displayOrder: recommendation.displayOrder,
+      });
+    }
+
+    setShowModal(true);
+  };
+
+  // 추천 삭제
+  const handleDeleteRecommendation = async (id: number) => {
+    if (!confirm("정말 삭제하시겠습니까?")) return;
+
+    setLoading(true);
+
+    try {
+      const success = await deleteSportRecommendation(id);
+      if (success) {
+        setSuccess("스포츠 종목 추천이 삭제되었습니다.");
+        fetchRecommendations();
+      } else {
+        setError("스포츠 종목 추천 삭제에 실패했습니다.");
+      }
+    } catch (err) {
+      console.error("Error deleting sport recommendation:", err);
+      setError("스포츠 종목 추천 삭제 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
   };
 
-  // 사용 가능한 스포츠 경기 목록 가져오기
-  const fetchAvailableSportGames = async () => {
-    try {
-      const response = await axios.get("/api/sports/admin/games", {
-        params: { limit: 100 },
-      });
-
-      if (response.data && response.data.success) {
-        setAvailableSportGames(response.data.data || []);
-        setFilteredSportGames(response.data.data || []);
-      } else {
-        setAvailableSportGames([]);
-        setFilteredSportGames([]);
-      }
-    } catch (err) {
-      console.error("Error fetching available sport games:", err);
-      // 개발 중이므로 샘플 데이터 사용
-      const sampleData = [
-        {
-          id: 1,
-          sport: "FOOTBALL",
-          league: "Premier League",
-          matchName: "Arsenal vs Liverpool",
-          homeTeam: "Arsenal",
-          awayTeam: "Liverpool",
-          dateTime: "2023-04-15T19:30:00",
-        },
-        {
-          id: 2,
-          sport: "FOOTBALL",
-          league: "La Liga",
-          matchName: "Barcelona vs Real Madrid",
-          homeTeam: "Barcelona",
-          awayTeam: "Real Madrid",
-          dateTime: "2023-04-16T20:00:00",
-        },
-        {
-          id: 3,
-          sport: "FOOTBALL",
-          league: "Bundesliga",
-          matchName: "Bayern Munich vs Dortmund",
-          homeTeam: "Bayern Munich",
-          awayTeam: "Dortmund",
-          dateTime: "2023-04-17T18:30:00",
-        },
-        {
-          id: 4,
-          sport: "BASKETBALL",
-          league: "NBA",
-          matchName: "Lakers vs Warriors",
-          homeTeam: "LA Lakers",
-          awayTeam: "Golden State Warriors",
-          dateTime: "2023-04-18T19:00:00",
-        },
-        {
-          id: 5,
-          sport: "BASKETBALL",
-          league: "NBA",
-          matchName: "Celtics vs Nets",
-          homeTeam: "Boston Celtics",
-          awayTeam: "Brooklyn Nets",
-          dateTime: "2023-04-19T18:00:00",
-        },
-      ];
-      setAvailableSportGames(sampleData);
-      setFilteredSportGames(sampleData);
-    }
-  };
-
-  // 선택된 경기의 세부 정보 가져오기
-  const fetchSelectedSportGameDetails = async (ids: number[]) => {
-    if (ids.length === 0) {
-      setSelectedSportGameDetails([]);
-      return;
-    }
-
-    try {
-      // 실제 API에서는 벌크로 게임 정보를 가져오는 엔드포인트 사용
-      // 샘플 구현에서는 availableSportGames에서 필터링
-      const details = availableSportGames.filter((game) => ids.includes(game.id));
-      setSelectedSportGameDetails(details);
-    } catch (err) {
-      console.error("Error fetching selected sport game details:", err);
-      setSelectedSportGameDetails([]);
-    }
-  };
-
-  useEffect(() => {
-    fetchRecommendations();
-    fetchAvailableSportGames();
-  }, [page, limit]);
-
-  // 검색어로 게임 필터링
-  useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredSportGames(availableSportGames);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = availableSportGames.filter(
-        (game) =>
-          game.matchName.toLowerCase().includes(query) ||
-          game.homeTeam.toLowerCase().includes(query) ||
-          game.awayTeam.toLowerCase().includes(query) ||
-          game.league.toLowerCase().includes(query) ||
-          game.sport.toLowerCase().includes(query)
-      );
-      setFilteredSportGames(filtered);
-    }
-  }, [searchQuery, availableSportGames]);
-
-  // 선택된 게임 세부 정보 업데이트
-  useEffect(() => {
-    fetchSelectedSportGameDetails(selectedSportGames);
-  }, [selectedSportGames]);
-
-  // 모달 닫기
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setSelectedSportGames([]);
-    setSelectedSportGameDetails([]);
-    setShowSportGameSelector(false);
-  };
-
-  // 추천 추가 모달 열기
-  const handleAddRecommendation = () => {
-    // 초기화
-    const now = new Date();
-    const weekLater = new Date();
-    weekLater.setDate(now.getDate() + 7);
-
-    setCurrentRecommendation(null);
-    setFormData({
-      title: "",
-      description: "",
-      startDate:
-        now.toISOString().split("T")[0] + "T" + now.toTimeString().split(" ")[0].substring(0, 5),
-      endDate:
-        weekLater.toISOString().split("T")[0] +
-        "T" +
-        weekLater.toTimeString().split(" ")[0].substring(0, 5),
-      isPublic: 1,
-    });
-    setSelectedSportGames([]);
-    setSelectedSportGameDetails([]);
-    setIsEditing(false);
-    setShowModal(true);
-  };
-
-  // 추천 수정 모달 열기
-  const handleEditRecommendation = (recommendation: SportRecommendation) => {
-    setCurrentRecommendation(recommendation);
-
-    setFormData({
-      title: recommendation.title || "",
-      description: recommendation.description || "",
-      startDate: formatDateForInput(recommendation.startDate),
-      endDate: formatDateForInput(recommendation.endDate),
-      isPublic: recommendation.isPublic,
-    });
-
-    // 선택된 게임 설정
-    const gameIds =
-      Array.isArray(recommendation.sportGames) && typeof recommendation.sportGames[0] === "number"
-        ? (recommendation.sportGames as number[])
-        : recommendation.sportGameIds || [];
-
-    setSelectedSportGames(gameIds);
-    setIsEditing(true);
-    setShowModal(true);
-  };
-
-  // input datetime-local용 날짜 포맷
-  const formatDateForInput = (dateString: string): string => {
-    if (!dateString) return "";
-    const date = new Date(dateString);
-    return date.toISOString().substring(0, 16);
-  };
-
-  // 추천 삭제
-  const handleDeleteRecommendation = async (id: number) => {
-    if (!window.confirm("정말로 이 추천을 삭제하시겠습니까?")) {
-      return;
-    }
-
-    try {
-      // 실제 API 엔드포인트 사용
-      // const response = await axios.delete(`/api/sports/recommendations/${id}`);
-      // if (response.data && response.data.success) {
-      //   setAlertMessage({ type: "success", message: "추천이 성공적으로 삭제되었습니다." });
-      //   fetchRecommendations();
-      // } else {
-      //   setAlertMessage({ type: "error", message: "추천 삭제 중 오류가 발생했습니다." });
-      // }
-
-      // 개발 중이므로 성공 응답 가정
-      setAlertMessage({ type: "success", message: "추천이 성공적으로 삭제되었습니다." });
-      setRecommendations((prev) => prev.filter((rec) => rec.id !== id));
-    } catch (err) {
-      console.error("Error deleting recommendation:", err);
-      setAlertMessage({ type: "error", message: "추천 삭제 중 오류가 발생했습니다." });
-    }
-  };
-
-  // 폼 입력 핸들러
+  // 폼 입력값 변경 처리
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target;
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: ["number", "radio", "select-one"].includes(type) ? parseInt(value) : value,
+    }));
   };
 
-  // 스포츠 게임 선택/해제
-  const handleSportGameToggle = (game: SportGame) => {
-    setSelectedSportGames((prev) => {
-      if (prev.includes(game.id)) {
-        return prev.filter((id) => id !== game.id);
-      } else {
-        return [...prev, game.id];
+  // 추천 저장 (추가 또는 수정)
+  const handleSaveRecommendation = async () => {
+    // 유효성 검사
+    if (!formData.title.trim()) {
+      setError("제목을 입력해주세요.");
+      return;
+    }
+
+    if (formData.sportGameIds.length === 0) {
+      setError("스포츠 게임을 최소 하나 이상 선택해주세요.");
+      return;
+    }
+
+    if (!formData.startTime || !formData.endTime) {
+      setError("시작일과 종료일을 설정해주세요.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 주의: 서버 API가 단일 sportGameId만 지원하는 경우 아래 주석 부분으로 변경해야 합니다.
+      // 현재는 sportGameIds 배열을 전달하는 형태로 구현되어 있습니다.
+
+      /*
+      // 서버가 단일 ID만 지원하는 경우
+      const firstGameId = formData.sportGameIds[0] || 0;
+      const dataToSend = {
+        ...formData,
+        sportGameId: firstGameId
+      };
+      */
+
+      let result;
+      if (modalType === "add") {
+        result = await createSportRecommendation(formData);
+        setSuccess("새 스포츠 종목 추천이 등록되었습니다.");
+      } else if (currentRecommendation) {
+        result = await updateSportRecommendation(currentRecommendation.id, formData);
+        setSuccess("스포츠 종목 추천이 수정되었습니다.");
       }
+
+      setShowModal(false);
+      fetchRecommendations();
+    } catch (err) {
+      console.error("Error saving sport recommendation:", err);
+      setError("스포츠 종목 추천 저장 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 게임 정보 가져오기
+  const getGameInfo = (gameId: number) => {
+    const game = sportGames.find((g) => g.id === gameId);
+    return game || null;
+  };
+
+  // 게임 선택/해제 토글
+  const handleToggleGame = (game: SportGame) => {
+    setSelectedGames((prev) => {
+      // 이미 선택된 게임인지 확인
+      const isSelected = prev.some((g) => g.id === game.id);
+
+      // 선택된 게임 목록 업데이트
+      const newSelectedGames = isSelected ? prev.filter((g) => g.id !== game.id) : [...prev, game];
+
+      // formData의 sportGameIds도 함께 업데이트
+      setFormData((prevForm) => ({
+        ...prevForm,
+        sportGameIds: newSelectedGames.map((g) => g.id),
+      }));
+
+      return newSelectedGames;
     });
   };
 
-  // 선택한 게임 제거
-  const handleRemoveSportGame = (gameId: number) => {
-    setSelectedSportGames((prev) => prev.filter((id) => id !== gameId));
+  // 선택된 게임 제거
+  const handleRemoveSelectedGame = (gameId: number) => {
+    setSelectedGames((prev) => {
+      const newSelectedGames = prev.filter((g) => g.id !== gameId);
+
+      // formData의 sportGameIds도 함께 업데이트
+      setFormData((prevForm) => ({
+        ...prevForm,
+        sportGameIds: newSelectedGames.map((g) => g.id),
+      }));
+
+      return newSelectedGames;
+    });
   };
 
-  // 추천 저장
-  const handleSaveRecommendation = async () => {
-    if (!formData.title.trim()) {
-      setAlertMessage({ type: "error", message: "제목을 입력해주세요." });
-      return;
-    }
+  // 게임 위로 이동
+  const handleMoveUp = async (index: number) => {
+    if (index <= 0) return;
 
-    if (selectedSportGames.length === 0) {
-      setAlertMessage({ type: "error", message: "하나 이상의 스포츠 경기를 선택해주세요." });
-      return;
-    }
+    const newRecommendations = [...recommendations];
 
-    if (!formData.startDate || !formData.endDate) {
-      setAlertMessage({ type: "error", message: "시작일과 종료일을 모두 입력해주세요." });
-      return;
-    }
+    // 현재 선택된 추천과 위의 추천
+    const currentRecommendation = newRecommendations[index];
+    const targetRecommendation = newRecommendations[index - 1];
+
+    // displayOrder 값 교환
+    const currentDisplayOrder = currentRecommendation.displayOrder;
+    const targetDisplayOrder = targetRecommendation.displayOrder;
+
+    // displayOrder 값 교환
+    currentRecommendation.displayOrder = targetDisplayOrder;
+    targetRecommendation.displayOrder = currentDisplayOrder;
+
+    // 배열 내 위치 교환
+    newRecommendations[index] = targetRecommendation;
+    newRecommendations[index - 1] = currentRecommendation;
 
     try {
-      setSaving(true);
+      // 로컬 상태 먼저 업데이트
+      setRecommendations(newRecommendations);
 
-      const recommendationData = {
-        ...formData,
-        sportGameIds: selectedSportGames,
-      };
-
-      if (!isEditing) {
-        // 새 추천 생성
-        // const response = await axios.post("/api/sports/recommendations", recommendationData);
-        // if (response.data && response.data.success) {
-        //   setAlertMessage({ type: "success", message: "추천이 성공적으로 추가되었습니다." });
-        //   fetchRecommendations();
-        // } else {
-        //   setAlertMessage({ type: "error", message: "추천 추가 중 오류가 발생했습니다." });
-        // }
-
-        // 개발 중이므로 성공 응답 가정
-        const newRecommendation: SportRecommendation = {
-          id: Date.now(), // 임시 ID
-          ...formData,
-          sportGames: selectedSportGames,
-          position: 1,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-        setRecommendations((prev) => [newRecommendation, ...prev]);
-        setAlertMessage({ type: "success", message: "추천이 성공적으로 추가되었습니다." });
-      } else if (currentRecommendation) {
-        // 기존 추천 수정
-        // const response = await axios.put(`/api/sports/recommendations/${currentRecommendation.id}`, recommendationData);
-        // if (response.data && response.data.success) {
-        //   setAlertMessage({ type: "success", message: "추천이 성공적으로 수정되었습니다." });
-        //   fetchRecommendations();
-        // } else {
-        //   setAlertMessage({ type: "error", message: "추천 수정 중 오류가 발생했습니다." });
-        // }
-
-        // 개발 중이므로 성공 응답 가정
-        const updatedRecommendation: SportRecommendation = {
-          ...currentRecommendation,
-          ...formData,
-          sportGames: selectedSportGames,
-          updatedAt: new Date().toISOString(),
-        };
-        setRecommendations((prev) =>
-          prev.map((rec) => (rec.id === currentRecommendation.id ? updatedRecommendation : rec))
-        );
-        setAlertMessage({ type: "success", message: "추천이 성공적으로 수정되었습니다." });
-      }
-
-      handleCloseModal();
-    } catch (err) {
-      console.error("Error saving recommendation:", err);
-      setAlertMessage({
-        type: "error",
-        message: !isEditing
-          ? "추천 추가 중 오류가 발생했습니다."
-          : "추천 수정 중 오류가 발생했습니다.",
+      // API를 통해 각 추천 개별적으로 업데이트
+      await updateSportRecommendation(currentRecommendation.id, {
+        displayOrder: currentRecommendation.displayOrder,
       });
-    } finally {
-      setSaving(false);
+
+      await updateSportRecommendation(targetRecommendation.id, {
+        displayOrder: targetRecommendation.displayOrder,
+      });
+
+      // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
+      fetchRecommendations();
+      setSuccess("추천 순서가 변경되었습니다.");
+    } catch (err) {
+      // 에러 발생 시 원래 순서로 되돌림
+      fetchRecommendations();
+      setError("추천 순서 변경 중 오류가 발생했습니다.");
+      console.error("Error updating recommendation order:", err);
     }
+  };
+
+  // 게임 아래로 이동
+  const handleMoveDown = async (index: number) => {
+    if (index >= recommendations.length - 1) return;
+
+    const newRecommendations = [...recommendations];
+
+    // 현재 선택된 추천과 아래 추천
+    const currentRecommendation = newRecommendations[index];
+    const targetRecommendation = newRecommendations[index + 1];
+
+    // displayOrder 값 교환
+    const currentDisplayOrder = currentRecommendation.displayOrder;
+    const targetDisplayOrder = targetRecommendation.displayOrder;
+
+    // displayOrder 값 교환
+    currentRecommendation.displayOrder = targetDisplayOrder;
+    targetRecommendation.displayOrder = currentDisplayOrder;
+
+    // 배열 내 위치 교환
+    newRecommendations[index] = targetRecommendation;
+    newRecommendations[index + 1] = currentRecommendation;
+
+    try {
+      // 로컬 상태 먼저 업데이트
+      setRecommendations(newRecommendations);
+
+      // API를 통해 각 추천 개별적으로 업데이트
+      await updateSportRecommendation(currentRecommendation.id, {
+        displayOrder: currentRecommendation.displayOrder,
+      });
+
+      await updateSportRecommendation(targetRecommendation.id, {
+        displayOrder: targetRecommendation.displayOrder,
+      });
+
+      // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
+      fetchRecommendations();
+      setSuccess("추천 순서가 변경되었습니다.");
+    } catch (err) {
+      // 에러 발생 시 원래 순서로 되돌림
+      fetchRecommendations();
+      setError("추천 순서 변경 중 오류가 발생했습니다.");
+      console.error("Error updating recommendation order:", err);
+    }
+  };
+
+  // 등록 경기 개수 렌더링 함수
+  const renderGameCount = (gameIds: number[]) => {
+    if (!gameIds || gameIds.length === 0) return "0개의 경기";
+    return `${gameIds.length}개의 경기`;
   };
 
   // 데이터 테이블 컬럼 정의
   const columns = [
     {
-      header: "ID",
-      accessor: "id",
-      className: "w-16",
-    },
-    {
       header: "제목",
       accessor: "title",
     },
     {
-      header: "설명",
-      accessor: "description",
-      cell: (value: string) => <div className="max-w-md truncate">{value || "-"}</div>,
-    },
-    {
-      header: "경기 수",
-      accessor: (rec: SportRecommendation) => {
-        const games = Array.isArray(rec.sportGames) ? rec.sportGames.length : 0;
-        return <span>{games} 경기</span>;
+      header: "등록 경기",
+      accessor: (item: SportRecommendation) => {
+        // 서버에서 반환된 games 배열 사용
+        if (item.games && Array.isArray(item.games)) {
+          const count = item.games.length;
+          return count + "개의 경기";
+        }
+
+        // 기존 방식 (대체)
+        const gameIds = item.sportGameIds || [item.sportGameId];
+        return gameIds.length + "개의 경기";
       },
-      className: "w-24 text-center",
     },
     {
       header: "기간",
-      accessor: (rec: SportRecommendation) => (
-        <div>
-          {formatDate(rec.startDate, "YYYY.MM.DD")} ~ <br />
-          {formatDate(rec.endDate, "YYYY.MM.DD")}
-        </div>
-      ),
-      className: "w-44",
-    },
-    {
-      header: "상태",
-      accessor: (rec: SportRecommendation) => {
-        const now = new Date();
-        const start = new Date(rec.startDate);
-        const end = new Date(rec.endDate);
-        let status = "";
-        let colorClass = "";
-
-        if (now < start) {
-          status = "예정";
-          colorClass = "bg-blue-100 text-blue-800";
-        } else if (now > end) {
-          status = "종료";
-          colorClass = "bg-gray-100 text-gray-800";
-        } else {
-          status = "진행중";
-          colorClass = "bg-green-100 text-green-800";
-        }
-
-        return <span className={`px-2 py-1 rounded text-xs ${colorClass}`}>{status}</span>;
-      },
-      className: "w-24 text-center",
-    },
-    {
-      header: "공개",
-      accessor: (rec: SportRecommendation) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            rec.isPublic ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}
-        >
-          {rec.isPublic ? "공개" : "비공개"}
+      accessor: "startTime",
+      cell: (value: string, row: SportRecommendation) => (
+        <span>
+          {formatDate(row.startTime)} ~ {formatDate(row.endTime)}
         </span>
       ),
-      className: "w-20 text-center",
     },
     {
-      header: "등록일",
-      accessor: (rec: SportRecommendation) => formatDate(rec.createdAt || "", "YYYY.MM.DD"),
-      className: "w-28",
+      header: "공개 상태",
+      accessor: "isPublic",
+      cell: (value: number, row: SportRecommendation) => {
+        if (!value) {
+          return (
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              비공개
+            </span>
+          );
+        }
+
+        // 현재 시간과 시작일/종료일 비교
+        const now = new Date();
+        const startTime = row.startTime ? new Date(row.startTime) : null;
+        const endTime = row.endTime ? new Date(row.endTime) : null;
+
+        // 공개 상태 결정
+        let status = "공개";
+        let colorClass = "bg-green-100 text-green-800";
+
+        if (startTime && now < startTime) {
+          status = "공개 전";
+          colorClass = "bg-gray-100 text-gray-800";
+        } else if (endTime && now > endTime) {
+          status = "공개 종료";
+          colorClass = "bg-gray-100 text-gray-800";
+        }
+
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+            {status}
+          </span>
+        );
+      },
     },
     {
       header: "관리",
-      accessor: (rec: SportRecommendation) => (
+      accessor: "id",
+      cell: (value: number, row: SportRecommendation, index: number) => (
         <div className="flex space-x-2">
-          <ActionButton type="edit" onClick={() => handleEditRecommendation(rec)} />
-          <ActionButton type="delete" onClick={() => handleDeleteRecommendation(rec.id)} />
+          <ActionButton
+            label="위로"
+            action="up"
+            size="sm"
+            onClick={() => handleMoveUp(index)}
+            disabled={index === 0}
+          />
+          <ActionButton
+            label="아래로"
+            action="down"
+            size="sm"
+            onClick={() => handleMoveDown(index)}
+            disabled={index === recommendations.length - 1}
+          />
+          <ActionButton
+            label="수정"
+            action="edit"
+            size="sm"
+            onClick={() => handleEditRecommendation(row)}
+          />
+          <ActionButton
+            label="삭제"
+            action="delete"
+            size="sm"
+            onClick={() => handleDeleteRecommendation(value)}
+          />
         </div>
       ),
-      className: "w-24",
     },
   ];
 
   return (
-    <div>
+    <div className="mb-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">스포츠 종목 추천 관리</h1>
-        <p className="text-sm text-gray-600">메인 페이지에 노출될 스포츠 종목 추천을 관리합니다.</p>
+        <p className="text-sm text-gray-600">
+          메인에 노출될 스포츠 게임 추천을 관리하고 공개 여부를 설정할 수 있습니다.
+        </p>
       </div>
 
-      {alertMessage && (
+      {(error || success) && (
         <div className="mb-4">
           <Alert
-            type={alertMessage.type}
-            message={alertMessage.message}
-            onClose={() => setAlertMessage(null)}
+            type={error ? "error" : "success"}
+            message={error || success || ""}
+            onClose={() => {
+              setError(null);
+              setSuccess(null);
+            }}
           />
         </div>
       )}
 
-      {/* 작업 버튼 */}
       <div className="flex justify-end mb-4">
-        <Button type="primary" onClick={handleAddRecommendation}>
-          추천 추가
+        <Button onClick={handleAddRecommendation}>
+          <div className="flex items-center gap-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span>새 게임 추천 추가</span>
+          </div>
         </Button>
       </div>
 
-      {/* 데이터 테이블 */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <DataTable
           columns={columns}
           data={recommendations}
           loading={loading}
-          emptyMessage="스포츠 추천 데이터가 없습니다."
-          pagination={{
-            currentPage: page,
-            pageSize: limit,
-            totalItems: total,
-            onPageChange: setPage,
-          }}
+          emptyMessage="등록된 스포츠 게임 추천이 없습니다."
         />
       </div>
 
-      {/* 추천 추가/수정 모달 */}
       <Modal
         isOpen={showModal}
-        title={isEditing ? "스포츠 추천 수정" : "새 스포츠 추천 추가"}
-        onClose={handleCloseModal}
+        onClose={() => setShowModal(false)}
+        title={modalType === "add" ? "새 게임 추천 추가" : "게임 추천 수정"}
+        size="lg"
+        footer={
+          <div className="flex justify-end space-x-3">
+            <Button variant="outline" onClick={() => setShowModal(false)}>
+              취소
+            </Button>
+            <Button onClick={handleSaveRecommendation}>저장</Button>
+          </div>
+        }
       >
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* 1. 제목 입력 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
-            <Input
+            <input
               type="text"
               name="title"
-              placeholder="추천 제목 입력"
               value={formData.title}
               onChange={handleInputChange}
-              required
+              className="w-full p-2 border border-gray-300 rounded-md"
+              placeholder="예: 이번 주 주목할 경기"
             />
           </div>
 
+          {/* 2. 선택된 스포츠 게임 표시 */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">설명</label>
-            <textarea
-              name="description"
-              placeholder="추천 설명 입력"
-              value={formData.description}
-              onChange={handleInputChange}
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
-              <Input
-                type="datetime-local"
-                name="startDate"
-                value={formData.startDate}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">종료일</label>
-              <Input
-                type="datetime-local"
-                name="endDate"
-                value={formData.endDate}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">공개 여부</label>
-            <select
-              name="isPublic"
-              value={formData.isPublic}
-              onChange={handleInputChange}
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              선택된 스포츠 게임 ({selectedGames.length})
+            </label>
+            <div
+              className="border border-gray-300 rounded-md p-3"
+              style={{ maxHeight: "150px", overflowY: "auto" }}
             >
-              <option value={1}>공개</option>
-              <option value={0}>비공개</option>
-            </select>
-          </div>
-
-          <div>
-            <div className="flex justify-between items-center mb-1">
-              <label className="block text-sm font-medium text-gray-700">
-                선택된 경기 ({selectedSportGames.length})
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowSportGameSelector(!showSportGameSelector)}
-                className="text-sm text-blue-600 hover:text-blue-800"
-              >
-                {showSportGameSelector ? "접기" : "경기 선택"}
-              </button>
-            </div>
-
-            {/* 선택된 경기 목록 */}
-            <div className="border border-gray-300 rounded-md p-2 max-h-48 overflow-y-auto">
-              {selectedSportGameDetails.length > 0 ? (
+              {selectedGames.length > 0 ? (
                 <div className="space-y-2">
-                  {selectedSportGameDetails.map((game) => (
+                  {selectedGames.map((game) => (
                     <div key={game.id} className="flex justify-between items-center border-b pb-2">
-                      <div className="flex-1">
-                        <div className="font-medium">{game.matchName}</div>
-                        <div className="text-sm text-gray-600">
-                          {game.homeTeam} vs {game.awayTeam} |{" "}
-                          {formatDate(game.dateTime, "YYYY.MM.DD HH:mm")}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {game.league} ({game.sport})
-                        </div>
-                      </div>
+                      <div className="font-medium">{game.matchName}</div>
                       <button
                         type="button"
-                        onClick={() => handleRemoveSportGame(game.id)}
-                        className="text-red-600 hover:text-red-800"
+                        onClick={() => handleRemoveSelectedGame(game.id)}
+                        className="text-red-500 hover:text-red-700 text-sm"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className="h-5 w-5"
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
+                        삭제
                       </button>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-gray-500 text-center py-4">
-                  선택된 경기가 없습니다. 경기를 선택해주세요.
+                <div className="flex items-center justify-center h-20 text-gray-500">
+                  아래에서 스포츠 게임을 선택해주세요
                 </div>
               )}
             </div>
           </div>
 
-          {/* 경기 선택기 */}
-          {showSportGameSelector && (
-            <div className="border border-gray-300 rounded-md p-3">
-              <div className="mb-3">
-                <Input
+          {/* 3. 스포츠 게임 선택 */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-700">스포츠 게임 선택</label>
+              <div className="relative w-64">
+                <input
                   type="text"
-                  placeholder="경기 검색 (팀명, 리그, 종목 등)"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="게임 검색 (팀명, 리그, 종목, 경기명)"
+                  className="p-2 w-full border border-gray-300 rounded-md"
                 />
               </div>
-
-              <div className="max-h-64 overflow-y-auto">
-                {filteredSportGames.length > 0 ? (
-                  <div className="space-y-2">
-                    {filteredSportGames.map((game) => (
-                      <div
-                        key={game.id}
-                        className={`p-2 border rounded-md cursor-pointer ${
-                          selectedSportGames.includes(game.id)
-                            ? "bg-blue-50 border-blue-300"
-                            : "border-gray-200 hover:bg-gray-50"
-                        }`}
-                        onClick={() => handleSportGameToggle(game)}
-                      >
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedSportGames.includes(game.id)}
-                            onChange={() => {}}
-                            className="h-4 w-4 text-blue-600 mr-2"
-                          />
-                          <div className="flex-1">
-                            <div className="font-medium">{game.matchName}</div>
-                            <div className="text-sm">
-                              {game.homeTeam} vs {game.awayTeam} |{" "}
-                              {formatDate(game.dateTime, "YYYY.MM.DD HH:mm")}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {game.league} ({game.sport})
-                            </div>
+            </div>
+            <div
+              className="border border-gray-300 rounded-md p-3"
+              style={{ maxHeight: "300px", overflowY: "auto" }}
+            >
+              {filteredGames.length > 0 ? (
+                <div className="space-y-2">
+                  {filteredGames.map((game) => (
+                    <div
+                      key={game.id}
+                      className={`p-2 border rounded-md cursor-pointer ${
+                        selectedGames.some((g) => g.id === game.id)
+                          ? "bg-blue-50 border-blue-300"
+                          : "border-gray-200 hover:bg-gray-50"
+                      }`}
+                      onClick={() => handleToggleGame(game)}
+                    >
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          name={`game-${game.id}`}
+                          checked={selectedGames.some((g) => g.id === game.id)}
+                          onChange={() => handleToggleGame(game)}
+                          className="h-4 w-4 text-blue-600 mr-2 rounded"
+                        />
+                        <div>
+                          <div className="font-medium">{game.matchName}</div>
+                          <div className="text-sm">
+                            {game.homeTeam} vs {game.awayTeam}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {game.league} ({game.sport}) | {formatDate(game.dateTime)}
                           </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-gray-500 text-center py-4">검색 결과가 없습니다.</div>
-                )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center p-6 text-gray-500">
+                  {searchQuery.trim()
+                    ? "검색 결과가 없습니다. 팀명, 리그, 종목 또는 경기명으로 검색해 보세요."
+                    : "게임 목록을 불러오는 중입니다..."}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 4. 기간 설정 */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">시작일</label>
+              <input
+                type="datetime-local"
+                name="startTime"
+                value={formData.startTime}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">종료일</label>
+              <input
+                type="datetime-local"
+                name="endTime"
+                value={formData.endTime}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded-md"
+              />
+            </div>
+          </div>
+
+          {/* 5. 공개여부 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">공개여부</label>
+            <div className="flex space-x-4">
+              <div className="flex items-center">
+                <input
+                  type="radio"
+                  id="visibility-public"
+                  name="isPublic"
+                  value="1"
+                  checked={formData.isPublic === 1}
+                  onChange={handleInputChange}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <label htmlFor="visibility-public" className="ml-2 text-sm text-gray-700">
+                  공개
+                </label>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="radio"
+                  id="visibility-private"
+                  name="isPublic"
+                  value="0"
+                  checked={formData.isPublic === 0}
+                  onChange={handleInputChange}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                />
+                <label htmlFor="visibility-private" className="ml-2 text-sm text-gray-700">
+                  비공개
+                </label>
               </div>
             </div>
-          )}
-        </div>
-
-        <div className="mt-6 flex justify-end space-x-3">
-          <Button type="secondary" onClick={handleCloseModal}>
-            취소
-          </Button>
-          <Button type="primary" onClick={handleSaveRecommendation} disabled={saving}>
-            {saving ? "저장 중..." : isEditing ? "수정" : "추가"}
-          </Button>
+          </div>
         </div>
       </Modal>
     </div>
   );
-};
-
-export default SportRecommendationsManagement;
+}
