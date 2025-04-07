@@ -174,3 +174,15 @@ export interface SportCategory {
   createdAt: string;
   updatedAt: string;
 }
+
+// 송금 배너(암호화폐 송금) 관련 타입
+export interface RemittanceBanner {
+  id: number;
+  name: string; // siteName → name으로 변경
+  imageUrl: string; // logo → imageUrl로 변경
+  link: string;
+  isPublic: number;
+  displayOrder: number; // 순서
+  createdAt: string;
+  updatedAt: string;
+}
