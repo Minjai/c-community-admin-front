@@ -36,7 +36,7 @@ const CompanyBannerPage: React.FC = () => {
     position: 0,
   };
 
-  // 날짜 포맷 변환 함수
+  // 날짜 표시 포맷 변환 함수 (UI 표시용)
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
 
@@ -51,6 +51,23 @@ const CompanyBannerPage: React.FC = () => {
     const minutes = String(date.getMinutes()).padStart(2, "0");
 
     return `${year}.${month}.${day} ${hours}:${minutes}`;
+  };
+
+  // 날짜를 yyyy-MM-dd 형식으로 변환하는 함수 (폼 입력용)
+  const formatDateForInput = (dateStr: string) => {
+    if (!dateStr) return "";
+
+    const date = new Date(dateStr);
+
+    // Create a date-time string in the format required by datetime-local input
+    // Format: yyyy-MM-ddThh:mm
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
   // 배너 목록 조회
@@ -105,10 +122,22 @@ const CompanyBannerPage: React.FC = () => {
 
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
+    console.log("수정할 배너 데이터:", banner);
+
+    // 서버에서 받은 날짜 형식을 폼에 맞게 변환
+    const formattedStartDate = formatDateForInput(banner.startDate);
+    const formattedEndDate = formatDateForInput(banner.endDate);
+
+    console.log("변환된 시작일:", formattedStartDate);
+    console.log("변환된 종료일:", formattedEndDate);
+
     setCurrentBanner({
       ...banner,
+      startDate: formattedStartDate,
+      endDate: formattedEndDate,
       isPublic: banner.isPublic === 1 ? 1 : 0,
     });
+
     setPcImageFile(null);
     setMobileImageFile(null);
     setShowModal(true);

@@ -93,7 +93,7 @@ const MainBannerPage: React.FC = () => {
       mUrl: "",
       startDate: "",
       endDate: "",
-      isPublic: true,
+      isPublic: 1,
       position: banners.length + 1, // 현재 배너 개수 + 1
       bannerType: "main",
     });
@@ -207,8 +207,8 @@ const MainBannerPage: React.FC = () => {
               position: currentBanner.position,
               bannerType: "main",
             },
-            null, // 이미지 강제로 null 설정
-            null // 이미지 강제로 null 설정
+            pcImageFile, // 이미지 파일 전송
+            mobileImageFile // 이미지 파일 전송
           );
 
           // 수정 후 데이터 즉시 확인 (변경 사항이 제대로 적용되었는지 확인)
@@ -647,8 +647,8 @@ const MainBannerPage: React.FC = () => {
               <input
                 type="checkbox"
                 id="isPublic"
-                checked={currentBanner.isPublic || false}
-                onChange={(e) => handleInputChange("isPublic", e.target.checked)}
+                checked={currentBanner.isPublic === 1}
+                onChange={(e) => handleInputChange("isPublic", e.target.checked ? 1 : 0)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
               <label htmlFor="isPublic" className="text-sm font-medium text-gray-700">
