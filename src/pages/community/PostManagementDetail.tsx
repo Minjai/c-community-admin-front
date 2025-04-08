@@ -3,6 +3,7 @@ import TextEditor from "../../components/forms/TextEditor";
 import { useParams, useNavigate } from "react-router-dom";
 import { Post, Comment } from "@/types";
 import axios from "@/api/axios";
+import { AxiosProgressEvent } from "axios";
 
 // replaceAsync 유틸리티 함수 추가
 const replaceAsync = async (
@@ -10,14 +11,53 @@ const replaceAsync = async (
   regex: RegExp,
   asyncFn: (match: string, ...args: any[]) => Promise<string>
 ): Promise<string> => {
+  // 입력 문자열 검증
+  if (!str || typeof str !== "string") {
+    console.warn("Invalid string provided to replaceAsync:", str);
+    return str || "";
+  }
+
   const promises: Promise<string>[] = [];
+
+  // 정규식 매치 처리
   str.replace(regex, (match, ...args) => {
-    const promise = asyncFn(match, ...args);
-    promises.push(promise);
+    // match가 유효한지 확인
+    if (!match) {
+      console.warn("Invalid match in replaceAsync");
+      return match;
+    }
+
+    try {
+      const promise = asyncFn(match, ...args);
+      promises.push(promise);
+    } catch (error) {
+      console.error("Error in asyncFn:", error);
+      promises.push(Promise.resolve(match));
+    }
+
     return match; // 이 반환값은 실제로 사용되지 않음
   });
-  const data = await Promise.all(promises);
-  return str.replace(regex, () => data.shift() || "");
+
+  // 모든 프로미스 처리
+  let replacementData: string[] = [];
+  try {
+    replacementData = await Promise.all(promises);
+  } catch (error) {
+    console.error("Error in Promise.all:", error);
+    // 오류 발생 시 원본 반환
+    return str;
+  }
+
+  // 결과 문자열 생성
+  try {
+    return str.replace(regex, () => {
+      const replacement = replacementData.shift();
+      return replacement !== undefined ? replacement : "";
+    });
+  } catch (error) {
+    console.error("Error in final replace:", error);
+    return str;
+  }
 };
 
 // S3에 이미지 업로드 함수
@@ -28,18 +68,55 @@ const uploadBase64ImageToS3 = async (
   postId: number
 ): Promise<string> => {
   try {
-    const response = await axios.post("/upload/image", {
-      image: base64Data,
-      userId,
-      folder,
-      postId,
-    });
-    return response.data.imageUrl;
-  } catch (error) {
-    console.error("이미지 업로드 오류:", error);
+    // 이미지 크기 확인
+    const sizeInBytes = Math.ceil((base64Data.length * 3) / 4);
+    const sizeInMB = sizeInBytes / (1024 * 1024);
+
+    console.log(`이미지 업로드 시도: 크기 약 ${sizeInMB.toFixed(2)}MB`);
+
+    // 크기 제한 (8MB)
+    if (sizeInMB > 8) {
+      console.warn(
+        `이미지 크기가 ${sizeInMB.toFixed(
+          2
+        )}MB로 제한(8MB)을 초과합니다. 업로드가 실패할 수 있습니다.`
+      );
+    }
+
+    // 대용량 이미지는 청크로 나누어 처리
+    if (sizeInMB > 4) {
+      console.log("대용량 이미지 감지. FormData를 사용한 업로드를 권장합니다.");
+    }
+
+    // 이미지 업로드는 게시물 저장 시 함께 처리될 예정이므로 여기서는 가짜 응답을 반환
+    // 실제 구현에서는 이 함수 호출이 필요 없을 수 있음
+    console.log("이미지 데이터 준비 완료, 게시물 저장 시 함께 전송됩니다.");
+    return `temp_image_url_${Date.now()}.jpg`;
+  } catch (error: any) {
+    console.error("이미지 처리 오류:", error);
+    if (error.response) {
+      console.error("서버 응답:", error.response.status, error.response.data);
+    }
+
+    if (error.response?.status === 413) {
+      throw new Error("이미지 크기가 너무 큽니다. 8MB 이하의 이미지를 사용해주세요.");
+    }
+
     throw error;
   }
 };
+
+interface Response {
+  success: boolean;
+  data?: {
+    id: number;
+    title: string;
+    content: string;
+    // 다른 필요한 속성들
+  };
+  imageUrl?: string;
+  error?: string;
+}
 
 const PostDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -52,6 +129,7 @@ const PostDetail = () => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0); // 업로드 진행 상태
   const [error, setError] = useState<string | null>(null);
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
@@ -59,159 +137,101 @@ const PostDetail = () => {
   const isNewPost = id === "new";
   const isEditMode = !isNewPost;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    // HTML 내용 정제 함수
-    const sanitizeHtml = (html: string) => {
-      // 빈 p 태그 및 br 태그만 있는 경우를 감지
-      const isEmptyHtml =
-        !html ||
-        html === "<p><br></p>" ||
-        html.trim() === "" ||
-        html.replace(/<p><br><\/p>/g, "").trim() === "";
-
-      return {
-        isEmpty: isEmptyHtml,
-        html: html,
-      };
-    };
-
-    // 내용 분석
-    const contentAnalysis = sanitizeHtml(content);
-
-    // 이미지 포함 여부 확인 (이미지만 있는 경우에도 유효하도록)
-    const hasImage = content.includes("<img");
-
-    const trimmedTitle = title.trim();
-
-    // 제목 체크
-    if (!trimmedTitle) {
-      setError("제목을 입력해주세요.");
-      return;
-    }
-
-    // 내용이 비어있고 이미지도 없는 경우
-    if (contentAnalysis.isEmpty && !hasImage) {
-      setError("내용을 입력하거나 이미지를 첨부해주세요.");
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
-
     try {
-      // 현재 로그인한 사용자 ID 가져오기
-      const userData = JSON.parse(localStorage.getItem("admin_user") || "{}");
-      const userId = userData.id || 0;
-
-      // 이미지 URL 저장 배열
-      const imageUrls = [];
-
-      // 게시물 ID (새 게시물인 경우 임시 ID 사용)
-      const postId = isEditMode ? Number(id) : Date.now();
-
-      // 이미지 처리
-      const imageRegex = /<img[^>]+src="data:image\/[^>]+"[^>]*>/g;
-      const srcRegex = /src="(data:image\/[^"]+)"/;
-      let processedContent = await replaceAsync(content, imageRegex, async (match) => {
-        const src = match.match(srcRegex)[1];
-        const imageUrl = await uploadBase64ImageToS3(src, userId, "posts", postId);
-        imageUrls.push(imageUrl);
-        return match.replace(src, imageUrl);
-      });
-
-      // 유튜브 링크 변환
-      const youtubeRegex =
-        /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
-      const paragraphRegex =
-        /<p>(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[a-zA-Z0-9_-]{11})<\/p>/g;
-      processedContent = processedContent.replace(paragraphRegex, (match, p1) => {
-        const videoId = p1.match(youtubeRegex)[0].match(/([a-zA-Z0-9_-]{11})/)[1];
-        return `<div class="video-container"><iframe width="560" height="315" src="https://www.youtube.com/embed/${videoId}" frameborder="0" allowfullscreen></iframe></div>`;
-      });
-
-      const requestData = {
-        title: trimmedTitle,
-        content: processedContent, // 처리된 컨텐츠 사용
-        boardId: isEditMode ? post?.boardId || 2 : 2, // boardId를 숫자로 유지
-        isPopular: isPopular ? 1 : 0, // 인기 게시물 여부 (1 또는 0)
-      };
-
-      console.log("저장 요청 데이터:", requestData);
-
-      if (isEditMode) {
-        // 기존 게시물 수정
-        const response = await axios.put<Post>(`/post/${id}`, requestData);
-
-        if (response.status === 200) {
-          alert("게시물이 수정되었습니다.");
-          navigate("/community/posts");
-        } else {
-          // 상세 오류 메시지 설정
-          const errorMessage =
-            (response.data as any)?.error ||
-            (response.data as any)?.message ||
-            "게시물 수정 중 오류가 발생했습니다.";
-          setError(errorMessage);
-        }
-      } else {
-        // 새 게시물 작성
-        const response = await axios.post<Post>("/post", requestData);
-
-        if (response.status === 201 || response.status === 200) {
-          alert("게시물이 작성되었습니다.");
-          navigate("/community/posts");
-        } else {
-          // 상세 오류 메시지 설정
-          const errorMessage =
-            (response.data as any)?.error ||
-            (response.data as any)?.message ||
-            "게시물 작성 중 오류가 발생했습니다.";
-          setError(errorMessage);
-        }
+      // 폼 유효성 검사
+      const trimmedTitle = title.trim();
+      if (trimmedTitle.length === 0) {
+        setError("제목을 입력해주세요.");
+        return;
       }
-    } catch (error: any) {
-      console.error("게시물 저장 오류:", error);
 
-      // 오류 상세 정보 분석
-      let errorMessage = "게시물을 저장하는 중 오류가 발생했습니다.";
+      if (content.length <= 20) {
+        setError("내용은 최소 20자 이상 입력해주세요.");
+        return;
+      }
 
-      if (error.response) {
-        // 서버 응답이 있는 경우 상세 오류 메시지 표시
-        if (error.response.data) {
-          if (error.response.data.error) {
-            errorMessage = `저장 오류: ${error.response.data.error}`;
-          } else if (error.response.data.message) {
-            errorMessage = `저장 오류: ${error.response.data.message}`;
-          } else if (typeof error.response.data === "string") {
-            errorMessage = `저장 오류: ${error.response.data}`;
+      // 에디터 내용 분석
+      const contentAnalysis = analyzeContent(content);
+
+      // **이미지와 콘텐츠를 함께 저장하는 새로운 접근법**
+      console.log("서버 API 명세에 맞춰 이미지와 게시물을 함께 전송합니다.");
+
+      // 서버측 요구사항에 맞게 요청 형식 변경
+      const formData = new FormData();
+      formData.append("title", trimmedTitle);
+      formData.append("content", content);
+      formData.append("boardId", "2");
+      formData.append("isPublic", "1");
+      formData.append("isPopular", isPopular ? "1" : "0");
+
+      // 이미지 파일 추가 (에디터에서 감지된 이미지)
+      if (contentAnalysis.imgSources.length > 0) {
+        let imageCount = 0;
+
+        // 이미지 소스를 파일로 변환하여 추가
+        for (const imgSrc of contentAnalysis.imgSources) {
+          if (imgSrc.startsWith("data:image/")) {
+            const file = base64ToFile(imgSrc);
+            if (file) {
+              formData.append("images", file);
+              imageCount++;
+              console.log(
+                `Base64 이미지를 File로 변환하여 추가: ${file.name} (${file.size} bytes)`
+              );
+            }
           }
         }
 
-        // 특정 상태 코드별 메시지
-        if (error.response.status === 413) {
-          errorMessage = "업로드한 이미지 크기가 너무 큽니다. 이미지 크기를 줄여주세요.";
-        } else if (error.response.status === 400) {
-          errorMessage = "잘못된 요청입니다. 입력 내용을 확인해주세요.";
-        } else if (error.response.status === 401) {
-          errorMessage = "인증이 필요합니다. 다시 로그인해주세요.";
-          setTimeout(() => {
-            navigate("/login");
-          }, 1500);
-        } else if (error.response.status === 403) {
-          errorMessage = "이 작업을 수행할 권한이 없습니다.";
-          setTimeout(() => {
-            navigate("/login");
-          }, 1500);
-        }
-      } else if (error.message && error.message.includes("Network")) {
-        errorMessage = "네트워크 연결 오류가 발생했습니다. 연결 상태를 확인해주세요.";
+        console.log(`총 ${imageCount}개의 이미지가 FormData에 추가됨`);
+      } else {
+        console.log("이미지가 감지되지 않았습니다.");
       }
 
-      setError(errorMessage);
+      // 진행률 설정
+      setUploadProgress(30);
+
+      console.log("FormData 준비 완료");
+
+      const response = await axios({
+        method: isEditMode ? "PUT" : "POST",
+        url: isEditMode ? `/admin/post/${id}` : "/admin/post",
+        data: formData,
+        onUploadProgress: (progressEvent: AxiosProgressEvent) => {
+          const total = progressEvent.total || 0;
+          const progress = total ? Math.round((progressEvent.loaded * 100) / total) : 0;
+          console.log(`업로드 진행률: ${progress}%`);
+          setUploadProgress(30 + progress * 0.7); // 30%~100% 구간으로 설정
+        },
+      });
+
+      if (response.data && response.data.success) {
+        console.log("게시물 저장 성공:", response.data);
+        setLoading(false);
+        alert(isEditMode ? "게시물이 수정되었습니다." : "게시물이 작성되었습니다.");
+        navigate("/community/posts");
+      } else if (response.data && response.data.post) {
+        // 서버에서 'message'와 'post' 객체를 반환하는 경우도 성공으로 처리
+        console.log("게시물 저장 성공:", response.data);
+        setLoading(false);
+        alert(
+          response.data.message ||
+            (isEditMode ? "게시물이 수정되었습니다." : "게시물이 작성되었습니다.")
+        );
+        navigate("/community/posts");
+      } else {
+        console.error("게시물 저장 실패:", response.data);
+        setLoading(false);
+        alert(isEditMode ? "수정 중 오류가 발생했습니다." : "등록 중 오류가 발생했습니다.");
+      }
+    } catch (error: any) {
+      console.error("처리 중 오류 발생:", error);
+      setError("게시물 처리 중 오류가 발생했습니다.");
     } finally {
       setSaving(false);
+      setUploadProgress(0);
     }
   };
 
@@ -453,6 +473,104 @@ const PostDetail = () => {
     }
   }, [editorContainerRef.current]);
 
+  // 데이터 분석 및 콘텐츠 내 이미지 처리
+  const analyzeContent = (content: string) => {
+    console.log("전체 에디터 내용:", content);
+
+    // 에디터 내용 샘플 출력 (기본값)
+    const contentSample = content;
+    console.log("에디터 내용 샘플:", contentSample);
+
+    // 이미지 태그 추출 (정규식)
+    const imgTags = content.match(/<img[^>]+>/g) || [];
+    console.log("에디터의 모든 이미지 태그:", imgTags.length ? imgTags : "이미지 태그 없음");
+
+    // 이미지 소스 추출
+    const imgSources: string[] = [];
+    imgTags.forEach((tag) => {
+      const srcMatch = tag.match(/src=["']([^"']+)["']/);
+      if (srcMatch && srcMatch[1]) {
+        imgSources.push(srcMatch[1]);
+      }
+    });
+
+    // 이미지 태그 수와 추출된 이미지 소스 수가 일치하는지 확인
+    console.log(
+      `이미지 태그 개수: ${imgTags.length}, 추출된 이미지 소스 개수: ${imgSources.length}`
+    );
+    if (imgSources.length > 0) {
+      // 첫 번째와 마지막 이미지 소스 미리보기
+      console.log("첫 번째 이미지 소스:", imgSources[0].substring(0, 50) + "...");
+      if (imgSources.length > 1) {
+        console.log(
+          "마지막 이미지 소스:",
+          imgSources[imgSources.length - 1].substring(0, 50) + "..."
+        );
+      }
+    }
+
+    // 이미지 감지 여부
+    const hasImgTag = imgTags.length > 0;
+    const hasBase64Image = content.includes("data:image/");
+    const hasEmbeddedImage = imgSources.some((src) => src.startsWith("data:image/"));
+    const hasQuillImage = content.includes('class="ql-image"');
+    const hasGifImage = content.toLowerCase().includes(".gif") || content.includes("image/gif");
+
+    console.log("폼 제출 전 내용 분석:", {
+      hasImgTag,
+      hasBase64Image,
+      hasEmbeddedImage,
+      hasQuillImage,
+      hasGifImage,
+      imgTagCount: imgTags.length,
+      imgSourceCount: imgSources.length,
+    });
+
+    return {
+      imgTags,
+      imgSources,
+      hasImage: hasImgTag || hasBase64Image || hasEmbeddedImage || hasQuillImage,
+      hasBase64Images: hasBase64Image || hasEmbeddedImage,
+    };
+  };
+
+  // base64 이미지를 File 객체로 변환하는 함수
+  const base64ToFile = (base64String: string): File | null => {
+    try {
+      // Base64 데이터에서 파일로 변환
+      const parts = base64String.split(",");
+      if (parts.length !== 2) {
+        console.error("잘못된 base64 형식:", base64String.substring(0, 30) + "...");
+        return null;
+      }
+
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      if (!mimeMatch || !mimeMatch[1]) {
+        console.error("MIME 타입을 찾을 수 없음");
+        return null;
+      }
+
+      const mime = mimeMatch[1];
+      const bstr = atob(parts[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+
+      const blob = new Blob([u8arr], { type: mime });
+      const extension = mime.split("/")[1] || "png";
+      const fileName = `image-${new Date().getTime()}-${Math.floor(
+        Math.random() * 1000
+      )}.${extension}`;
+      return new File([blob], fileName, { type: mime });
+    } catch (error) {
+      console.error("Base64 이미지 변환 오류:", error);
+      return null;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -511,6 +629,21 @@ const PostDetail = () => {
             인기 게시물로 등록
           </label>
         </div>
+
+        {/* 업로드 진행 상태 표시 */}
+        {saving && uploadProgress > 0 && (
+          <div className="mb-4">
+            <div className="text-sm font-medium text-gray-700 mb-1">
+              업로드 진행률: {uploadProgress}%
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div
+                className="bg-blue-600 h-2.5 rounded-full"
+                style={{ width: `${uploadProgress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
 
         <div className="flex justify-end space-x-3">
           <button
