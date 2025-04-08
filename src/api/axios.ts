@@ -1,9 +1,30 @@
 import axios from "axios";
 
+// 현재 포트 번호 확인 (어드민/유저 구분)
+const getCurrentPort = () => {
+  return window.location.port;
+};
+
+// 어드민 포트 번호 (실제 환경에 맞게 수정 필요)
+const ADMIN_PORT = import.meta.env.VITE_ADMIN_PORT || "3000";
+
+// 현재 포트가 어드민 포트인지 확인
+export const isAdminPort = () => {
+  return getCurrentPort() === ADMIN_PORT;
+};
+
+// 로컬 스토리지 접두사 (포트 기반 구분)
+const STORAGE_PREFIX = isAdminPort() ? "admin_" : "user_";
+
 // 어드민 로컬 스토리지 키 (일반 사용자와 구분)
-const ADMIN_USER_KEY = "admin_user";
-const ADMIN_TOKEN_KEY = "admin_token";
-const ADMIN_REFRESH_TOKEN_KEY = "admin_refreshToken";
+const ADMIN_USER_KEY = `${STORAGE_PREFIX}user`;
+const ADMIN_TOKEN_KEY = `${STORAGE_PREFIX}token`;
+const ADMIN_REFRESH_TOKEN_KEY = `${STORAGE_PREFIX}refreshToken`;
+
+// 일반 사용자 로컬 스토리지 키
+const USER_TOKEN_KEY = "token"; // 기존 호환성 유지
+const USER_REFRESH_TOKEN_KEY = "refreshToken"; // 기존 호환성 유지
+const USER_DATA_KEY = "user"; // 기존 호환성 유지
 
 // API 기본 URL 설정
 //if build, change to production server
@@ -20,6 +41,45 @@ const instance = axios.create({
   },
 });
 
+// 토큰 저장 함수 (키 구분)
+export const saveToken = (token: string, refreshToken: string, userData: any) => {
+  if (isAdminPort()) {
+    localStorage.setItem(ADMIN_TOKEN_KEY, token);
+    localStorage.setItem(ADMIN_REFRESH_TOKEN_KEY, refreshToken);
+    localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(userData));
+    console.log("어드민 토큰 저장됨:", ADMIN_TOKEN_KEY);
+  } else {
+    localStorage.setItem(USER_TOKEN_KEY, token);
+    localStorage.setItem(USER_REFRESH_TOKEN_KEY, refreshToken);
+    localStorage.setItem(USER_DATA_KEY, JSON.stringify(userData));
+    console.log("유저 토큰 저장됨:", USER_TOKEN_KEY);
+  }
+};
+
+// 토큰 가져오기 함수 (키 구분)
+export const getToken = () => {
+  if (isAdminPort()) {
+    return localStorage.getItem(ADMIN_TOKEN_KEY);
+  } else {
+    return localStorage.getItem(USER_TOKEN_KEY);
+  }
+};
+
+// 토큰 제거 함수 (키 구분)
+export const removeToken = () => {
+  if (isAdminPort()) {
+    localStorage.removeItem(ADMIN_USER_KEY);
+    localStorage.removeItem(ADMIN_TOKEN_KEY);
+    localStorage.removeItem(ADMIN_REFRESH_TOKEN_KEY);
+    console.log("어드민 토큰 제거됨");
+  } else {
+    localStorage.removeItem(USER_DATA_KEY);
+    localStorage.removeItem(USER_TOKEN_KEY);
+    localStorage.removeItem(USER_REFRESH_TOKEN_KEY);
+    console.log("유저 토큰 제거됨");
+  }
+};
+
 // 요청 인터셉터 추가
 instance.interceptors.request.use(
   (config) => {
@@ -29,37 +89,31 @@ instance.interceptors.request.use(
     // 관리자 API 요청인지 확인 (URL에 '/admin/' 포함 여부로 판단)
     const isAdminRequest = config.url?.includes("/admin/");
 
-    // 어드민 페이지인지 확인 (URL에 따라 관리자/일반 사용자 토큰 적용)
-    const isAdminRoute =
-      window.location.pathname.includes("/community") ||
-      window.location.pathname.includes("/guidelines") ||
-      window.location.pathname.includes("/users") ||
-      window.location.hostname.includes("admin");
+    // 현재 사용 중인 포트 기반으로 어드민 여부 확인
+    const currentIsAdmin = isAdminPort();
 
-    console.log("어드민 경로 확인:", isAdminRoute, "어드민 요청 확인:", isAdminRequest);
+    console.log(
+      "현재 포트:",
+      getCurrentPort(),
+      "어드민 포트 여부:",
+      currentIsAdmin,
+      "어드민 요청 여부:",
+      isAdminRequest
+    );
 
-    // 어드민 토큰 확인
-    let token = localStorage.getItem(ADMIN_TOKEN_KEY);
+    // 토큰 선택 - 현재 포트에 맞는 토큰 사용
+    let token = getToken();
 
-    // 어드민 API 요청이거나 어드민 경로인 경우 어드민 토큰 사용
-    if ((isAdminRequest || isAdminRoute) && token) {
-      console.log("어드민 토큰 사용:", token.substring(0, 10) + "...");
-    }
-    // 어드민 토큰이 없거나 일반 요청인 경우 일반 토큰 사용
-    else {
-      const userToken = localStorage.getItem("token");
-      if (userToken) {
-        token = userToken;
-        console.log("일반 사용자 토큰 사용:", userToken.substring(0, 10) + "...");
-      } else if (isAdminRequest) {
-        // 어드민 API를 호출하는데 토큰이 없는 경우
-        console.warn("어드민 API 호출에 필요한 토큰이 없습니다");
-      }
-    }
-
-    // 토큰이 있으면 헤더에 추가
     if (token) {
+      console.log(
+        `${currentIsAdmin ? "어드민" : "유저"} 토큰 사용:`,
+        token.substring(0, 10) + "..."
+      );
       config.headers.Authorization = `Bearer ${token}`;
+    } else if (isAdminRequest && currentIsAdmin) {
+      console.warn("어드민 API 호출에 필요한 토큰이 없습니다");
+    } else if (!isAdminRequest && !currentIsAdmin) {
+      console.warn("API 호출에 필요한 토큰이 없습니다");
     }
 
     return config;
@@ -82,32 +136,22 @@ instance.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       console.log("인증 오류: 인증 정보가 만료되었거나 유효하지 않습니다.");
 
-      // 어드민 API 요청인지 확인
-      const isAdminRequest = error.config?.url?.includes("/admin/");
+      // 인증 오류 시 토큰 제거 및 리다이렉트
+      removeToken();
 
-      // 어드민 페이지인지 확인
-      const isAdminRoute =
-        window.location.pathname.includes("/community") ||
-        window.location.pathname.includes("/guidelines") ||
-        window.location.pathname.includes("/users") ||
-        window.location.hostname.includes("admin");
-
-      if (isAdminRequest || isAdminRoute) {
-        // 어드민 로컬 스토리지에서 인증 정보 제거
-        localStorage.removeItem(ADMIN_USER_KEY);
-        localStorage.removeItem(ADMIN_TOKEN_KEY);
-        localStorage.removeItem(ADMIN_REFRESH_TOKEN_KEY);
-
+      // 현재 포트에 따라 리다이렉트 처리
+      if (isAdminPort()) {
         // 어드민 로그인 페이지로 리다이렉트
         if (window.location.pathname !== "/admin/login") {
           alert("관리자 인증이 필요합니다. 다시 로그인해주세요.");
           window.location.href = "/admin/login";
         }
       } else {
-        // 일반 사용자 로컬 스토리지에서 인증 정보 제거
-        localStorage.removeItem("user");
-        localStorage.removeItem("token");
-        localStorage.removeItem("refreshToken");
+        // 일반 사용자 로그인 페이지로 리다이렉트
+        if (window.location.pathname !== "/login") {
+          alert("로그인이 필요합니다. 다시 로그인해주세요.");
+          window.location.href = "/login";
+        }
       }
 
       // 오류 객체에 인증 만료 플래그 추가
@@ -121,13 +165,10 @@ instance.interceptors.response.use(
       // 어드민 API 요청인지 확인
       const isAdminRequest = error.config?.url?.includes("/admin/");
 
-      if (isAdminRequest) {
+      // 현재 포트에 따른 처리
+      if (isAdminRequest && isAdminPort()) {
         alert("관리자 권한이 필요합니다. 다시 로그인해주세요.");
-
-        // 어드민 로컬 스토리지에서 인증 정보 제거
-        localStorage.removeItem(ADMIN_USER_KEY);
-        localStorage.removeItem(ADMIN_TOKEN_KEY);
-        localStorage.removeItem(ADMIN_REFRESH_TOKEN_KEY);
+        removeToken();
 
         // 어드민 로그인 페이지로 리다이렉트
         if (window.location.pathname !== "/admin/login") {

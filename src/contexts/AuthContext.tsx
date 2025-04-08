@@ -1,11 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "../api/axios";
+import axios, { saveToken, removeToken, getToken, isAdminPort } from "../api/axios";
 
-// 어드민 로컬 스토리지 키 (일반 사용자와 구분)
+// 로컬 스토리지 키는 axios에서 직접 관리하도록 변경
+// 기존 로컬 스토리지 키 참조는 유지 (기존 코드 호환성)
 const ADMIN_USER_KEY = "admin_user";
 const ADMIN_TOKEN_KEY = "admin_token";
 const ADMIN_REFRESH_TOKEN_KEY = "admin_refreshToken";
+const USER_DATA_KEY = "user";
 
 interface User {
   id: number;
@@ -33,8 +35,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     // 로컬 스토리지에서 인증 정보 복원
     const restoreAuth = () => {
-      const storedUser = localStorage.getItem(ADMIN_USER_KEY);
-      const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+      // 포트 기반으로 키 참조 (직접 참조 대신 axios의 getToken 사용)
+      let storedUser;
+      const token = getToken();
+
+      if (isAdminPort()) {
+        storedUser = localStorage.getItem(ADMIN_USER_KEY);
+      } else {
+        storedUser = localStorage.getItem(USER_DATA_KEY);
+      }
 
       if (storedUser && token) {
         setUser(JSON.parse(storedUser));
@@ -74,18 +83,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         setUser(userData);
 
-        // 어드민 로컬 스토리지에 인증 정보 저장
-        localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(userData));
-
-        // 토큰이 있는 경우 저장
+        // 포트 기반으로 토큰 저장 (새로운 유틸리티 함수 사용)
         if (response.data.token) {
-          localStorage.setItem(ADMIN_TOKEN_KEY, response.data.token);
-          localStorage.setItem(ADMIN_REFRESH_TOKEN_KEY, response.data.refreshToken);
-
-          // 일반 사용자 세션 키가 있다면 제거 (충돌 방지)
-          localStorage.removeItem("user");
-          localStorage.removeItem("token");
-          localStorage.removeItem("refreshToken");
+          // 새 토큰 저장 유틸리티 사용
+          saveToken(response.data.token, response.data.refreshToken || "", userData);
         }
 
         navigate("/banners/main");
@@ -114,10 +115,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const handleLogout = () => {
     setUser(null);
 
-    // 어드민 로컬 스토리지에서 인증 정보 제거
-    localStorage.removeItem(ADMIN_USER_KEY);
-    localStorage.removeItem(ADMIN_TOKEN_KEY);
-    localStorage.removeItem(ADMIN_REFRESH_TOKEN_KEY);
+    // 새 토큰 제거 유틸리티 사용
+    removeToken();
 
     navigate("/login");
   };
@@ -149,13 +148,24 @@ export const ProtectedRoute: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    // 어드민 로컬 스토리지에서 사용자 정보를 확인
+    // 포트 기반으로 적절한 토큰 확인
     const checkAuth = async () => {
-      const storedUser = localStorage.getItem(ADMIN_USER_KEY);
-      const token = localStorage.getItem(ADMIN_TOKEN_KEY);
+      const token = getToken();
+      let storedUser;
+
+      if (isAdminPort()) {
+        storedUser = localStorage.getItem(ADMIN_USER_KEY);
+      } else {
+        storedUser = localStorage.getItem(USER_DATA_KEY);
+      }
 
       if (!storedUser || !token) {
-        navigate("/login");
+        // 포트에 따라 적절한 로그인 페이지로 리다이렉트
+        if (isAdminPort()) {
+          navigate("/login");
+        } else {
+          navigate("/login"); // 일반 사용자 로그인 페이지
+        }
       }
 
       setIsCheckingAuth(false);
