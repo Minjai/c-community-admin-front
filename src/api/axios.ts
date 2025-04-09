@@ -162,19 +162,28 @@ instance.interceptors.response.use(
     if (error.response && error.response.status === 403) {
       console.log("권한 부족: 요청한 리소스에 대한 접근 권한이 없습니다.");
 
-      // 어드민 API 요청인지 확인
-      const isAdminRequest = error.config?.url?.includes("/admin/");
+      // 서버에서 받은 오류 메시지가 있으면 사용
+      const errorMessage =
+        error.response.data?.message ||
+        error.response.data?.error ||
+        "요청한 리소스에 대한 접근 권한이 없습니다.";
 
-      // 현재 포트에 따른 처리
-      if (isAdminRequest && isAdminPort()) {
-        alert("관리자 권한이 필요합니다. 다시 로그인해주세요.");
-        removeToken();
+      // 권한 부족 시 토큰 제거 및 로그인 페이지로 리다이렉트
+      removeToken();
 
+      // 현재 포트에 따라 리다이렉트 처리
+      if (isAdminPort()) {
         // 어드민 로그인 페이지로 리다이렉트
-        if (window.location.pathname !== "/admin/login") {
-          window.location.href = "/admin/login";
-        }
+        alert(`권한 부족: ${errorMessage}`);
+        window.location.href = "/login";
+      } else {
+        // 일반 사용자 로그인 페이지로 리다이렉트
+        alert(`권한 부족: ${errorMessage}`);
+        window.location.href = "/login";
       }
+
+      // 오류 객체에 권한 부족 플래그 추가
+      error.isPermissionError = true;
     }
 
     console.error("API 오류 상태:", error.response?.status);

@@ -16,7 +16,13 @@ const RoleBasedRoute: React.FC<RoleBasedRouteProps> = ({ children, allowedRoles 
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // 로그인한 사용자는 모두 접근 허용
+  // 사용자의 역할이 허용된 역할 목록에 있는지 확인
+  if (!allowedRoles.includes(user.role)) {
+    // 권한이 없는 경우 메인 페이지로 리다이렉트
+    return <Navigate to="/banners/main" replace />;
+  }
+
+  // 권한이 있는 경우 컴포넌트 렌더링
   return <>{children}</>;
 };
 

@@ -10,6 +10,7 @@ import DatePicker from "../../components/forms/DatePicker";
 import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
 import { addDays } from "date-fns";
+import LoadingOverlay from "../../components/LoadingOverlay";
 
 const CompanyBannerPage: React.FC = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -18,6 +19,7 @@ const CompanyBannerPage: React.FC = () => {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [currentBanner, setCurrentBanner] = useState<Partial<Banner> | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [alertMessage, setAlertMessage] = useState<{
     type: "success" | "error";
     message: string;
@@ -155,51 +157,40 @@ const CompanyBannerPage: React.FC = () => {
         return;
       }
 
+      // 저장 시작 시 로딩 상태 활성화
+      setIsSaving(true);
+
       if (isEditing && currentBanner.id) {
         // 수정 모드일 때
         try {
           // 날짜 형식 변환 - 로컬 시간 유지하면서 ISO 형식으로 변환
-          // 브라우저에서 new Date()는 로컬 시간을 기준으로 하지만, toISOString()은 항상 UTC로 변환
-          // 따라서 시간대 차이를 보정해야 함
-
-          // 시간대 오프셋 계산 (분 단위)
-          const tzOffset = new Date().getTimezoneOffset(); // 예: 한국은 -540 (UTC+9)
+          const tzOffset = new Date().getTimezoneOffset();
 
           // 시작일 변환
           const startDateObj = new Date(currentBanner.startDate);
-          // 로컬 시간 유지를 위해 타임존 오프셋 적용 (UTC로 변환될 때 오프셋을 적용)
           startDateObj.setMinutes(startDateObj.getMinutes() - tzOffset);
           const startDate = startDateObj.toISOString();
 
           // 종료일 변환
           const endDateObj = new Date(currentBanner.endDate);
-          // 로컬 시간 유지를 위해 타임존 오프셋 적용
           endDateObj.setMinutes(endDateObj.getMinutes() - tzOffset);
           const endDate = endDateObj.toISOString();
-
-          console.log("날짜 변환 전/후 비교(업체):", {
-            원래_시작일: currentBanner.startDate,
-            변환된_시작일: startDate,
-            원래_종료일: currentBanner.endDate,
-            변환된_종료일: endDate,
-            타임존_오프셋: tzOffset,
-          });
 
           await BannerApiService.updateCompanyBanner(
             currentBanner.id,
             {
               id: currentBanner.id,
               title: currentBanner.title,
-              startDate: startDate, // 변환된 ISO 형식 사용
-              endDate: endDate, // 변환된 ISO 형식 사용
+              startDate: startDate,
+              endDate: endDate,
               isPublic: currentBanner.isPublic,
               position: currentBanner.position,
               bannerType: "company",
               linkUrl: currentBanner.linkUrl,
               linkUrl2: currentBanner.linkUrl2,
             },
-            pcImageFile || undefined,
-            mobileImageFile || undefined
+            pcImageFile,
+            mobileImageFile
           );
 
           // 수정 후 데이터 즉시 확인 (변경 사항이 제대로 적용되었는지 확인)
@@ -273,6 +264,9 @@ const CompanyBannerPage: React.FC = () => {
     } catch (err) {
       console.error("Error saving banner:", err);
       setAlertMessage({ type: "error", message: "배너 저장 중 오류가 발생했습니다." });
+    } finally {
+      // 저장 완료 후 로딩 상태 비활성화
+      setIsSaving(false);
     }
   };
 
@@ -647,6 +641,9 @@ const CompanyBannerPage: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {/* 로딩 오버레이 */}
+      <LoadingOverlay isLoading={isSaving} />
     </div>
   );
 };

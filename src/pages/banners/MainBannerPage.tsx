@@ -10,6 +10,7 @@ import Input from "../../components/forms/Input";
 import DatePicker from "../../components/forms/DatePicker";
 import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
+import LoadingOverlay from "../../components/LoadingOverlay";
 
 const MainBannerPage: React.FC = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -22,6 +23,7 @@ const MainBannerPage: React.FC = () => {
     type: "success" | "error" | "info";
     message: string;
   } | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   // 파일 상태 관리
   const [pcImageFile, setPcImageFile] = useState<File | null>(null);
@@ -153,6 +155,9 @@ const MainBannerPage: React.FC = () => {
         setAlertMessage({ type: "error", message: "제목, 시작일, 종료일은 필수 항목입니다." });
         return;
       }
+
+      // 저장 시작 시 로딩 상태 활성화
+      setIsSaving(true);
 
       if (isEditing && currentBanner.id) {
         // 수정 모드일 때
@@ -291,6 +296,9 @@ const MainBannerPage: React.FC = () => {
     } catch (err) {
       console.error("Error saving banner:", err);
       setAlertMessage({ type: "error", message: "배너 저장 중 오류가 발생했습니다." });
+    } finally {
+      // 저장 완료 후 로딩 상태 비활성화
+      setIsSaving(false);
     }
   };
 
@@ -665,6 +673,12 @@ const MainBannerPage: React.FC = () => {
           </div>
         </Modal>
       )}
+
+      {/* 로딩 오버레이 */}
+      <LoadingOverlay
+        isLoading={isSaving}
+        message={isEditing ? "배너 수정 중..." : "배너 추가 중..."}
+      />
     </div>
   );
 };

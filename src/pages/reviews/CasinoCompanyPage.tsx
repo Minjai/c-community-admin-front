@@ -11,6 +11,7 @@ import Alert from "../../components/Alert";
 import { formatDate } from "../../utils/dateUtils";
 import axios from "@/api/axios";
 import { extractDataArray } from "../../api/util";
+import LoadingOverlay from "../../components/LoadingOverlay";
 
 // .env에서 카지노 정보 URL 접두사 가져오기
 const CASINO_INFO_URL_PREFIX =
@@ -31,6 +32,8 @@ const CasinoCompanyPage: React.FC = () => {
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isMoving, setIsMoving] = useState<boolean>(false);
 
   // 초기 상태 설정
   const initialCompanyState: Partial<CasinoCompany> = {
@@ -197,6 +200,7 @@ const CasinoCompanyPage: React.FC = () => {
     if (!currentCompany) return;
 
     try {
+      setIsSaving(true);
       // 필수 필드 검증
       if (!currentCompany.companyName || !currentCompany.description) {
         setAlertMessage({ type: "error", message: "업체명과 업체소개는 필수 항목입니다." });
@@ -260,6 +264,8 @@ const CasinoCompanyPage: React.FC = () => {
     } catch (error) {
       console.error("Error saving casino company:", error);
       setAlertMessage({ type: "error", message: "업체 정보 저장 중 오류가 발생했습니다." });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -284,6 +290,7 @@ const CasinoCompanyPage: React.FC = () => {
     if (index <= 0) return; // 이미 첫 번째 항목인 경우
 
     try {
+      setIsMoving(true);
       // 현재 업체와 이전 업체의 displayOrder 값을 서로 교환
       const prevCompany = companies[index - 1];
       const currentDisplayOrder = company.displayOrder;
@@ -305,6 +312,8 @@ const CasinoCompanyPage: React.FC = () => {
     } catch (error) {
       console.error("Error moving company up:", error);
       setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+    } finally {
+      setIsMoving(false);
     }
   };
 
@@ -313,6 +322,7 @@ const CasinoCompanyPage: React.FC = () => {
     if (index >= companies.length - 1) return; // 이미 마지막 항목인 경우
 
     try {
+      setIsMoving(true);
       // 현재 업체와 다음 업체의 displayOrder 값을 서로 교환
       const nextCompany = companies[index + 1];
       const currentDisplayOrder = company.displayOrder;
@@ -334,6 +344,8 @@ const CasinoCompanyPage: React.FC = () => {
     } catch (error) {
       console.error("Error moving company down:", error);
       setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+    } finally {
+      setIsMoving(false);
     }
   };
 
@@ -475,6 +487,9 @@ const CasinoCompanyPage: React.FC = () => {
       ) : (
         <DataTable data={companies} columns={columns} />
       )}
+
+      {/* 로딩 오버레이 */}
+      <LoadingOverlay isLoading={loading || isSaving || isMoving} />
 
       {/* 업체 추가/수정 모달 */}
       {showModal && currentCompany && (

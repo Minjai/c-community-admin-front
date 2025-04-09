@@ -55,32 +55,131 @@ function App() {
               }
             >
               <Route index element={<Navigate to="/banners/main" replace />} />
-              <Route path="dashboard" element={<DashboardPage />} />
+              <Route
+                path="dashboard"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <DashboardPage />
+                  </RoleBasedRoute>
+                }
+              />
 
               {/* 배너 관리 */}
-              <Route path="banners/main" element={<MainBannerPage />} />
-              <Route path="banners/company" element={<CompanyBannerPage />} />
-              <Route path="banners/bottom" element={<BottomBannerPage />} />
-              <Route path="banners/mini" element={<MiniBannerPage />} />
+              <Route
+                path="banners/main"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <MainBannerPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="banners/company"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <CompanyBannerPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="banners/bottom"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <BottomBannerPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="banners/mini"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <MiniBannerPage />
+                  </RoleBasedRoute>
+                }
+              />
 
               {/* 가이드라인 관리 */}
-              <Route path="guidelines/casino" element={<CasinoGuidelineManagement />} />
-              <Route path="guidelines/casino/:id" element={<GuidelineDetail boardId={3} />} />
-              <Route path="guidelines/sports" element={<SportsGuidelineManagement />} />
-              <Route path="guidelines/sports/:id" element={<GuidelineDetail boardId={4} />} />
-              <Route path="guidelines/crypto" element={<CryptoGuidelineManagement />} />
-              <Route path="guidelines/crypto/:id" element={<GuidelineDetail boardId={5} />} />
+              <Route
+                path="guidelines/casino"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <CasinoGuidelineManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="guidelines/casino/:id"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <GuidelineDetail boardId={3} />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="guidelines/sports"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <SportsGuidelineManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="guidelines/sports/:id"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <GuidelineDetail boardId={4} />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="guidelines/crypto"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <CryptoGuidelineManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="guidelines/crypto/:id"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <GuidelineDetail boardId={5} />
+                  </RoleBasedRoute>
+                }
+              />
 
               {/* 데이터 관리 */}
-              <Route path="data/casino-games" element={<CasinoGameManagement />} />
+              <Route
+                path="data/casino-games"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <CasinoGameManagement />
+                  </RoleBasedRoute>
+                }
+              />
               <Route
                 path="data/casino-recommendations"
-                element={<CasinoRecommendationManagement />}
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <CasinoRecommendationManagement />
+                  </RoleBasedRoute>
+                }
               />
-              <Route path="data/sports" element={<SportsManagement />} />
+              <Route
+                path="data/sports"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <SportsManagement />
+                  </RoleBasedRoute>
+                }
+              />
               <Route
                 path="data/sports-recommendations"
-                element={<SportRecommendationsManagement />}
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <SportRecommendationsManagement />
+                  </RoleBasedRoute>
+                }
               />
 
               {/* 리뷰 업체 관리 - 관리자 권한 필요 */}
@@ -104,11 +203,46 @@ function App() {
               />
 
               {/* 커뮤니티 관리 */}
-              <Route path="community/notices" element={<NoticeManagement />} />
-              <Route path="notice/:id" element={<NoticeDetail />} />
-              <Route path="notice" element={<NoticeManagement />} />
-              <Route path="community/posts" element={<PostManagement />} />
-              <Route path="community/posts/:id" element={<PostDetail />} />
+              <Route
+                path="community/notices"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <NoticeManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="notice/:id"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <NoticeDetail />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="notice"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <NoticeManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="community/posts"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <PostManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="community/posts/:id"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <PostDetail />
+                  </RoleBasedRoute>
+                }
+              />
 
               {/* 회원 정보 관리 - 관리자 권한 필요 */}
               <Route
@@ -127,8 +261,22 @@ function App() {
                   </RoleBasedRoute>
                 }
               />
-              <Route path="/users" element={<UserManagement />} />
-              <Route path="/user-ranks" element={<UserRankManagement />} />
+              <Route
+                path="/users"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <UserManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="/user-ranks"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <UserRankManagement />
+                  </RoleBasedRoute>
+                }
+              />
 
               {/* 기타 관리 - 관리자 권한 필요 */}
               <Route
