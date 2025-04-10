@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { BellIcon, UserCircleIcon } from '@heroicons/react/24/outline';
-import { Bars3Icon } from '@heroicons/react/24/outline';
+import React, { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { UserCircleIcon } from "@heroicons/react/24/outline";
+import { Bars3Icon } from "@heroicons/react/24/outline";
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -23,31 +23,26 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
           </button>
           <h1 className="text-lg font-semibold text-gray-900">Gamblescan Admin</h1>
         </div>
-        
-        <div className="flex items-center space-x-4">
-          <button className="p-1 rounded-full text-gray-500 hover:text-gray-900 relative">
-            <BellIcon className="h-6 w-6" />
-            <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500"></span>
-          </button>
-          
+
+        <div className="flex items-center">
           <div className="relative">
-            <div 
+            <div
               className="flex items-center cursor-pointer"
               onClick={() => setShowProfileMenu(!showProfileMenu)}
             >
               <UserCircleIcon className="h-8 w-8 text-gray-500" />
               <div className="ml-2">
-                <p className="text-sm font-medium text-gray-900">{user?.nickname || '관리자'}</p>
-                <p className="text-xs text-gray-500">{user?.email || 'admin@gamblescan.com'}</p>
+                <p className="text-sm font-medium text-gray-900">{user?.nickname || "관리자"}</p>
+                <p className="text-xs text-gray-500">{user?.email}</p>
               </div>
             </div>
-            
+
             {showProfileMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50">
                 <a href="#" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                   프로필 설정
                 </a>
-                <button 
+                <button
                   onClick={logout}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >

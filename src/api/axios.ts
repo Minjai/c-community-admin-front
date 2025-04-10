@@ -93,6 +93,7 @@ export const handleAdminLogin = (email: string, password: string) => {
       })
       .then((response) => {
         const data = response.data;
+        console.log("로그인 응답 데이터:", data); // 응답 로깅 추가
 
         // 어드민 권한 확인
         if (data.role !== "admin" && data.role !== "superadmin") {
@@ -100,10 +101,11 @@ export const handleAdminLogin = (email: string, password: string) => {
           return;
         }
 
-        // 어드민 데이터 저장
+        // 어드민 데이터 저장 - 이메일 추가
         const adminData = {
           id: data.userId,
           nickname: data.nickname,
+          email: data.email || email, // 서버 응답에서 이메일 가져오기, 없으면 입력한 이메일 사용
           role: data.role,
           userType: "admin",
         };

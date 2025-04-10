@@ -6,6 +6,8 @@ import axios, {
   isAdminPort,
   getToken,
   handleAdminLogin,
+  getAdminUser,
+  checkIsAdminLoggedIn,
 } from "../api/axios";
 
 // 로컬 스토리지 키는 axios에서 직접 관리하도록 변경
@@ -41,7 +43,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     // 로컬 스토리지에서 인증 정보 복원
     const restoreAuth = () => {
-      // 포트 기반으로 키 참조 (직접 참조 대신 axios의 getToken 사용)
+      // 어드민 인증 정보 확인
+      if (isAdminPort() && checkIsAdminLoggedIn()) {
+        const adminUserData = getAdminUser();
+        if (adminUserData) {
+          setUser(adminUserData);
+          console.log("어드민 인증 정보 복원:", adminUserData);
+          return;
+        }
+      }
+
+      // 기존 방식으로 인증 정보 확인 (fallback)
       let storedUser;
       const token = getToken();
 
@@ -53,6 +65,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (storedUser && token) {
         setUser(JSON.parse(storedUser));
+        console.log("기존 방식으로 인증 정보 복원");
       } else {
         // 인증 정보가 없으면 로그아웃 상태로 설정
         setUser(null);
