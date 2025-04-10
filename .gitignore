@@ -1,2 +1,4 @@
 /node_modules
 /.idea
+aws_configure_dev_minjai.sh
+aws_configure_prod.sh

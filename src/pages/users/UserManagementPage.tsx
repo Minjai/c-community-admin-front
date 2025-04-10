@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../../services/NavigationService';
 import { getUsers } from '../../api';
-import { User } from '../../types/prisma';
 import DataTable from '../../components/DataTable';
 import Button from '../../components/Button';
 import ActionButton from '../../components/ActionButton';
@@ -11,14 +10,14 @@ import Select from '../../components/forms/Select';
 import Alert from '../../components/Alert';
 
 const UserManagementPage: React.FC = () => {
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState([]);
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<Partial<User> | null>(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -93,14 +92,14 @@ const UserManagementPage: React.FC = () => {
     { header: 'ID', accessor: 'id' },
     { header: '이메일', accessor: 'email' },
     { header: '닉네임', accessor: 'nickname' },
-    { 
-      header: '역할', 
+    {
+      header: '역할',
       accessor: 'role',
       cell: (value: string) => {
         let badgeClass = 'bg-gray-100 text-gray-800';
         if (value === 'admin') badgeClass = 'bg-blue-100 text-blue-800';
         if (value === 'superadmin') badgeClass = 'bg-purple-100 text-purple-800';
-        
+
         return (
           <span className={`px-2 py-1 rounded-full text-xs ${badgeClass}`}>
             {value}
@@ -109,13 +108,13 @@ const UserManagementPage: React.FC = () => {
       }
     },
     { header: '점수', accessor: 'score' },
-    { 
-      header: '가입일', 
+    {
+      header: '가입일',
       accessor: 'createdAt',
       cell: (value: string) => new Date(value).toLocaleDateString()
     },
-    { 
-      header: '최근 로그인', 
+    {
+      header: '최근 로그인',
       accessor: 'lastLoginAt',
       cell: (value: string) => value ? new Date(value).toLocaleDateString() : '-'
     },
@@ -206,7 +205,7 @@ const UserManagementPage: React.FC = () => {
                 disabled={!isEditing}
                 required
               />
-              
+
               <Input
                 label="닉네임"
                 name="nickname"
@@ -216,7 +215,7 @@ const UserManagementPage: React.FC = () => {
                 required
               />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Select
                 label="역할"
@@ -231,7 +230,7 @@ const UserManagementPage: React.FC = () => {
                 disabled={!isEditing}
                 required
               />
-              
+
               <Input
                 label="점수"
                 name="score"
@@ -241,7 +240,7 @@ const UserManagementPage: React.FC = () => {
                 disabled={!isEditing}
               />
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="가입일"
@@ -249,7 +248,7 @@ const UserManagementPage: React.FC = () => {
                 value={currentUser.createdAt ? new Date(currentUser.createdAt).toLocaleDateString() : ''}
                 disabled
               />
-              
+
               <Input
                 label="최근 로그인"
                 name="lastLoginAt"
@@ -257,7 +256,7 @@ const UserManagementPage: React.FC = () => {
                 disabled
               />
             </div>
-            
+
             {isEditing && (
               <div className="flex justify-end space-x-2 pt-4">
                 <Button variant="secondary" onClick={() => setShowModal(false)}>
@@ -268,7 +267,7 @@ const UserManagementPage: React.FC = () => {
                 </Button>
               </div>
             )}
-            
+
             {!isEditing && (
               <div className="flex justify-end space-x-2 pt-4">
                 <Button variant="secondary" onClick={() => setShowModal(false)}>

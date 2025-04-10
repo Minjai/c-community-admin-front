@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigation } from '../../services/NavigationService';
 import { getPosts, getBoards } from '../../api';
-import { Post, Board } from '../../types/prisma';
 import DataTable from '../../components/DataTable';
 import Button from '../../components/Button';
 import ActionButton from '../../components/ActionButton';
@@ -11,8 +10,8 @@ import Select from '../../components/forms/Select';
 import Alert from '../../components/Alert';
 
 const PostManagementPage: React.FC = () => {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [boards, setBoards] = useState<Board[]>([]);
+  const [posts, setPosts] = useState([]);
+  const [boards, setBoards] = useState([]);
   const [totalPosts, setTotalPosts] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -20,7 +19,7 @@ const PostManagementPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [currentPost, setCurrentPost] = useState<Partial<Post> | null>(null);
+  const [currentPost, setCurrentPost] = useState(null);
   const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // 게시판 목록 조회
@@ -97,8 +96,8 @@ const PostManagementPage: React.FC = () => {
   // 테이블 컬럼 정의
   const columns = [
     { header: 'ID', accessor: 'id' },
-    { 
-      header: '게시판', 
+    {
+      header: '게시판',
       accessor: 'boardId',
       cell: (value: number) => {
         const board = boards.find(b => b.id === value);
@@ -106,14 +105,14 @@ const PostManagementPage: React.FC = () => {
       }
     },
     { header: '제목', accessor: 'title' },
-    { 
-      header: '작성자', 
+    {
+      header: '작성자',
       accessor: 'author',
       cell: (value: any) => value?.nickname || '-'
     },
     { header: '조회수', accessor: 'viewCount' },
-    { 
-      header: '인기글', 
+    {
+      header: '인기글',
       accessor: 'isPopular',
       cell: (value: number) => (
         <span className={`px-2 py-1 rounded-full text-xs ${value ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'}`}>
@@ -121,8 +120,8 @@ const PostManagementPage: React.FC = () => {
         </span>
       )
     },
-    { 
-      header: '작성일', 
+    {
+      header: '작성일',
       accessor: 'createdAt',
       cell: (value: string) => new Date(value).toLocaleDateString()
     },
@@ -220,53 +219,53 @@ const PostManagementPage: React.FC = () => {
                 value={boards.find(b => b.id === currentPost.boardId)?.name || '-'}
                 disabled
               />
-              
+
               <Input
                 label="작성자"
                 value={currentPost.author?.nickname || '-'}
                 disabled
               />
             </div>
-            
+
             <Input
               label="제목"
               value={currentPost.title || ''}
               disabled
             />
-            
+
             <div className="space-y-2">
               <label className="block text-sm font-medium text-gray-700">내용</label>
               <div className="p-3 bg-gray-50 rounded-md border border-gray-300 min-h-[200px] whitespace-pre-wrap">
                 {currentPost.content || ''}
               </div>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Input
                 label="조회수"
                 value={currentPost.viewCount?.toString() || '0'}
                 disabled
               />
-              
+
               <Input
                 label="인기글 여부"
                 value={currentPost.isPopular ? '인기글' : '일반글'}
                 disabled
               />
-              
+
               <Input
                 label="작성일"
                 value={currentPost.createdAt ? new Date(currentPost.createdAt).toLocaleString() : '-'}
                 disabled
               />
             </div>
-            
+
             <div className="flex justify-end space-x-2 pt-4">
               <Button variant="secondary" onClick={() => setShowModal(false)}>
                 닫기
               </Button>
-              <Button 
-                variant="danger" 
+              <Button
+                variant="danger"
                 onClick={() => {
                   setShowModal(false);
                   if (currentPost.id) handleDeletePost(currentPost.id);
