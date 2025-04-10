@@ -20,12 +20,10 @@ const LoginPage: React.FC = () => {
     }
 
     try {
-      console.log("로그인 시도:", { email, password: "********" });
       await login(email, password);
       // 성공 시 AuthContext에서 자동으로 리다이렉트
     } catch (err: any) {
       // 오류 처리는 AuthContext에서 담당
-      console.error("로그인 페이지 오류:", err);
       // 디버깅 정보 저장
       if (err.response) {
         setDebugInfo(

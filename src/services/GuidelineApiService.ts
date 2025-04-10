@@ -18,8 +18,6 @@ export class GuidelineApiService {
    */
   static async getGuidelines(boardId: number, page = 1, pageSize = 100) {
     try {
-      console.log("가이드라인 목록 API 요청:", { boardId, page, pageSize });
-
       // 모든 가이드라인을 한 번에 가져오기 위해 /guidelines/all 엔드포인트 사용
       const response = await axios.get("/guidelines/all", {
         params: {
@@ -27,10 +25,8 @@ export class GuidelineApiService {
         },
       });
 
-      console.log("가이드라인 목록 API 응답:", response.data);
       return response.data;
     } catch (error) {
-      console.error(`가이드라인 목록 조회 오류 (boardId: ${boardId}):`, error);
       throw error;
     }
   }
@@ -42,11 +38,8 @@ export class GuidelineApiService {
    */
   static async getGuidelineById(id: number) {
     try {
-      console.log("가이드라인 상세 API 요청:", { id });
-
       const response = await axios.get(`/guidelines/${id}`);
 
-      console.log("가이드라인 상세 API 응답:", response.data);
       return response.data;
     } catch (error) {
       console.error(`가이드라인 상세 조회 오류 (ID: ${id}):`, error);
@@ -254,7 +247,6 @@ export class GuidelineApiService {
       const response = await axios.delete(`/guidelines/${id}`);
       return response.data;
     } catch (error) {
-      console.error(`가이드라인 삭제 오류 (ID: ${id}):`, error);
       throw error;
     }
   }
@@ -267,24 +259,17 @@ export class GuidelineApiService {
    */
   static async updateGuidelinePosition(id: number, position: number) {
     try {
-      // 매개변수 로깅 (디버깅용)
-      console.log("가이드라인 위치 변경 요청 매개변수:", { id, position });
-      console.log("id 타입:", typeof id, "position 타입:", typeof position);
-
       // 서버에 전송할 데이터 - 서버 요구사항에 맞게 수정
       const data = {
         id: Number(id), // 명시적으로 숫자로 변환
         position: Number(position), // 명시적으로 숫자로 변환
       };
 
-      console.log("서버로 전송되는 데이터:", data);
-
       // 기존 /guidelines/position 엔드포인트가 아닌 일반 가이드라인 업데이트 엔드포인트 사용
       const response = await axios.put(`/guidelines/${id}`, data);
 
       return response.data;
     } catch (error) {
-      console.error(`가이드라인 위치 변경 오류 (ID: ${id}):`, error);
       throw error;
     }
   }

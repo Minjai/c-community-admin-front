@@ -45,7 +45,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
           return;
         }
 
-        console.log("에디터 내용 변경됨:", content.substring(0, 30) + "...");
+        // Log removed
         setCurrentGuideline((prev) => {
           if (!prev) return null;
           return { ...prev, content };
@@ -78,24 +78,24 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
     try {
       const response = await GuidelineApiService.getGuidelines(boardId);
-      console.log("가이드라인 응답 전체 구조:", response); // 전체 응답 구조 확인
+      // Log removed
 
       // 응답 구조를 더 자세히 확인
       if (response?.data) {
-        console.log("response.data 구조:", response.data);
+        // Log removed
       }
       if (response?.data?.data) {
-        console.log("response.data.data 구조:", response.data.data);
+        // Log removed
         // 중요: 첫 번째 객체의 구조를 자세히 로그
         if (Array.isArray(response.data.data) && response.data.data.length > 0) {
-          console.log("첫 번째 데이터 객체 구조:", response.data.data[0]);
-          console.log("모든 키:", Object.keys(response.data.data[0]));
+          // Log removed
+          // Log removed
         }
       }
 
       // 페이지네이션 정보 확인
       if (response?.data?.pagination) {
-        console.log("페이지네이션 정보:", response.data.pagination);
+        // Log removed
       }
 
       // 가이드라인 데이터 추출 시도
@@ -105,35 +105,35 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       // 1. response.data가 배열인 경우
       if (response?.data && Array.isArray(response.data)) {
         dataArray = response.data;
-        console.log("case 1: response.data는 배열입니다");
+        // Log removed
       }
       // 2. response.data.data가 배열인 경우
       else if (response?.data?.data && Array.isArray(response.data.data)) {
         dataArray = response.data.data;
-        console.log("case 2: response.data.data는 배열입니다");
+        // Log removed
       }
       // 3. response.data.data가 객체이고 내부에 배열 필드가 있는 경우
       else if (response?.data?.data && typeof response.data.data === "object") {
-        console.log("case 3: response.data.data는 객체입니다");
+        // Log removed
         // 가능한 배열 필드 이름들
         const possibleArrayFields = ["guidelines", "posts", "items", "list", "results", "posts"];
 
         for (const field of possibleArrayFields) {
           if (Array.isArray(response.data.data[field])) {
             dataArray = response.data.data[field];
-            console.log(`데이터 배열 필드 발견: ${field}`, dataArray);
+            // Log removed
             break;
           }
         }
 
         // 직접 객체 내용 확인
         if (!dataArray) {
-          console.log("객체 내 모든 키 확인:", Object.keys(response.data.data));
+          // Log removed
           // 첫 번째 배열 형태의 값을 찾아 사용
           for (const key in response.data.data) {
             if (Array.isArray(response.data.data[key])) {
               dataArray = response.data.data[key];
-              console.log(`배열 형태의 데이터 발견(${key}):`, dataArray);
+              // Log removed
               break;
             }
           }
@@ -141,32 +141,32 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       }
       // 4. response.success가 true이고 response.data 자체가 가이드라인 데이터인 경우
       else if (response?.success === true && response?.data) {
-        console.log("case 4: response.success가 true이고 data가 있습니다");
+        // Log removed
         // response.data가 가이드라인 객체 자체일 수 있음
         extractedData = response.data;
       }
 
       // 페이지네이션이 있는 경우 별도 처리
       if (response?.data?.pagination && response?.data?.posts) {
-        console.log("페이지네이션 구조 데이터 발견:", response.data.posts);
+        // Log removed
         dataArray = response.data.posts;
       }
 
       // 데이터가 객체이고 posts 속성을 가진 경우
       if (!dataArray && extractedData && extractedData.posts) {
-        console.log("posts 속성을 가진 객체 발견:", extractedData.posts);
+        // Log removed
         dataArray = extractedData.posts;
       }
 
       // response.data에 items 배열이 있는 경우 (로그에서 확인된 실제 구조)
       if (!dataArray && response?.data?.items && Array.isArray(response.data.items)) {
-        console.log("response.data.items 배열 발견:", response.data.items);
+        // Log removed
         dataArray = response.data.items;
       }
 
       // 데이터가 객체이고 posts 속성을 가진 경우
       if (!dataArray && extractedData && extractedData.posts) {
-        console.log("posts 속성을 가진 객체 발견:", extractedData.posts);
+        // Log removed
         dataArray = extractedData.posts;
       }
 
@@ -177,20 +177,20 @@ const GuidelineManagement = ({ boardId = 3 }) => {
         extractedData.items &&
         Array.isArray(extractedData.items)
       ) {
-        console.log("extractedData.items 배열 발견:", extractedData.items);
+        // Log removed
         dataArray = extractedData.items;
       }
 
       // 추출된 데이터 배열이 있으면 정렬하여 표시
       if (dataArray && dataArray.length > 0) {
-        console.log("추출된 데이터 배열:", dataArray);
+        // Log removed
 
         // 데이터 매핑 - 필드명이 다를 수 있으므로 확인
         const mappedData = dataArray.map((item: any) => {
-          console.log("매핑 전 항목:", item);
+          // Log removed
           // 필수 필드가 없는 경우 로그
           if (!item.id || !item.title) {
-            console.warn("주요 필드가 없는 항목:", item);
+            // Log removed
           }
 
           return {
@@ -205,7 +205,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
           };
         });
 
-        console.log("매핑된 데이터:", mappedData);
+        // Log removed
 
         // position 값이 높은 순서대로 내림차순 정렬
         const sortedGuidelines = [...mappedData].sort(
@@ -224,16 +224,16 @@ const GuidelineManagement = ({ boardId = 3 }) => {
         response?.total === 0
       ) {
         // 정상 응답이지만 데이터가 없는 경우 (빈 배열)
-        console.log("가이드라인 데이터가 없습니다. 빈 배열을 사용합니다.");
+        // Log removed
         setGuidelines([]);
         setError(null); // 성공적인 응답이므로 에러 메시지 삭제
       } else {
-        console.log("적절한 데이터 배열을 찾지 못했습니다.");
+        // Log removed
         setGuidelines([]);
         setError(`${title} 가이드라인을 불러오는데 실패했습니다.`);
       }
     } catch (err) {
-      console.error(`Error fetching ${title} guidelines:`, err);
+      // Error logging removed
       setError(`${title} 가이드라인을 불러오는데 실패했습니다.`);
       setGuidelines([]);
     } finally {
@@ -333,7 +333,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       setShowModal(false);
       fetchGuidelines();
     } catch (error) {
-      console.error("Error saving guideline:", error);
+      // Error logging removed
       setAlertMessage({ type: "error", message: "가이드라인 저장 중 오류가 발생했습니다." });
     }
   };
@@ -347,7 +347,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       setAlertMessage({ type: "success", message: "가이드라인이 삭제되었습니다." });
       fetchGuidelines();
     } catch (err) {
-      console.error("Error deleting guideline:", err);
+      // Error logging removed
       setAlertMessage({ type: "error", message: "가이드라인 삭제 중 오류가 발생했습니다." });
     }
   };
@@ -370,7 +370,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
       fetchGuidelines(); // 목록 새로고침
     } catch (err) {
-      console.error("Error moving guideline up:", err);
+      // Error logging removed
       setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
       fetchGuidelines(); // 에러 시 원상복구
     }
@@ -392,7 +392,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
       fetchGuidelines();
     } catch (err) {
-      console.error("Error moving guideline down:", err);
+      // Error logging removed
       setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
       fetchGuidelines();
     }

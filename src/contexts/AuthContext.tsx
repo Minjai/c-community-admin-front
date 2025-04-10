@@ -48,7 +48,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const adminUserData = getAdminUser();
         if (adminUserData) {
           setUser(adminUserData);
-          console.log("어드민 인증 정보 복원:", adminUserData);
           return;
         }
       }
@@ -65,7 +64,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (storedUser && token) {
         setUser(JSON.parse(storedUser));
-        console.log("기존 방식으로 인증 정보 복원");
       } else {
         // 인증 정보가 없으면 로그아웃 상태로 설정
         setUser(null);
@@ -85,10 +83,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(userData);
       navigate("/banners/main");
     } catch (err: any) {
-      console.log("로그인 에러:", err);
-
-      // 오류 메시지 설정
-      setError(err.message || "로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
+      if (err.message === "NO_ADMIN_ROLE") {
+        setError("관리자 권한이 없습니다. 관리자에게 문의하세요.");
+      } else {
+        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+      }
     } finally {
       setIsLoading(false);
     }

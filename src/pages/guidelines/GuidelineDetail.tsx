@@ -128,13 +128,8 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         }
 
         setMaxPosition(maxPos);
-        console.log(
-          `현재 카테고리(boardId: ${boardId})의 게시물 개수: ${count}, 최대 position: ${maxPos}`
-        );
       }
-    } catch (error) {
-      console.error("가이드라인 개수 조회 오류:", error);
-    }
+    } catch (error) {}
   };
 
   // 태그 추가 처리
@@ -190,8 +185,6 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         return;
       }
 
-      console.log("내용 변경:", newContent.substring(0, 30) + "...", "길이:", newContent.length);
-
       // 에디터 초기화 직후 빈 업데이트 방지
       if (newContent === "<p><br></p>" && content === "") {
         return;
@@ -206,17 +199,17 @@ const GuidelineDetail = ({ boardId = 3 }) => {
     e.preventDefault();
 
     // 디버깅을 위한 로그 추가
-    console.log(
-      "제출 시 제목:",
-      title,
-      "길이:",
-      title.length,
-      "trimmed 길이:",
-      title.trim().length
-    );
-    console.log("제출 시 내용:", content);
-    console.log("제출 시 내용 길이:", content ? content.length : 0);
-    console.log("제출 시 내용 HTML:", content);
+    // console.log(
+    //   "제출 시 제목:",
+    //   title,
+    //   "길이:",
+    //   title.length,
+    //   "trimmed 길이:",
+    //   title.trim().length
+    // );
+    // console.log("제출 시 내용:", content);
+    // console.log("제출 시 내용 길이:", content ? content.length : 0);
+    // console.log("제출 시 내용 HTML:", content);
 
     // 빈 HTML인지 확인 (ReactQuill은 빈 내용일 때도 <p><br></p>와 같은 HTML을 생성함)
     const isContentEmpty = !content || content === "<p><br></p>" || content.trim() === "";
@@ -249,7 +242,7 @@ const GuidelineDetail = ({ boardId = 3 }) => {
 
       // Base64 이미지가 발견된 경우 처리
       if (dataURLs.length > 0) {
-        console.log(`HTML 내용에서 ${dataURLs.length}개의 Base64 이미지를 발견했습니다.`);
+        // console.log(`HTML 내용에서 ${dataURLs.length}개의 Base64 이미지를 발견했습니다.`);
 
         // 각 Base64 이미지를 파일로 변환
         const imageFiles = dataURLs.map((dataURL, index) => createFileFromDataURL(dataURL, index));
@@ -257,12 +250,12 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         // GIF 파일 디버깅 로그
         imageFiles.forEach((file) => {
           if (file.type === "image/gif" || file.name.endsWith(".gif")) {
-            console.log(
-              "GIF 파일 발견:",
-              file.name,
-              file.type,
-              `${(file.size / 1024 / 1024).toFixed(2)}MB`
-            );
+            // console.log(
+            //   "GIF 파일 발견:",
+            //   file.name,
+            //   file.type,
+            //   `${(file.size / 1024 / 1024).toFixed(2)}MB`
+            // );
           }
         });
 
@@ -271,20 +264,20 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         for (let i = 0; i < imageFiles.length; i++) {
           try {
             const file = imageFiles[i];
-            console.log(
-              `인라인 이미지 ${i + 1}/${imageFiles.length} 업로드 중:`,
-              file.name,
-              file.type
-            );
+            // console.log(
+            //   `인라인 이미지 ${i + 1}/${imageFiles.length} 업로드 중:`,
+            //   file.name,
+            //   file.type
+            // );
 
             // 실제 서버 API 호출
             const imageUrl = await ImageApiService.uploadInlineImage(file);
             uploadedUrls.push(imageUrl);
 
             // 업로드 진행 상황 로그
-            console.log(`인라인 이미지 ${i + 1}/${imageFiles.length} 업로드 완료:`, imageUrl);
+            // console.log(`인라인 이미지 ${i + 1}/${imageFiles.length} 업로드 완료:`, imageUrl);
           } catch (err) {
-            console.error(`인라인 이미지 ${i + 1} 업로드 실패:`, err);
+            // console.error(`인라인 이미지 ${i + 1} 업로드 실패:`, err);
             // 오류 발생 시 임시 URL 사용 (실패해도 계속 진행)
             uploadedUrls.push(`https://via.placeholder.com/300x200?text=Image+Upload+Failed`);
           }
@@ -298,7 +291,7 @@ const GuidelineDetail = ({ boardId = 3 }) => {
 
         // 최종 처리된 HTML 사용
         trimmedContent = finalHtml;
-        console.log("최종 처리된 HTML:", trimmedContent.substring(0, 100) + "...");
+        // console.log("최종 처리된 HTML:", trimmedContent.substring(0, 100) + "...");
       }
 
       if (isEditMode) {
@@ -314,10 +307,10 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         };
 
         // 요청 데이터 로깅
-        console.log("가이드라인 수정 요청 데이터:", {
-          ...requestData,
-          content: requestData.content.substring(0, 100) + "...", // 너무 길지 않게 자름
-        });
+        // console.log("가이드라인 수정 요청 데이터:", {
+        //   ...requestData,
+        //   content: requestData.content.substring(0, 100) + "...", // 너무 길지 않게 자름
+        // });
 
         const response = await GuidelineApiService.updateGuideline(
           parseInt(id as string),
@@ -325,7 +318,7 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         );
 
         // 응답 로깅
-        console.log("가이드라인 수정 응답:", response);
+        // console.log("가이드라인 수정 응답:", response);
 
         alert("가이드라인이 수정되었습니다.");
         navigate(getNavigationPath());
@@ -348,22 +341,22 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         };
 
         // 요청 데이터 로깅
-        console.log("가이드라인 생성 요청 데이터:", {
-          ...requestData,
-          content: requestData.content.substring(0, 100) + "...", // 너무 길지 않게 자름
-        });
+        // console.log("가이드라인 생성 요청 데이터:", {
+        //   ...requestData,
+        //   content: requestData.content.substring(0, 100) + "...", // 너무 길지 않게 자름
+        // });
 
         const response = await GuidelineApiService.createGuideline(requestData);
 
         // 응답 로깅
-        console.log("가이드라인 생성 응답:", response);
+        // console.log("가이드라인 생성 응답:", response);
 
         alert("가이드라인이 작성되었습니다.");
         navigate(getNavigationPath());
       }
     } catch (error: any) {
-      console.error("가이드라인 저장 오류:", error);
-      console.error("에러 응답 데이터:", error.response?.data);
+      // console.error("가이드라인 저장 오류:", error);
+      // console.error("에러 응답 데이터:", error.response?.data);
 
       // 인증 오류 처리
       if (error.response?.status === 401 || error.response?.status === 403) {
@@ -389,13 +382,13 @@ const GuidelineDetail = ({ boardId = 3 }) => {
 
     setLoading(true);
     try {
-      console.log("가이드라인 상세 조회 시작 - ID:", id);
+      // console.log("가이드라인 상세 조회 시작 - ID:", id);
       const response = await GuidelineApiService.getGuidelineById(parseInt(id as string));
-      console.log("가이드라인 상세 응답:", response); // 서버 응답 로깅
+      // console.log("가이드라인 상세 응답:", response); // 서버 응답 로깅
 
       if (response && response.data) {
         const postData = response.data;
-        console.log("가이드라인 데이터:", postData); // 데이터 구조 로깅
+        // console.log("가이드라인 데이터:", postData); // 데이터 구조 로깅
         setPost(postData);
         setTitle(postData.title);
         setContent(postData.content);
@@ -407,7 +400,7 @@ const GuidelineDetail = ({ boardId = 3 }) => {
 
         // 태그 설정
         if (postData.tags) {
-          console.log("태그 데이터 타입:", typeof postData.tags, "값:", postData.tags);
+          // console.log("태그 데이터 타입:", typeof postData.tags, "값:", postData.tags);
           try {
             // 문자열로 저장된 경우 파싱
             if (typeof postData.tags === "string") {
@@ -417,24 +410,24 @@ const GuidelineDetail = ({ boardId = 3 }) => {
                   // 외부 따옴표 제거 후 파싱 시도
                   const unescapedString = postData.tags.slice(1, -1).replace(/\\"/g, '"');
                   setTags(JSON.parse(unescapedString));
-                  console.log("이중 JSON 문자열 파싱 성공");
+                  // console.log("이중 JSON 문자열 파싱 성공");
                 } catch (e) {
                   // 일반 방식으로 파싱 시도
                   setTags(JSON.parse(postData.tags));
-                  console.log("일반 JSON 문자열 파싱 성공");
+                  // console.log("일반 JSON 문자열 파싱 성공");
                 }
               } else {
                 setTags(JSON.parse(postData.tags));
-                console.log("표준 JSON 문자열 파싱 성공");
+                // console.log("표준 JSON 문자열 파싱 성공");
               }
             }
             // 이미 배열인 경우 그대로 사용
             else if (Array.isArray(postData.tags)) {
               setTags(postData.tags);
-              console.log("태그 배열 직접 사용");
+              // console.log("태그 배열 직접 사용");
             }
           } catch (e) {
-            console.error("태그 파싱 오류:", e, "원본 태그 데이터:", postData.tags);
+            // console.error("태그 파싱 오류:", e, "원본 태그 데이터:", postData.tags);
             // 파싱 오류 시 빈 배열로 설정하고 계속 진행
             setTags([]);
           }
@@ -443,18 +436,18 @@ const GuidelineDetail = ({ boardId = 3 }) => {
         // 이미지가 있으면 미리보기 설정
         if (postData.imageUrl) {
           setImagePreview(postData.imageUrl);
-          console.log("이미지 URL 설정:", postData.imageUrl);
+          // console.log("이미지 URL 설정:", postData.imageUrl);
         }
       } else {
-        console.error("응답 데이터 형식이 예상과 다름:", response);
+        // console.error("응답 데이터 형식이 예상과 다름:", response);
         setError("가이드라인을 찾을 수 없습니다.");
-        console.error("가이드라인 조회 실패: 데이터 없음");
+        // console.error("가이드라인 조회 실패: 데이터 없음");
       }
     } catch (error: any) {
-      console.error("가이드라인 조회 중 예외 발생:", error);
+      // console.error("가이드라인 조회 중 예외 발생:", error);
       if (error?.response) {
-        console.error("응답 상태:", error.response.status);
-        console.error("응답 데이터:", error.response.data);
+        // console.error("응답 상태:", error.response.status);
+        // console.error("응답 데이터:", error.response.data);
       }
       setError("가이드라인을 불러오는 중 오류가 발생했습니다.");
     } finally {
