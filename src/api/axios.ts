@@ -21,6 +21,10 @@ const ADMIN_USER_KEY = `${STORAGE_PREFIX}user`;
 const ADMIN_TOKEN_KEY = `${STORAGE_PREFIX}token`;
 const ADMIN_REFRESH_TOKEN_KEY = `${STORAGE_PREFIX}refreshToken`;
 
+// 어드민 인증용 키 (포트와 관계없이 항상 별도로 저장)
+const ADMIN_USER_DATA_KEY = "adminUserData";
+const ADMIN_IS_LOGGED_IN_KEY = "adminIsLoggedIn";
+
 // 일반 사용자 로컬 스토리지 키
 const USER_TOKEN_KEY = "token"; // 기존 호환성 유지
 const USER_REFRESH_TOKEN_KEY = "refreshToken"; // 기존 호환성 유지
@@ -41,12 +45,119 @@ const instance = axios.create({
   },
 });
 
-// 토큰 저장 함수 (키 구분)
+// 어드민 인증 관련 함수들
+export const checkIsAdminLoggedIn = () => {
+  return localStorage.getItem(ADMIN_IS_LOGGED_IN_KEY) === "true";
+};
+
+export const getAdminUser = () => {
+  const adminJson = localStorage.getItem(ADMIN_USER_DATA_KEY);
+  if (adminJson) {
+    try {
+      return JSON.parse(adminJson);
+    } catch (e) {
+      console.error("Failed to parse admin data:", e);
+    }
+  }
+  return null;
+};
+
+export const setAdminLoggedIn = (adminData: any) => {
+  localStorage.setItem(ADMIN_USER_DATA_KEY, JSON.stringify(adminData));
+  localStorage.setItem(ADMIN_IS_LOGGED_IN_KEY, "true");
+};
+
+export const adminLogout = () => {
+  localStorage.removeItem(ADMIN_USER_DATA_KEY);
+  localStorage.removeItem(ADMIN_IS_LOGGED_IN_KEY);
+
+  // 기존 어드민 토큰도 함께 제거
+  localStorage.removeItem(ADMIN_USER_KEY);
+  localStorage.removeItem(ADMIN_TOKEN_KEY);
+  localStorage.removeItem(ADMIN_REFRESH_TOKEN_KEY);
+};
+
+// 어드민 로그인 처리 함수
+export const handleAdminLogin = (email: string, password: string) => {
+  return new Promise<any>((resolve, reject) => {
+    if (!email || !password) {
+      reject(new Error("이메일과 비밀번호를 모두 입력해주세요."));
+      return;
+    }
+
+    // 로그인 API 호출
+    instance
+      .post("/admin/login", {
+        email: email,
+        password: password,
+      })
+      .then((response) => {
+        const data = response.data;
+
+        // 어드민 권한 확인
+        if (data.role !== "admin" && data.role !== "superadmin") {
+          reject(new Error("관리자 권한이 없습니다."));
+          return;
+        }
+
+        // 어드민 데이터 저장
+        const adminData = {
+          id: data.userId,
+          nickname: data.nickname,
+          role: data.role,
+          userType: "admin",
+        };
+
+        // 토큰 저장
+        if (data.token) {
+          saveToken(data.token, data.refreshToken || "", adminData);
+        }
+
+        // 어드민 전용 저장소에 저장
+        setAdminLoggedIn(adminData);
+        console.log("어드민 로그인 성공:", adminData);
+
+        // 성공 응답
+        resolve(adminData);
+      })
+      .catch((error) => {
+        console.error("로그인 실패:", error);
+
+        // 서버에서 반환한 상세 오류 메시지 사용
+        const errorMessage =
+          error.response?.data?.details ||
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          "로그인에 실패했습니다. 이메일과 비밀번호를 확인해주세요.";
+
+        reject(new Error(errorMessage));
+      });
+  });
+};
+
+// 어드민 권한 검사 함수
+export const requireAdminAuth = (redirectPath = "/admin/login") => {
+  if (!checkIsAdminLoggedIn()) {
+    // 권한 부족 메시지 표시
+    alert("관리자 권한이 필요합니다. 로그인 페이지로 이동합니다.");
+
+    // 로그인 페이지로 리다이렉트
+    window.location.href = redirectPath;
+    return false;
+  }
+  return true;
+};
+
+// 토큰 저장 함수 (키 구분) - 어드민 인증 추가
 export const saveToken = (token: string, refreshToken: string, userData: any) => {
   if (isAdminPort()) {
     localStorage.setItem(ADMIN_TOKEN_KEY, token);
     localStorage.setItem(ADMIN_REFRESH_TOKEN_KEY, refreshToken);
     localStorage.setItem(ADMIN_USER_KEY, JSON.stringify(userData));
+
+    // 어드민 인증 정보도 함께 저장
+    setAdminLoggedIn(userData);
+
     console.log("어드민 토큰 저장됨:", ADMIN_TOKEN_KEY);
   } else {
     localStorage.setItem(USER_TOKEN_KEY, token);
@@ -65,12 +176,11 @@ export const getToken = () => {
   }
 };
 
-// 토큰 제거 함수 (키 구분)
+// 토큰 제거 함수 (키 구분) - 어드민 인증 추가
 export const removeToken = () => {
   if (isAdminPort()) {
-    localStorage.removeItem(ADMIN_USER_KEY);
-    localStorage.removeItem(ADMIN_TOKEN_KEY);
-    localStorage.removeItem(ADMIN_REFRESH_TOKEN_KEY);
+    // 어드민 인증 정보도 함께 제거
+    adminLogout();
     console.log("어드민 토큰 제거됨");
   } else {
     localStorage.removeItem(USER_DATA_KEY);
@@ -168,22 +278,30 @@ instance.interceptors.response.use(
         error.response.data?.error ||
         "요청한 리소스에 대한 접근 권한이 없습니다.";
 
-      // 권한 부족 시 토큰 제거 및 로그인 페이지로 리다이렉트
+      // 권한 부족 시 토큰 제거
       removeToken();
-
-      // 현재 포트에 따라 리다이렉트 처리
-      if (isAdminPort()) {
-        // 어드민 로그인 페이지로 리다이렉트
-        alert(`권한 부족: ${errorMessage}`);
-        window.location.href = "/login";
-      } else {
-        // 일반 사용자 로그인 페이지로 리다이렉트
-        alert(`권한 부족: ${errorMessage}`);
-        window.location.href = "/login";
-      }
 
       // 오류 객체에 권한 부족 플래그 추가
       error.isPermissionError = true;
+
+      // 현재 포트에 따라 메시지 및 리다이렉트 처리
+      if (isAdminPort()) {
+        // 어드민 로그인 페이지로 리다이렉트
+        alert(`권한 부족: 관리자만 접근할 수 있습니다.`);
+
+        // 현재 경로가 로그인 페이지가 아닐 경우에만 리다이렉트
+        if (window.location.pathname !== "/admin/login" && window.location.pathname !== "/login") {
+          window.location.href = "/admin/login";
+        }
+      } else {
+        // 일반 사용자 로그인 페이지로 리다이렉트
+        alert(`권한 부족: ${errorMessage}`);
+
+        // 현재 경로가 로그인 페이지가 아닐 경우에만 리다이렉트
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+      }
     }
 
     console.error("API 오류 상태:", error.response?.status);

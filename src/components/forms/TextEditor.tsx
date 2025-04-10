@@ -109,16 +109,28 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 }
 
 // YouTube 비디오 블롯 정의 및 등록
-// Quill을 외부에서 가져와서 한 번만 등록
 const BlockEmbed = Quill.import("blots/block/embed");
 
 class VideoBlot extends BlockEmbed {
   static create(value: string) {
     const node = super.create();
-    // YouTube 비디오 ID를 추출하여 iframe으로 삽입
+
+    // YouTube 비디오 URL 처리
+    let videoUrl = value;
+
+    // 이미 임베드 URL이 아닌 경우만 변환
+    if (!videoUrl.includes("youtube.com/embed/")) {
+      videoUrl = this.transformVideoUrl(value);
+    }
+
+    // iframe 속성 설정
     node.setAttribute("frameborder", "0");
-    node.setAttribute("allowfullscreen", true);
-    node.setAttribute("src", this.transformVideoUrl(value));
+    node.setAttribute("allowfullscreen", "true");
+    node.setAttribute("src", videoUrl);
+
+    // 디버깅을 위한 로그
+    console.log("비디오 블롯 생성:", value, "->", videoUrl);
+
     return node;
   }
 
@@ -128,63 +140,71 @@ class VideoBlot extends BlockEmbed {
 
   // YouTube 비디오 URL을 임베드 URL로 변환
   static transformVideoUrl(url: string) {
-    // YouTube URL 패턴 지원 (여러 형태의 URL 처리)
-    let videoId = "";
+    console.log("URL 변환 시작:", url);
 
     // 입력값 검증
     if (!url || typeof url !== "string") {
       console.warn("유효하지 않은 YouTube URL:", url);
-      return "https://www.youtube.com/embed/error";
+      return "https://www.youtube.com/embed/dQw4w9WgXcQ"; // 기본 비디오
     }
 
     // 이미 videoId만 전달된 경우
     if (url.match(/^[a-zA-Z0-9_-]{11}$/)) {
-      return `https://www.youtube.com/embed/${url}?showinfo=0`;
+      console.log("ID만 전달됨:", url);
+      return `https://www.youtube.com/embed/${url}`;
+    }
+
+    // 이미 임베드 URL인 경우
+    if (url.includes("youtube.com/embed/")) {
+      console.log("이미 임베드 URL임:", url);
+      return url;
     }
 
     // URL 패턴에서 ID 추출
-    const youtubeRegex =
-      /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-    const match = url.match(youtubeRegex);
+    let videoId = "";
 
-    if (match && match[1]) {
-      videoId = match[1];
-    } else {
-      // 기존 로직도 백업으로 유지
-      if (url.includes("youtube.com/watch?v=")) {
-        const splitResult = url.split("v=");
-        if (splitResult.length >= 2) {
-          videoId = splitResult[1];
-          const ampersandPosition = videoId.indexOf("&");
-          if (ampersandPosition !== -1) {
-            videoId = videoId.substring(0, ampersandPosition);
-          }
-        }
-      } else if (url.includes("youtube.com/embed/")) {
-        const splitResult = url.split("embed/");
-        if (splitResult.length >= 2) {
-          videoId = splitResult[1];
-        }
-      } else if (url.includes("youtu.be/")) {
-        const splitResult = url.split("youtu.be/");
-        if (splitResult.length >= 2) {
-          videoId = splitResult[1];
-        }
-      } else {
-        // 직접 비디오 ID를 입력한 경우 또는 URL이 인식되지 않는 경우
-        console.warn("YouTube ID를 추출할 수 없음:", url);
-        videoId = url;
+    // 일반 유튜브 URL (watch?v=)
+    if (url.includes("youtube.com/watch?v=")) {
+      const match = url.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+      if (match && match[1]) {
+        videoId = match[1];
+        console.log("watch?v= 패턴에서 ID 추출:", videoId);
+      }
+    }
+    // 짧은 유튜브 URL (youtu.be/)
+    else if (url.includes("youtu.be/")) {
+      const match = url.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+      if (match && match[1]) {
+        videoId = match[1];
+        console.log("youtu.be/ 패턴에서 ID 추출:", videoId);
+      }
+    }
+    // 그 외 모든 경우에 대한 포괄적인 정규식 시도
+    else {
+      const generalMatch = url.match(
+        /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/
+      );
+      if (generalMatch && generalMatch[1]) {
+        videoId = generalMatch[1];
+        console.log("일반 정규식으로 ID 추출:", videoId);
       }
     }
 
-    // videoId가 유효한지 확인 (기본적인 형식 검사)
-    if (!videoId || videoId.length < 5) {
-      console.warn("유효하지 않은 YouTube 비디오 ID:", videoId);
-      return `https://www.youtube.com/embed/${url}?showinfo=0`;
+    // videoId가 추출되지 않은 경우, 직접 ID로 간주
+    if (!videoId) {
+      console.log("ID 추출 실패, 입력값을 직접 ID로 사용:", url);
+      videoId = url.trim();
     }
 
-    // 임베드 URL 생성
-    return `https://www.youtube.com/embed/${videoId}?showinfo=0`;
+    // ID 길이 검사 (기본적인 유효성 확인)
+    if (videoId.length !== 11) {
+      console.warn("비정상적인 YouTube ID 길이:", videoId.length, videoId);
+    }
+
+    // 임베드 URL 생성 및 반환
+    const embedUrl = `https://www.youtube.com/embed/${videoId}`;
+    console.log("최종 임베드 URL:", embedUrl);
+    return embedUrl;
   }
 }
 
@@ -193,7 +213,12 @@ VideoBlot.tagName = "iframe";
 VideoBlot.className = "ql-video";
 
 // 글로벌 등록은 한 번만 수행
-Quill.register(VideoBlot, true);
+try {
+  Quill.register(VideoBlot, true);
+  console.log("VideoBlot 등록 성공");
+} catch (error) {
+  console.warn("VideoBlot 등록 오류 (이미 등록됨):", error);
+}
 
 // 유튜브 링크 인식 패턴
 const YOUTUBE_REGEX =
@@ -567,11 +592,26 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
       if (range) {
         const videoUrl = prompt("YouTube 비디오 URL 또는 ID를 입력하세요:");
+
         if (videoUrl) {
+          console.log("비디오 삽입 시도:", videoUrl);
+
           // 동영상 삽입
           editor.insertEmbed(range.index, "video", videoUrl);
-          // 커서 위치 조정 - 두 번째 인자 추가 (length = 0)
+
+          // 커서 위치 조정
           editor.setSelection(range.index + 1, 0);
+
+          // 변경 사항이 감지되도록 에디터에 포커스 후 블러 처리
+          editor.focus();
+          setTimeout(() => {
+            const editorContainer = quillRef.current?.editor?.root.parentElement;
+            if (editorContainer) {
+              editorContainer.click();
+            }
+          }, 100);
+
+          console.log("비디오 삽입 완료");
         }
       }
     } catch (err) {
@@ -903,6 +943,20 @@ const TextEditor: React.FC<TextEditorProps> = ({
       container.removeEventListener("click", handleContainerClick as EventListener);
     };
   }, []);
+
+  // 툴바 구성 (여기서는 일부만 보여줌)
+  useEffect(() => {
+    if (quillRef.current) {
+      console.log("에디터 툴바 설정 중...");
+      const toolbar = quillRef.current.getEditor().getModule("toolbar");
+
+      // 핸들러 등록
+      toolbar.addHandler("image", imageHandler);
+      toolbar.addHandler("video", videoHandler);
+
+      console.log("에디터 툴바 핸들러 등록 완료");
+    }
+  }, [imageHandler, videoHandler]);
 
   return (
     <div ref={editorRef} className="quill-editor-container">

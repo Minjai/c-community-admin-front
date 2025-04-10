@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import axios, { saveToken, removeToken, getToken, isAdminPort } from "../api/axios";
+import axios, {
+  saveToken,
+  removeToken,
+  isAdminPort,
+  getToken,
+  handleAdminLogin,
+} from "../api/axios";
 
 // 로컬 스토리지 키는 axios에서 직접 관리하도록 변경
 // 기존 로컬 스토리지 키 참조는 유지 (기존 코드 호환성)
@@ -61,52 +67,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
 
     try {
-      // 올바른 API 경로 사용
-      const response = await axios.post("/account/login", { email, password });
-      console.log("로그인 응답:", response.data);
-
-      // 응답 구조 확인 및 처리
-      if (response.data && response.data.message === "로그인 성공") {
-        // role 체크 - admin이 아니면 로그인 실패로 처리
-        if (response.data.role !== "admin") {
-          setError("관리자 계정이 아닙니다. 관리자 권한이 필요합니다.");
-          setIsLoading(false);
-          return;
-        }
-
-        const userData = {
-          id: response.data.userId,
-          nickname: response.data.nickname || "관리자계정",
-          email: email,
-          role: response.data.role || "admin",
-        };
-
-        setUser(userData);
-
-        // 포트 기반으로 토큰 저장 (새로운 유틸리티 함수 사용)
-        if (response.data.token) {
-          // 새 토큰 저장 유틸리티 사용
-          saveToken(response.data.token, response.data.refreshToken || "", userData);
-        }
-
-        navigate("/banners/main");
-      } else {
-        // 서버에서 받은 자세한 오류 메시지 사용
-        setError(response.data.details || "이메일 또는 비밀번호가 올바르지 않습니다.");
-      }
+      // axios.ts의 handleAdminLogin 함수 활용
+      const userData = await handleAdminLogin(email, password);
+      setUser(userData);
+      navigate("/banners/main");
     } catch (err: any) {
       console.log("로그인 에러:", err);
 
-      // 서버에서 받은 details 값 확인
-      const serverDetails = err.response?.data?.details;
-      const serverMessage = err.response?.data?.message;
-
-      // details 값이 있으면 그것을 사용, 없으면 message 사용, 둘 다 없으면 기본 메시지 사용
-      const errorMessage =
-        serverDetails || serverMessage || "로그인 중 오류가 발생했습니다. 다시 시도해주세요.";
-
-      setError(errorMessage);
-      console.error("Login error details:", serverDetails);
+      // 오류 메시지 설정
+      setError(err.message || "로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
       setIsLoading(false);
     }
