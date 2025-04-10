@@ -24,6 +24,8 @@ interface TextEditorProps {
   customModules?: any;
   customFormats?: string[];
   height?: string;
+  onChange?: (content: string) => void;
+  onFocus?: () => void;
 }
 
 const MAX_IMAGE_SIZE_MB = 20; // 이미지 크기 제한 20MB
@@ -234,6 +236,113 @@ const isValidImageExtension = (filename: string): boolean => {
   );
 };
 
+// MutationObserver 설정
+const setupMutationObserver = (editorRoot: HTMLElement) => {
+  if (!editorRoot) return null;
+
+  // 대신 MutationObserver의 childList와 subtree 옵션만 사용
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === "childList" && mutation.addedNodes.length > 0) {
+        mutation.addedNodes.forEach((node) => {
+          if (node instanceof HTMLImageElement) {
+            node.addEventListener("error", (e) => {
+              console.error("이미지 로딩 오류:", e);
+            });
+          }
+        });
+      }
+    });
+  });
+
+  observer.observe(editorRoot, {
+    childList: true,
+    subtree: true,
+  });
+
+  return observer;
+};
+
+// 에디터 초기화 함수 수정
+const initQuill = async (
+  quillRef: React.RefObject<ReactQuill>,
+  content: string,
+  prevContentRef: React.MutableRefObject<string>
+) => {
+  try {
+    // 에디터가 아직 초기화되지 않았을 때만 초기화
+    if (!quillRef.current) return;
+
+    // 초기 콘텐츠 설정
+    const editor = quillRef.current.getEditor();
+
+    // 초기 콘텐츠가 있는 경우에만 설정
+    if (content) {
+      console.log("초기 콘텐츠 설정 시작:", content.substring(0, 30) + "...");
+
+      try {
+        // HTML 문자열 정리 및 정규화
+        const normalizedContent = content === "<p><br></p>" ? "" : content;
+        // silent 모드로 내용 설정 (이벤트 발생 방지)
+        editor.clipboard.dangerouslyPasteHTML(normalizedContent, "silent");
+        prevContentRef.current = normalizedContent;
+        console.log("초기 콘텐츠 설정 완료");
+      } catch (err) {
+        console.error("초기 콘텐츠 설정 실패:", err);
+      }
+    }
+
+    // 에디터 포커스 시 onFocus 호출
+    editor.root.addEventListener("focus", () => {
+      onFocus && onFocus();
+    });
+
+    // 이미지 처리를 위한 Quill 이벤트 핸들러
+    editor.getModule("toolbar").addHandler("image", () => {
+      // 파일 선택 모달 열기
+      const input = document.createElement("input");
+      input.setAttribute("type", "file");
+      input.setAttribute("accept", "image/*");
+      input.click();
+
+      // 파일 선택 시 처리
+      input.onchange = async () => {
+        if (!input.files || input.files.length === 0) return;
+
+        const file = input.files[0];
+
+        try {
+          // 파일 크기 검증 (5MB 제한)
+          if (file.size > 5 * 1024 * 1024) {
+            alert("파일 크기는 5MB 이하여야 합니다.");
+            return;
+          }
+
+          // 로컬에서 이미지 미리보기를 위한 base64 변환
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const range = editor.getSelection(true);
+            if (range) {
+              editor.insertEmbed(range.index, "image", e.target?.result);
+              editor.setSelection(range.index + 1, 0);
+            }
+          };
+          reader.readAsDataURL(file);
+        } catch (error) {
+          console.error("이미지 업로드 중 오류:", error);
+          alert("이미지 업로드 중 오류가 발생했습니다.");
+        }
+      };
+    });
+
+    // 초기화 완료 표시
+    initializedRef.current = true;
+    console.log("에디터 초기화 완료");
+  } catch (error) {
+    console.error("에디터 초기화 중 오류:", error);
+  }
+};
+
 const TextEditor: React.FC<TextEditorProps> = ({
   content,
   setContent,
@@ -241,165 +350,148 @@ const TextEditor: React.FC<TextEditorProps> = ({
   customModules,
   customFormats,
   height = "400px",
+  onChange,
+  onFocus,
 }) => {
   const quillRef = useRef<ReactQuill>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+  const initializedRef = useRef<boolean>(false);
+  const prevContentRef = useRef<string>(content || "");
+  const internalChangeRef = useRef<boolean>(false);
 
-  // 에디터 초기화 및 방향 설정
+  // 에디터 초기화 useEffect
   useEffect(() => {
-    if (quillRef.current) {
+    if (initializedRef.current) return;
+
+    const initQuill = async () => {
       try {
+        // 에디터가 아직 초기화되지 않았을 때만 초기화
+        if (!quillRef.current) return;
+
+        // 초기 콘텐츠 설정
         const editor = quillRef.current.getEditor();
 
-        // 기존 내용이 있으면 설정
+        // 초기 콘텐츠가 있는 경우에만 설정
         if (content) {
-          const delta = editor.clipboard.convert(content);
-          editor.setContents(delta, "silent");
+          console.log("초기 콘텐츠 설정 시작:", content.substring(0, 30) + "...");
+
+          try {
+            // HTML 문자열 정리 및 정규화
+            const normalizedContent = content === "<p><br></p>" ? "" : content;
+            // silent 모드로 내용 설정 (이벤트 발생 방지)
+            editor.clipboard.dangerouslyPasteHTML(normalizedContent, "silent");
+            prevContentRef.current = normalizedContent;
+            console.log("초기 콘텐츠 설정 완료");
+          } catch (err) {
+            console.error("초기 콘텐츠 설정 실패:", err);
+          }
         }
 
-        // 자동 유튜브 링크 감지 설정
-        setupYouTubeLinkDetection(editor, setContent);
+        // 에디터 포커스 시 onFocus 호출
+        editor.root.addEventListener("focus", () => {
+          onFocus && onFocus();
+        });
 
-        // LTR(Left-to-Right) 방향 설정
-        editor.root.setAttribute("dir", "ltr");
+        // 이미지 처리를 위한 Quill 이벤트 핸들러
+        editor.getModule("toolbar").addHandler("image", () => {
+          // 파일 선택 모달 열기
+          const input = document.createElement("input");
+          input.setAttribute("type", "file");
+          input.setAttribute("accept", "image/*");
+          input.click();
+
+          // 파일 선택 시 처리
+          input.onchange = async () => {
+            if (!input.files || input.files.length === 0) return;
+
+            const file = input.files[0];
+
+            try {
+              // 파일 크기 검증 (5MB 제한)
+              if (file.size > 5 * 1024 * 1024) {
+                alert("파일 크기는 5MB 이하여야 합니다.");
+                return;
+              }
+
+              // 로컬에서 이미지 미리보기를 위한 base64 변환
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                const range = editor.getSelection(true);
+                if (range) {
+                  editor.insertEmbed(range.index, "image", e.target?.result);
+                  editor.setSelection(range.index + 1, 0);
+                }
+              };
+              reader.readAsDataURL(file);
+            } catch (error) {
+              console.error("이미지 업로드 중 오류:", error);
+              alert("이미지 업로드 중 오류가 발생했습니다.");
+            }
+          };
+        });
+
+        // 초기화 완료 표시
+        initializedRef.current = true;
+        console.log("에디터 초기화 완료");
       } catch (error) {
-        console.error("에디터 초기화 오류:", error);
+        console.error("에디터 초기화 중 오류:", error);
       }
-    }
+    };
+
+    // 초기화 실행
+    initQuill();
+
+    // 컴포넌트 언마운트 시 초기화 상태 리셋
+    return () => {
+      initializedRef.current = false;
+      prevContentRef.current = "";
+      console.log("에디터 정리됨");
+    };
   }, []);
 
-  // 유튜브 링크 자동 감지 및 변환 설정
-  const setupYouTubeLinkDetection = (editor: any, contentSetter: (value: string) => void) => {
-    editor.on("text-change", function (delta: any, oldContents: any, source: string) {
-      if (source !== "user") return;
+  // 초기화 및 업데이트 함수
+  useEffect(() => {
+    if (!initializedRef.current) return;
 
-      try {
-        const text = editor.getText();
-        if (!text) return;
+    if (quillRef.current) {
+      const editor = quillRef.current.getEditor();
 
-        // 정규식 객체 재설정 (매번 처음부터 검색을 시작하도록)
-        YOUTUBE_REGEX.lastIndex = 0;
-
-        let match;
-        let linkDetected = false;
-
-        // 새로 추가된 텍스트에서 YouTube URL 찾기
-        while ((match = YOUTUBE_REGEX.exec(text)) !== null) {
-          // 매치 결과 검증
-          if (!match || !match[0] || !match[1]) {
-            console.warn("YouTube 링크 매치 결과가 유효하지 않음:", match);
-            continue;
-          }
-
-          const url = match[0];
-          const videoId = match[1];
-
-          console.log("YouTube 링크 감지됨:", {
-            fullUrl: url,
-            videoId: videoId,
-            position: match.index,
-          });
-
-          // URL의 위치 확인
-          const urlPosition = match.index;
-          if (urlPosition < 0) continue;
-
-          // 주변 내용 확인 (이미 변환된 URL인지 확인)
-          let surroundingDelta;
-          try {
-            // 범위 오류 방지
-            let startPos = Math.max(0, urlPosition - 1);
-            let length = Math.min(url.length + 2, text.length - startPos);
-
-            surroundingDelta = editor.getContents(startPos, length);
-            if (!surroundingDelta || !surroundingDelta.ops) {
-              console.warn("YouTube URL 주변 내용을 가져오지 못함");
-              continue;
-            }
-          } catch (err) {
-            console.warn("YouTube URL 주변 내용 처리 오류:", err);
-            continue;
-          }
-
-          const ops = surroundingDelta.ops;
-
-          // URL이 텍스트로만 구성되어 있는지 확인 (이미 변환되지 않았는지)
-          let isPlainText = true;
-          for (const op of ops) {
-            if (!op || typeof op.insert !== "string") {
-              isPlainText = false;
-              break;
-            }
-          }
-
-          if (isPlainText) {
-            linkDetected = true;
-            // 링크를 영상으로 변환
-            setTimeout(() => {
-              try {
-                // 에디터가 유효한지 다시 확인
-                if (!editor || !editor.deleteText) {
-                  console.error("에디터 객체가 유효하지 않음");
-                  return;
-                }
-
-                // 현재 콘텐츠 상태 확인
-                const currentPos = editor.getSelection();
-                console.log("링크 변환 전 상태:", {
-                  currentPosition: currentPos,
-                  urlPosition: urlPosition,
-                  urlLength: url.length,
-                });
-
-                // 삭제 및 삽입 전에 범위 유효성 확인
-                if (urlPosition < 0 || urlPosition >= editor.getText().length) {
-                  console.warn("유효하지 않은 URL 위치:", urlPosition);
-                  return;
-                }
-
-                editor.deleteText(urlPosition, url.length);
-                editor.insertEmbed(urlPosition, "video", videoId);
-                editor.insertText(urlPosition + 1, "\n");
-
-                console.log("YouTube 링크가 성공적으로 비디오로 변환됨");
-              } catch (err) {
-                console.error("유튜브 링크 변환 중 오류 발생:", err);
-              }
-            }, 100);
-          }
-        }
-
-        // 정규식 객체 초기화 (다음 실행을 위해)
-        YOUTUBE_REGEX.lastIndex = 0;
-      } catch (error) {
-        console.error("유튜브 링크 감지 중 오류 발생:", error);
+      // 외부에서 content가 변경되었고, 내부 변경이 아닌 경우에만 적용
+      if (content !== prevContentRef.current && !internalChangeRef.current) {
+        prevContentRef.current = content;
+        editor.root.innerHTML = content || "";
       }
-    });
-  };
 
-  // 에디터 내용이 변경될 때 HTML로 변환하여 상위 컴포넌트에 전달
-  const handleChange = (value: string, delta: any, source: string, editor: any) => {
-    try {
-      // source가 'user'이고 실제 내용이 변경된 경우에만 부모 컴포넌트에 알림
-      if (source === "user") {
-        let html = "";
-        if (editor && editor.getHTML) {
-          html = editor.getHTML();
-        } else if (editor && editor.root) {
-          html = editor.root.innerHTML;
-        } else if (value && typeof value === "string") {
-          html = value;
-        }
-
-        // 현재 content와 동일하지 않을 때만 부모에게 전달
-        if (html !== content) {
-          setContent(html);
-        }
-      }
-    } catch (error) {
-      console.error("에디터 변경 처리 오류:", error);
+      // 내부 변경 플래그 초기화
+      internalChangeRef.current = false;
     }
-  };
+  }, [content]);
+
+  // 에디터 변경 핸들러
+  const handleChange = useCallback(
+    (value: string) => {
+      if (!initializedRef.current) return;
+
+      // 내부 변경 플래그 설정
+      internalChangeRef.current = true;
+
+      // 비동기로 상태 업데이트 (에디터가 사라지는 문제 방지)
+      setTimeout(() => {
+        prevContentRef.current = value;
+        setContent(value);
+        if (onChange) onChange(value);
+      }, 0);
+    },
+    [setContent, onChange]
+  );
+
+  // 포커스 핸들러
+  const handleFocus = useCallback(() => {
+    // 에디터 포커스 시 onFocus 호출
+    if (onFocus) {
+      onFocus();
+    }
+  }, [onFocus]);
 
   // 에디터에 이미지 삽입
   const insertToEditor = useCallback(
@@ -462,26 +554,28 @@ const TextEditor: React.FC<TextEditorProps> = ({
     [setContent]
   );
 
-  // YouTube 비디오 삽입 핸들러
+  // 유튜브 동영상 링크 처리 함수
   const videoHandler = useCallback(() => {
     try {
-      const editor = quillRef.current?.getEditor();
-      if (!editor) return;
+      if (!quillRef.current || !initializedRef.current) {
+        console.warn("에디터 참조가 없거나 초기화되지 않아 비디오 삽입 불가");
+        return;
+      }
 
-      const url = prompt("YouTube 동영상 URL을 입력하세요:");
-      if (!url) return;
+      const editor = quillRef.current.getEditor();
+      const range = editor.getSelection(true);
 
-      // 현재 선택 위치에 비디오 삽입
-      const range = editor.getSelection() || { index: 0, length: 0 };
-      editor.insertEmbed(range.index, "video", url);
-      editor.setSelection(range.index + 1, 0);
-
-      // 콘솔 로그만 남기고 중복 업데이트는 제거
-      console.log("동영상이 에디터에 삽입되었습니다.");
-      // 이미 handleChange에서 업데이트가 발생하므로 여기서는 setContent를 호출하지 않음
-    } catch (error) {
-      console.error("비디오 삽입 중 오류:", error);
-      alert("동영상 삽입 중 오류가 발생했습니다.");
+      if (range) {
+        const videoUrl = prompt("YouTube 비디오 URL 또는 ID를 입력하세요:");
+        if (videoUrl) {
+          // 동영상 삽입
+          editor.insertEmbed(range.index, "video", videoUrl);
+          // 커서 위치 조정 - 두 번째 인자 추가 (length = 0)
+          editor.setSelection(range.index + 1, 0);
+        }
+      }
+    } catch (err) {
+      console.error("비디오 삽입 중 오류 발생:", err);
     }
   }, []);
 
@@ -573,28 +667,67 @@ const TextEditor: React.FC<TextEditorProps> = ({
   // 이미지 핸들러 함수
   const imageHandler = useCallback(() => {
     try {
+      if (!quillRef.current) return;
+
+      // 파일 선택 인풋 생성 및 트리거
       const input = document.createElement("input");
       input.setAttribute("type", "file");
-      // accept에 .gif 명시적 추가
-      input.setAttribute(
-        "accept",
-        "image/jpeg, image/png, image/gif, image/webp, image/svg+xml, .jpg, .jpeg, .png, .gif, .webp, .svg"
-      );
-
-      input.onchange = (e: Event) => {
-        const target = e.target as HTMLInputElement;
-        if (target.files && target.files[0]) {
-          const file = target.files[0];
-          insertBase64Image(file);
-        }
-      };
-
+      input.setAttribute("accept", "image/*");
       input.click();
+
+      // 파일 선택 이벤트 핸들러
+      input.onchange = async () => {
+        if (!input.files || !input.files[0]) return;
+        const file = input.files[0];
+
+        // 디버깅용 로그
+        logFileInfo(file, "이미지 선택");
+
+        // 파일 유형 및 크기 검증
+        if (!isImageTypeSupported(file) || !checkImageSize(file)) {
+          return;
+        }
+
+        // GIF 파일 특별 처리 (필요시)
+        let processedFile = file;
+        if (file.type === "image/gif") {
+          processedFile = await optimizeGifImage(file);
+        }
+
+        // 에디터 참조 유효성 검사
+        const editor = quillRef.current?.getEditor();
+        if (!editor) {
+          console.error("에디터 참조를 찾을 수 없음");
+          return;
+        }
+
+        // 현재 커서 위치 가져오기
+        const range = editor.getSelection();
+        if (!range) {
+          console.warn("선택 범위를 찾을 수 없음. 문서 끝에 삽입합니다.");
+        }
+
+        // 이미지 FileReader 처리
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          // 임시 이미지 URL 생성
+          const imageDataUrl = e.target?.result as string;
+
+          // 이미지 삽입 및 커서 위치 조정
+          editor.insertEmbed(range ? range.index : 0, "image", imageDataUrl);
+          editor.setSelection((range ? range.index : 0) + 1, 0);
+
+          // 콘솔 로그만 남기고 중복 업데이트는 제거
+          console.log("이미지가 에디터에 삽입되었습니다.");
+        };
+
+        // 파일 처리 시작
+        reader.readAsDataURL(processedFile);
+      };
     } catch (error) {
-      console.error("이미지 선택 오류:", error);
-      alert("이미지 선택 중 오류가 발생했습니다.");
+      console.error("이미지 핸들러 오류:", error);
     }
-  }, [insertBase64Image]);
+  }, []);
 
   // 드래그 앤 드롭 이벤트 핸들러
   const handleDrop = useCallback(
@@ -778,6 +911,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
           ref={quillRef}
           value={content || ""}
           onChange={handleChange}
+          preserveWhitespace={true}
+          className="quill-editor-maintain-focus"
           modules={{
             toolbar: {
               container: showImageAndLink
@@ -803,6 +938,11 @@ const TextEditor: React.FC<TextEditorProps> = ({
             },
             clipboard: {
               matchVisual: false, // 텍스트 방향 문제 해결에 도움이 될 수 있음
+            },
+            keyboard: {
+              bindings: {
+                tab: false,
+              },
             },
           }}
           formats={[
@@ -862,6 +1002,16 @@ const TextEditor: React.FC<TextEditorProps> = ({
             width: 100%;
             height: 315px;
             margin: 10px 0;
+          }
+          /* 에디터가 비정상적으로 사라지는 것을 방지하는 스타일 */
+          .quill-editor-maintain-focus {
+            min-height: ${height};
+            opacity: 1 !important;
+            visibility: visible !important;
+          }
+          .quill-editor-maintain-focus .ql-editor {
+            visibility: visible !important;
+            display: block !important;
           }
           /* 툴바 버튼들의 정렬 수정 */
           .ql-toolbar.ql-snow .ql-formats {

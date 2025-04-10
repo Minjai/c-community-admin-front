@@ -66,7 +66,7 @@ const RemittanceBannerService = {
     }
 
     // 로고 파일 추가
-    formData.append("imageUrl", logoFile);
+    formData.append("image", logoFile);
 
     try {
       const response = await axios.post("/crypto-transfers/admin", formData, {
@@ -114,7 +114,7 @@ const RemittanceBannerService = {
         }
 
         // 로고 파일 추가
-        formData.append("imageUrl", logoFile);
+        formData.append("image", logoFile);
 
         const response = await axios.put(`/crypto-transfers/admin/${id}`, formData, {
           headers: {

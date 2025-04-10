@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Post as Guideline } from "@/types";
 import GuidelineApiService from "@/services/GuidelineApiService";
@@ -7,7 +7,7 @@ import Button from "@/components/Button";
 import ActionButton from "@/components/ActionButton";
 import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
-import TextEditor from "@/components/forms/TextEditor";
+import TextEditor from "../../components/forms/TextEditor";
 import FileUpload from "@/components/forms/FileUpload";
 import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
@@ -35,6 +35,25 @@ const GuidelineManagement = ({ boardId = 3 }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+
+  // TextEditor의 content를 업데이트하는 함수를 useCallback으로 감싸기
+  const handleEditorContentChange = useCallback(
+    (content: string) => {
+      if (currentGuideline) {
+        // 이전 내용과 동일한 경우 업데이트 불필요
+        if (currentGuideline.content === content) {
+          return;
+        }
+
+        console.log("에디터 내용 변경됨:", content.substring(0, 30) + "...");
+        setCurrentGuideline((prev) => {
+          if (!prev) return null;
+          return { ...prev, content };
+        });
+      }
+    },
+    [currentGuideline]
+  );
 
   // boardId 기반 경로 및 타이틀 결정
   const getPageInfo = () => {
@@ -194,6 +213,20 @@ const GuidelineManagement = ({ boardId = 3 }) => {
             (b.position || b.displayOrder || 0) - (a.position || a.displayOrder || 0)
         );
         setGuidelines(sortedGuidelines);
+        setError(null); // 성공적으로 데이터 로드
+      } else if (
+        // 성공적인 응답이지만 데이터가 없는 다양한 케이스 처리
+        (response?.success === true &&
+          Array.isArray(response.data) &&
+          response.data.length === 0) ||
+        (dataArray && dataArray.length === 0) ||
+        response?.data?.total === 0 ||
+        response?.total === 0
+      ) {
+        // 정상 응답이지만 데이터가 없는 경우 (빈 배열)
+        console.log("가이드라인 데이터가 없습니다. 빈 배열을 사용합니다.");
+        setGuidelines([]);
+        setError(null); // 성공적인 응답이므로 에러 메시지 삭제
       } else {
         console.log("적절한 데이터 배열을 찾지 못했습니다.");
         setGuidelines([]);
@@ -496,12 +529,13 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
-              <TextEditor
-                content={currentGuideline.content || ""}
-                setContent={(content: string) =>
-                  setCurrentGuideline({ ...currentGuideline, content })
-                }
-              />
+              <div className="min-h-[300px] border border-gray-300 rounded-md bg-white">
+                <TextEditor
+                  content={currentGuideline.content || ""}
+                  setContent={handleEditorContentChange}
+                  height="400px"
+                />
+              </div>
             </div>
 
             <div className="flex items-center space-x-2">

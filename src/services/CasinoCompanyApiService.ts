@@ -81,14 +81,17 @@ const CasinoCompanyApiService = {
     if (companyData.description) formData.append("description", companyData.description);
     if (companyData.linkUrl1) formData.append("linkUrl1", companyData.linkUrl1);
 
-    // linkUrl2에는 접두사를 붙여서 전송
-    if (companyData.linkUrl2) {
+    // linkUrl2에는 접두사를 붙여서 전송 (빈 문자열 체크 추가)
+    if (companyData.linkUrl2 && companyData.linkUrl2.trim() !== "") {
       let fullUrl = companyData.linkUrl2;
       // 이미 접두사가 있는 경우 중복 방지
       if (!fullUrl.startsWith(CASINO_INFO_URL_PREFIX)) {
         fullUrl = CASINO_INFO_URL_PREFIX + fullUrl;
       }
       formData.append("linkUrl2", fullUrl);
+    } else {
+      // 빈 링크로 전송하여 서버에서 undefined 오류 방지
+      formData.append("linkUrl2", "");
     }
 
     // boolean과 number 값은 문자열로 변환
@@ -131,14 +134,17 @@ const CasinoCompanyApiService = {
       if (companyData.description) formData.append("description", companyData.description);
       if (companyData.linkUrl1) formData.append("linkUrl1", companyData.linkUrl1);
 
-      // linkUrl2에는 접두사를 붙여서 전송
-      if (companyData.linkUrl2) {
+      // linkUrl2에는 접두사를 붙여서 전송 (빈 문자열 체크 추가)
+      if (companyData.linkUrl2 && companyData.linkUrl2.trim() !== "") {
         let fullUrl = companyData.linkUrl2;
         // 이미 접두사가 있는 경우 중복 방지
         if (!fullUrl.startsWith(CASINO_INFO_URL_PREFIX)) {
           fullUrl = CASINO_INFO_URL_PREFIX + fullUrl;
         }
         formData.append("linkUrl2", fullUrl);
+      } else {
+        // 빈 링크로 전송하여 서버에서 undefined 오류 방지
+        formData.append("linkUrl2", "");
       }
 
       // boolean과 number 값은 문자열로 변환

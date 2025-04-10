@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, KeyboardEvent } from "react";
+import React, { useEffect, useState, useRef, KeyboardEvent, useCallback } from "react";
 import TextEditor from "../../components/forms/TextEditor";
 import { useParams, useNavigate } from "react-router-dom";
 import { Post } from "@/types";
@@ -181,6 +181,26 @@ const GuidelineDetail = ({ boardId = 3 }) => {
   const getPublicValue = () => {
     return isPublic ? 1 : 0; // 1 또는 0으로 전송
   };
+
+  // 내용 변경 핸들러를 useCallback으로 래핑하여 안정적인 참조 제공
+  const handleContentChange = useCallback(
+    (newContent: string) => {
+      // 이전 내용과 동일한 경우 업데이트 불필요
+      if (content === newContent) {
+        return;
+      }
+
+      console.log("내용 변경:", newContent.substring(0, 30) + "...", "길이:", newContent.length);
+
+      // 에디터 초기화 직후 빈 업데이트 방지
+      if (newContent === "<p><br></p>" && content === "") {
+        return;
+      }
+
+      setContent(newContent);
+    },
+    [content]
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -538,41 +558,8 @@ const GuidelineDetail = ({ boardId = 3 }) => {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
-          <div className="min-h-[400px] border border-gray-300 rounded-md">
-            <TextEditor
-              content={content}
-              setContent={setContent}
-              showImageAndLink={true}
-              height="500px"
-              customFormats={[
-                "header",
-                "bold",
-                "italic",
-                "underline",
-                "strike",
-                "blockquote",
-                "list",
-                "bullet",
-                "indent",
-                "link",
-                "image",
-                "align",
-                "color",
-                "background",
-                "font",
-                "size",
-              ]}
-              customModules={{
-                toolbar: [
-                  [{ header: [1, 2, 3, false] }],
-                  ["bold", "italic", "underline", "strike"],
-                  [{ list: "ordered" }, { list: "bullet" }],
-                  [{ align: [] }],
-                  ["link", "image"],
-                  ["clean"],
-                ],
-              }}
-            />
+          <div className="min-h-[400px] border border-gray-300 rounded-md bg-white">
+            <TextEditor content={content} setContent={handleContentChange} height="500px" />
           </div>
         </div>
 
