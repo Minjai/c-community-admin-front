@@ -46,13 +46,12 @@ const RemittanceBannerPage: React.FC = () => {
 
     try {
       const response = await RemittanceBannerService.getRemittanceBanners();
-      // 배너를 displayOrder 기준으로 내림차순 정렬 (높은 값이 위로)
+      // 배너를 displayOrder 기준으로 오름차순 정렬 (낮은 값이 위로)
       const sortedBanners = [...response].sort(
-        (a, b) => (b.displayOrder || 0) - (a.displayOrder || 0)
+        (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
       );
       setBanners(sortedBanners);
     } catch (err) {
-      console.error("Error fetching remittance banners:", err);
       setError("송금 배너를 불러오는데 실패했습니다.");
       setBanners([]);
     } finally {
