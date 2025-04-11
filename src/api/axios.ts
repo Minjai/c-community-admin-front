@@ -294,6 +294,8 @@ instance.interceptors.response.use(
         // 현재 경로가 로그인 페이지가 아닐 경우에만 리다이렉트
         if (window.location.pathname !== "/admin/login" && window.location.pathname !== "/login") {
           window.location.href = "/admin/login";
+          // 리디렉션 후 에러 처리 중단
+          return new Promise(() => {});
         }
       } else {
         // 일반 사용자 로그인 페이지로 리다이렉트
@@ -302,12 +304,15 @@ instance.interceptors.response.use(
         // 현재 경로가 로그인 페이지가 아닐 경우에만 리다이렉트
         if (window.location.pathname !== "/login") {
           window.location.href = "/login";
+          // 리디렉션 후 에러 처리 중단
+          return new Promise(() => {});
         }
       }
     }
 
     // console.error("API 오류 상태:", error.response?.status);
     // console.error("API 오류 데이터:", error.response?.data);
+    // 리디렉션이 발생하지 않은 경우에만 에러를 reject
     return Promise.reject(error);
   }
 );
