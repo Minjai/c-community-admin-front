@@ -358,6 +358,61 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
     }
   };
 
+  // 닉네임 초기화 함수
+  const handleResetNickname = async () => {
+    if (!user) return;
+
+    // 확인 메시지 수정
+    if (
+      !confirm(`정말로 이 사용자의 닉네임을 초기화하시겠습니까?\n\n닉네임이 'user'로 초기화됩니다.`)
+    ) {
+      return;
+    }
+
+    try {
+      await axios.put(`/admin/account/${user.id}/reset-nickname`);
+      setAlertMessage({
+        type: "success",
+        message: "사용자 닉네임이 성공적으로 초기화되었습니다.",
+      });
+      // 사용자 정보 갱신
+      fetchUserDetail(user.id);
+    } catch (err) {
+      setAlertMessage({
+        type: "error",
+        message: "닉네임 초기화 중 오류가 발생했습니다.",
+      });
+    }
+  };
+
+  // 패스워드 초기화 함수
+  const handleResetPassword = async () => {
+    if (!user) return;
+
+    // 확인 메시지 수정
+    if (
+      !confirm(
+        `정말로 이 사용자의 패스워드를 초기화하시겠습니까?\n\n비밀번호 가 qwer1234!@#$ 로 초기화 됩니다.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await axios.put(`/admin/account/${user.id}/reset-password`);
+      setAlertMessage({
+        type: "success",
+        message: "사용자 패스워드가 성공적으로 초기화되었습니다.",
+      });
+      // 패스워드는 민감 정보이므로 사용자 정보 갱신은 생략 가능
+    } catch (err) {
+      setAlertMessage({
+        type: "error",
+        message: "패스워드 초기화 중 오류가 발생했습니다.",
+      });
+    }
+  };
+
   // 프로필 이미지 삭제 함수
   const handleDeleteProfileImage = async () => {
     if (!user) return;
@@ -446,7 +501,7 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
                     action="refresh"
                     size="sm"
                     className="ml-2"
-                    onClick={() => console.log("사용자명 초기화")}
+                    onClick={handleResetNickname}
                   />
                 </div>
               </div>
@@ -467,7 +522,7 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
                     action="refresh"
                     size="sm"
                     className="ml-2"
-                    onClick={() => console.log("패스워드 초기화")}
+                    onClick={handleResetPassword}
                   />
                 </div>
               </div>
