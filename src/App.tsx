@@ -29,6 +29,7 @@ import UserRankManagement from "./pages/users/UserRankManagement";
 import AdminManagement from "./pages/users/AdminManagement";
 import NewsManagementListPage from "./pages/news/NewsManagementListPage";
 import RemittanceBannerPage from "./pages/remittance/RemittanceBannerPage";
+import FooterManagementPage from "./pages/footer/FooterManagementPage";
 
 // 추후 구현할 페이지들을 위한 임시 컴포넌트
 const NotImplemented = ({ pageName }: { pageName: string }) => (
@@ -315,7 +316,7 @@ function App() {
                 path="settings/footer"
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
-                    <NotImplemented pageName="하단 푸터 관리" />
+                    <FooterManagementPage />
                   </RoleBasedRoute>
                 }
               />
