@@ -83,10 +83,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(userData);
       navigate("/banners/main");
     } catch (err: any) {
-      if (err.message === "NO_ADMIN_ROLE") {
-        setError("관리자 권한이 없습니다. 관리자에게 문의하세요.");
+      // handleAdminLogin에서 reject된 Error 객체의 message 사용
+      const errorMessage = err.message;
+
+      // 에러 메시지가 있으면 해당 메시지를 사용, 없으면 일반 메시지 사용
+      if (errorMessage) {
+        setError(errorMessage);
       } else {
-        setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+        setError("로그인 중 오류가 발생했습니다. 다시 시도해주세요.");
       }
     } finally {
       setIsLoading(false);

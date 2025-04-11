@@ -24,6 +24,7 @@ interface User {
   updatedAt: string;
   status: string;
   profileImage?: string;
+  profileImageUrl?: string;
   rank: {
     id: number;
     name: string;
@@ -212,8 +213,12 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
     if (!user) return;
 
     try {
-      await axios.post(`/admin/users/${user.id}/memo`, {
-        memo: adminMemo,
+      // 메모 내용이 비어있으면 null, 아니면 해당 내용으로 설정
+      const memoToSend = adminMemo.trim() === "" ? null : adminMemo;
+
+      // API 요청 메소드를 PUT으로 변경하고 엔드포인트 수정
+      await axios.put(`/admin/account/${user.id}/memo`, {
+        memo: memoToSend,
       });
 
       setAlertMessage({
@@ -221,12 +226,12 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
         message: "메모가 저장되었습니다.",
       });
 
-      // 부모 컴포넌트에 업데이트 알림
+      // 부모 컴포넌트에 업데이트 알림 (필요 시 유지)
       if (onUserUpdated) {
         onUserUpdated();
       }
     } catch (err) {
-      console.error("Error saving memo:", err);
+      // console.error("Error saving memo:", err); // 콘솔 로그 제거
       setAlertMessage({
         type: "error",
         message: "메모 저장 중 오류가 발생했습니다.",
@@ -284,6 +289,7 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
       setEditedUser({
         nickname: user?.nickname,
         email: user?.email,
+        profileImageUrl: user?.profileImageUrl,
       });
     }
   };
@@ -301,16 +307,68 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
     if (!user) return;
 
     try {
-      // 수정 API 요청
-      await axios.put(`/admin/account/${user.id}`, editedUser);
+      // 전송할 데이터 객체 생성
+      const updateData: Partial<User> = {};
 
-      setAlertMessage({
-        type: "success",
-        message: "회원 정보가 성공적으로 수정되었습니다.",
-      });
+      // 변경된 필드만 포함 (nickname, email)
+      if (editedUser.nickname !== undefined && editedUser.nickname !== user.nickname) {
+        updateData.nickname = editedUser.nickname;
+      }
+      if (editedUser.email !== undefined && editedUser.email !== user.email) {
+        updateData.email = editedUser.email;
+      }
+      // profileImageUrl 필드 추가 (존재하는 경우)
+      if (
+        editedUser.profileImageUrl !== undefined &&
+        editedUser.profileImageUrl !== user.profileImageUrl
+      ) {
+        updateData.profileImageUrl = editedUser.profileImageUrl;
+      }
+
+      // 변경된 내용이 있을 경우에만 API 요청
+      if (Object.keys(updateData).length > 0) {
+        await axios.put(`/admin/account/${user.id}`, updateData);
+
+        setAlertMessage({
+          type: "success",
+          message: "회원 정보가 성공적으로 수정되었습니다.",
+        });
+
+        // 사용자 정보 갱신
+        if (user.id) {
+          fetchUserDetail(user.id);
+        }
+
+        // 부모 컴포넌트에 업데이트 알림
+        if (onUserUpdated) {
+          onUserUpdated();
+        }
+      } else {
+        // 변경 내용 없을 시 메시지 (선택 사항)
+        setAlertMessage({ type: "info", message: "변경된 내용이 없습니다." });
+      }
 
       // 수정 모드 종료
       setIsEditing(false);
+    } catch (err) {
+      setAlertMessage({
+        type: "error",
+        message: "회원 정보 수정 중 오류가 발생했습니다.",
+      });
+    }
+  };
+
+  // 프로필 이미지 삭제 함수
+  const handleDeleteProfileImage = async () => {
+    if (!user) return;
+
+    try {
+      await axios.delete(`/admin/account/${user.id}/profile-image`);
+
+      setAlertMessage({
+        type: "success",
+        message: "프로필 이미지가 성공적으로 삭제되었습니다.",
+      });
 
       // 사용자 정보 갱신
       if (user.id) {
@@ -322,10 +380,9 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
         onUserUpdated();
       }
     } catch (err) {
-      console.error("Error updating user:", err);
       setAlertMessage({
         type: "error",
-        message: "회원 정보 수정 중 오류가 발생했습니다.",
+        message: "프로필 이미지 삭제 중 오류가 발생했습니다.",
       });
     }
   };
@@ -471,26 +528,29 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
             {/* 회원 프로필 영역 */}
             <div className="flex justify-between items-start mt-6">
               <div className="w-24 font-medium text-sm text-gray-500">프로필 사진</div>
-              <div className="flex-1 flex flex-col items-center">
-                <div className="bg-blue-100 rounded-md w-48 h-48 flex items-center justify-center overflow-hidden">
-                  <img
-                    src={user.profileImage || "/placeholder-user.png"}
-                    alt="프로필"
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      const target = e.target as HTMLImageElement;
-                      target.src = "/placeholder-user.png";
-                    }}
-                  />
+              <div className="flex-1 flex items-start">
+                <div className="bg-gray-200 rounded-md w-48 h-48 flex items-center justify-center overflow-hidden mr-2">
+                  {user.profileImageUrl ? (
+                    <img
+                      src={user.profileImageUrl}
+                      alt="프로필"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // 이미지 로드 실패 시 아무것도 표시하지 않음 (또는 다른 대체 처리)
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null; // 무한 루프 방지
+                        target.style.display = "none"; // 이미지 숨김
+                      }}
+                    />
+                  ) : // profileImageUrl이 없을 경우 아무것도 표시하지 않음
+                  null}
                 </div>
-                <Button
-                  variant="primary"
+                <ActionButton
+                  label="초기화"
+                  action="delete"
                   size="sm"
-                  className="mt-2"
-                  onClick={() => console.log("프로필 초기화")}
-                >
-                  초기화
-                </Button>
+                  onClick={handleDeleteProfileImage}
+                />
               </div>
             </div>
 
