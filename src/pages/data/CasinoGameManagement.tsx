@@ -91,10 +91,6 @@ const CasinoGameManagement = () => {
       } else {
         console.log("적절한 게임 데이터 배열을 찾지 못했습니다.");
         setGames([]);
-        setAlertMessage({
-          type: "error",
-          message: "게임 목록을 불러오는데 실패했습니다. 응답 구조가 변경되었습니다.",
-        });
       }
     } catch (err) {
       console.error("Error fetching casino games:", err);

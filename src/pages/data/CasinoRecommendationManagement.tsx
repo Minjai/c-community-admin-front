@@ -151,7 +151,6 @@ const CasinoRecommendationManagement = () => {
       } else {
         console.log("적절한 추천 데이터를 찾지 못했습니다.");
         setRecommendations([]);
-        setError("게임 추천 목록을 불러오는데 실패했습니다.");
       }
     } catch (err: any) {
       console.error("게임 추천 목록 조회 오류:", err);
