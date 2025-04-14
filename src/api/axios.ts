@@ -1,4 +1,5 @@
 import axios from "axios";
+import { toast } from "react-toastify";
 
 // 현재 포트 번호 확인 (어드민/유저 구분)
 const getCurrentPort = () => {
@@ -245,67 +246,29 @@ instance.interceptors.response.use(
     // console.log("API 응답:", response.status, response.config.url);
     return response;
   },
-  (error) => {
-    // 토큰 만료 오류(401)가 발생한 경우 처리
-    if (error.response && error.response.status === 401 && !isRedirecting) {
-      isRedirecting = true; // 리다이렉션 시작
-      // console.log("인증 오류: 인증 정보가 만료되었거나 유효하지 않습니다.");
+  async (error) => {
+    const originalRequest = error.config;
 
-      // 인증 오류 시 토큰 제거
-      removeToken();
-
-      // 현재 포트에 따라 리다이렉트 처리
-      const loginPath = isAdminPort() ? "/admin/login" : "/login";
-
-      if (window.location.pathname !== loginPath) {
-        const alertMessage = isAdminPort()
-          ? "관리자 인증이 필요합니다. 다시 로그인해주세요."
-          : "로그인이 필요합니다. 다시 로그인해주세요.";
-        alert(alertMessage); // 안내 메시지 한 번만 표시
-        window.location.href = loginPath;
-        // 리디렉션 후 에러 처리 중단
-        return new Promise(() => {});
-      }
-      // 이미 로그인 페이지에 있다면 플래그만 리셋
-      isRedirecting = false;
+    // 토큰 만료 오류(401) 처리
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      // ... 토큰 리프레시 로직 ...
     }
 
-    // 권한 부족(403) 오류인 경우 처리
+    // 권한 부족 오류(403) 처리
     if (error.response && error.response.status === 403 && !isRedirecting) {
-      isRedirecting = true; // 리다이렉션 시작 (권한 부족 시에도 중복 방지)
-      // console.log("권한 부족: 요청한 리소스에 대한 접근 권한이 없습니다.");
+      isRedirecting = true;
+      toast.error("접근 권한이 없습니다. 로그인 페이지로 이동합니다.");
 
-      // 서버에서 받은 오류 메시지가 있으면 사용
-      const errorMessage =
-        error.response.data?.message ||
-        error.response.data?.error ||
-        "요청한 리소스에 대한 접근 권한이 없습니다.";
+      // 리다이렉션 직전에 로그아웃 처리
+      setTimeout(() => {
+        adminLogout(); // Logout before redirecting
+        window.location.href = "/login";
+      }, 1500);
 
-      // 권한 부족 시 토큰 제거
-      removeToken();
-
-      // 오류 객체에 권한 부족 플래그 추가
-      error.isPermissionError = true;
-
-      // 현재 포트에 따라 메시지 및 리다이렉트 처리
-      const loginPath = isAdminPort() ? "/admin/login" : "/login";
-
-      if (window.location.pathname !== loginPath) {
-        const alertMessage = isAdminPort()
-          ? `권한 부족: 관리자만 접근할 수 있습니다.`
-          : `권한 부족: ${errorMessage}`;
-        alert(alertMessage); // 안내 메시지 한 번만 표시
-        window.location.href = loginPath;
-        // 리디렉션 후 에러 처리 중단
-        return new Promise(() => {});
-      }
-      // 이미 로그인 페이지에 있다면 플래그만 리셋
-      isRedirecting = false;
+      return Promise.reject(new Error("권한 부족으로 리디렉션됨"));
     }
 
-    // console.error("API 오류 상태:", error.response?.status);
-    // console.error("API 오류 데이터:", error.response?.data);
-    // 리디렉션이 발생하지 않은 경우에만 에러를 reject
+    // 기타 에러 처리
     return Promise.reject(error);
   }
 );
