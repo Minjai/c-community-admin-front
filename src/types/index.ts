@@ -19,6 +19,7 @@ export interface Post {
   isPublic?: boolean | number;
   position?: number;
   imageUrl?: string;
+  tags?: string[];
   author?: User;
   attachments?: Attachment[];
   comments?: Comment[];

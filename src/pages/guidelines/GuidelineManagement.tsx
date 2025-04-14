@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Post as Guideline } from "@/types";
 import GuidelineApiService from "@/services/GuidelineApiService";
 import DataTable from "@/components/DataTable";
@@ -13,10 +13,11 @@ import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
 import { toast } from "react-toastify";
 
-// Guideline 타입에 position과 displayOrder가 선택적으로 포함될 수 있도록 확장
+// Guideline 타입에 position과 displayOrder, tags 추가
 interface GuidelineWithOrder extends Guideline {
   position?: number;
   displayOrder?: number;
+  tags?: string[]; // Explicitly add tags as string array
 }
 
 const GuidelineManagement = ({ boardId = 3 }) => {
@@ -201,6 +202,13 @@ const GuidelineManagement = ({ boardId = 3 }) => {
             imageUrl: item.imageUrl || item.image_url || "",
             position: item.position || item.displayOrder || 0,
             displayOrder: item.displayOrder || item.position || 0,
+            tags:
+              typeof item.tags === "string"
+                ? item.tags
+                    .split(",")
+                    .map((t: string) => t.trim())
+                    .filter(Boolean)
+                : item.tags || [], // 서버 문자열 -> 배열 변환
           };
         });
 
@@ -274,9 +282,10 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       title: "",
       content: "",
       boardId: boardId,
-      isPublic: 1, // boolean true 대신 number 1 사용
-      position: guidelines.length + 1, // 기본 순서
+      isPublic: 1,
+      position: guidelines.length + 1,
       imageUrl: "",
+      tags: [], // Initialize as empty array
     });
     setImageFile(null);
     setShowModal(true);
@@ -284,13 +293,14 @@ const GuidelineManagement = ({ boardId = 3 }) => {
     setPreviewUrl(null);
   };
 
-  // 모달 열기 (수정)
+  // 모달 열기 (수정) - tags 처리 단순화
   const handleEditGuideline = (guideline: GuidelineWithOrder) => {
-    setModalError(null); // Reset modal error
-    // Boolean 타입인 isPublic을 Number 타입으로 변환
+    setModalError(null);
     const convertedGuideline = {
       ...guideline,
       isPublic: guideline.isPublic === true || guideline.isPublic === 1 ? 1 : 0,
+      // Now tags should be correctly typed as string[] | undefined
+      tags: guideline.tags || [], // Default to empty array if undefined
     };
     setCurrentGuideline(convertedGuideline);
     setImageFile(null);
@@ -320,10 +330,10 @@ const GuidelineManagement = ({ boardId = 3 }) => {
         title: currentGuideline.title,
         content: currentGuideline.content,
         boardId: boardId,
-        isPublic: isPublicValue, // 변환된 값 사용
+        isPublic: isPublicValue,
         position: currentGuideline.position,
         image: imageFile || undefined,
-        // tags: currentGuideline.tags // 태그 필드가 있다면 추가
+        tags: currentGuideline.tags?.join(",") || "",
       };
 
       if (isEditing && currentGuideline.id) {
@@ -416,7 +426,20 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
   // DataTable 컬럼 정의
   const columns = [
-    { header: "제목", accessor: "title" as keyof GuidelineWithOrder },
+    {
+      header: "제목",
+      accessor: "title" as keyof GuidelineWithOrder,
+      cell: (value: string, row: GuidelineWithOrder) => (
+        <button
+          type="button"
+          onClick={() => handleEditGuideline(row)}
+          title={value}
+          className="block w-[300px] truncate text-left cursor-pointer hover:text-primary-600 transition-colors focus:outline-none"
+        >
+          {value}
+        </button>
+      ),
+    },
     {
       header: "썸네일",
       accessor: "imageUrl" as keyof GuidelineWithOrder,
@@ -573,6 +596,23 @@ const GuidelineManagement = ({ boardId = 3 }) => {
                 이미지를 변경하지 않으면 기존 이미지가 유지됩니다.
               </p>
             )}
+
+            {/* Hashtags Input Field - value/onChange 수정 */}
+            <Input
+              label="해시태그 (콤마로 구분)"
+              id="guidelineTagsModal"
+              // Display tags array as comma-separated string in input
+              value={currentGuideline.tags?.join(",") || ""}
+              // Convert comma-separated string from input back to array for state
+              onChange={(e) => {
+                const tagsArray = e.target.value
+                  .split(",")
+                  .map((t) => t.trim())
+                  .filter(Boolean);
+                setCurrentGuideline({ ...currentGuideline, tags: tagsArray });
+              }}
+              placeholder="예: 카지노,가이드,팁"
+            />
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
