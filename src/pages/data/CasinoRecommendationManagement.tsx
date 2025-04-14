@@ -388,10 +388,10 @@ const CasinoRecommendationManagement = () => {
     setAlertMessage(null);
 
     try {
-      const payload: UpsertCasinoRecommendationPayload = {
+      const payload = {
         title,
         isMainDisplay,
-        selectedGameIds,
+        gameIds: selectedGameIds,
         startDate: new Date(startDate).toISOString(),
         endDate: new Date(endDate).toISOString(),
         isPublic: publicSettings === "public",
@@ -401,7 +401,7 @@ const CasinoRecommendationManagement = () => {
         await axios.put(`/casino-recommends/${currentRecommendationId}`, payload);
         setAlertMessage({ type: "success", message: "게임 추천이 성공적으로 수정되었습니다." });
       } else {
-        await axios.post("/casino-recommends", payload);
+        await axios.post("/casino-recommends", { ...payload, gameIds: selectedGameIds });
         setAlertMessage({ type: "success", message: "새 게임 추천이 성공적으로 등록되었습니다." });
       }
       fetchRecommendations();
