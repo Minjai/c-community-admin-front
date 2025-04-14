@@ -237,6 +237,8 @@ instance.interceptors.request.use(
 );
 
 // 응답 인터셉터 추가
+let isRedirecting = false; // 리다이렉션 진행 중 플래그
+
 instance.interceptors.response.use(
   (response) => {
     // 개발 중 디버깅을 위한 응답 로그
@@ -245,33 +247,32 @@ instance.interceptors.response.use(
   },
   (error) => {
     // 토큰 만료 오류(401)가 발생한 경우 처리
-    if (error.response && error.response.status === 401) {
+    if (error.response && error.response.status === 401 && !isRedirecting) {
+      isRedirecting = true; // 리다이렉션 시작
       // console.log("인증 오류: 인증 정보가 만료되었거나 유효하지 않습니다.");
 
-      // 인증 오류 시 토큰 제거 및 리다이렉트
+      // 인증 오류 시 토큰 제거
       removeToken();
 
       // 현재 포트에 따라 리다이렉트 처리
-      if (isAdminPort()) {
-        // 어드민 로그인 페이지로 리다이렉트
-        if (window.location.pathname !== "/admin/login") {
-          alert("관리자 인증이 필요합니다. 다시 로그인해주세요.");
-          window.location.href = "/admin/login";
-        }
-      } else {
-        // 일반 사용자 로그인 페이지로 리다이렉트
-        if (window.location.pathname !== "/login") {
-          alert("로그인이 필요합니다. 다시 로그인해주세요.");
-          window.location.href = "/login";
-        }
-      }
+      const loginPath = isAdminPort() ? "/admin/login" : "/login";
 
-      // 오류 객체에 인증 만료 플래그 추가
-      error.isAuthError = true;
+      if (window.location.pathname !== loginPath) {
+        const alertMessage = isAdminPort()
+          ? "관리자 인증이 필요합니다. 다시 로그인해주세요."
+          : "로그인이 필요합니다. 다시 로그인해주세요.";
+        alert(alertMessage); // 안내 메시지 한 번만 표시
+        window.location.href = loginPath;
+        // 리디렉션 후 에러 처리 중단
+        return new Promise(() => {});
+      }
+      // 이미 로그인 페이지에 있다면 플래그만 리셋
+      isRedirecting = false;
     }
 
     // 권한 부족(403) 오류인 경우 처리
-    if (error.response && error.response.status === 403) {
+    if (error.response && error.response.status === 403 && !isRedirecting) {
+      isRedirecting = true; // 리다이렉션 시작 (권한 부족 시에도 중복 방지)
       // console.log("권한 부족: 요청한 리소스에 대한 접근 권한이 없습니다.");
 
       // 서버에서 받은 오류 메시지가 있으면 사용
@@ -287,27 +288,19 @@ instance.interceptors.response.use(
       error.isPermissionError = true;
 
       // 현재 포트에 따라 메시지 및 리다이렉트 처리
-      if (isAdminPort()) {
-        // 어드민 로그인 페이지로 리다이렉트
-        alert(`권한 부족: 관리자만 접근할 수 있습니다.`);
+      const loginPath = isAdminPort() ? "/admin/login" : "/login";
 
-        // 현재 경로가 로그인 페이지가 아닐 경우에만 리다이렉트
-        if (window.location.pathname !== "/admin/login" && window.location.pathname !== "/login") {
-          window.location.href = "/admin/login";
-          // 리디렉션 후 에러 처리 중단
-          return new Promise(() => {});
-        }
-      } else {
-        // 일반 사용자 로그인 페이지로 리다이렉트
-        alert(`권한 부족: ${errorMessage}`);
-
-        // 현재 경로가 로그인 페이지가 아닐 경우에만 리다이렉트
-        if (window.location.pathname !== "/login") {
-          window.location.href = "/login";
-          // 리디렉션 후 에러 처리 중단
-          return new Promise(() => {});
-        }
+      if (window.location.pathname !== loginPath) {
+        const alertMessage = isAdminPort()
+          ? `권한 부족: 관리자만 접근할 수 있습니다.`
+          : `권한 부족: ${errorMessage}`;
+        alert(alertMessage); // 안내 메시지 한 번만 표시
+        window.location.href = loginPath;
+        // 리디렉션 후 에러 처리 중단
+        return new Promise(() => {});
       }
+      // 이미 로그인 페이지에 있다면 플래그만 리셋
+      isRedirecting = false;
     }
 
     // console.error("API 오류 상태:", error.response?.status);
