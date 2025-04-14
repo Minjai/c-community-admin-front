@@ -349,6 +349,37 @@ const AdminManagement: React.FC = () => {
         onClose={() => setShowModal(false)}
         title={isEditing ? "관리자 정보 수정" : "새 관리자 추가"}
       >
+        {/* Modal Error/Success Alert (Above controls) */}
+        {alertMessage && (
+          <div className="mb-4">
+            <Alert
+              type={alertMessage.type}
+              message={alertMessage.message}
+              onClose={() => setAlertMessage(null)}
+            />
+          </div>
+        )}
+        {error && (
+          <div className="mb-4">
+            <Alert type="error" message={error} onClose={() => setError(null)} />
+          </div>
+        )}
+
+        {/* Top Control Area */}
+        <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
+          {/* Buttons (Left) */}
+          <div className="flex space-x-3">
+            <Button onClick={handleSaveAdmin} variant="primary">
+              {isEditing ? "저장" : "등록"}
+            </Button>
+            <Button onClick={() => setShowModal(false)} variant="secondary">
+              취소
+            </Button>
+          </div>
+          {/* Right side - Placeholder if needed in future */}
+          <div></div>
+        </div>
+
         {currentAdmin && (
           <div className="space-y-6">
             <Input
@@ -411,15 +442,6 @@ const AdminManagement: React.FC = () => {
                 </div>
               </>
             )}
-
-            <div className="flex justify-end space-x-3 pt-4">
-              <Button onClick={() => setShowModal(false)} variant="secondary">
-                취소
-              </Button>
-              <Button onClick={handleSaveAdmin} variant="primary">
-                저장
-              </Button>
-            </div>
           </div>
         )}
       </Modal>

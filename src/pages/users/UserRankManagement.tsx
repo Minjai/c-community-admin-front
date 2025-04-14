@@ -383,6 +383,37 @@ const UserRankManagement: React.FC = () => {
         onClose={handleCloseModal}
         title={isEditing ? "등급 수정" : "새 등급 추가"}
       >
+        {/* Modal Error/Success Alert (Above controls) */}
+        {alertMessage && (
+          <div className="mb-4">
+            <Alert
+              type={alertMessage.type}
+              message={alertMessage.message}
+              onClose={() => setAlertMessage(null)}
+            />
+          </div>
+        )}
+        {error && (
+          <div className="mb-4">
+            <Alert type="error" message={error} onClose={() => setError(null)} />
+          </div>
+        )}
+
+        {/* Top Control Area */}
+        <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
+          {/* Buttons (Left) */}
+          <div className="flex space-x-3">
+            <Button onClick={handleSaveRank} variant="primary">
+              {isEditing ? "저장" : "등록"}
+            </Button>
+            <Button onClick={handleCloseModal} variant="secondary">
+              취소
+            </Button>
+          </div>
+          {/* Right side - Placeholder if needed in future */}
+          <div></div>
+        </div>
+
         {currentRank && (
           <div className="space-y-6">
             <Input
@@ -423,15 +454,6 @@ const UserRankManagement: React.FC = () => {
               onChange={(e) => handleInputChange("score", parseInt(e.target.value) || 0)}
               min="0"
             />
-
-            <div className="flex justify-end space-x-3 pt-4">
-              <Button onClick={handleCloseModal} variant="secondary">
-                취소
-              </Button>
-              <Button onClick={handleSaveRank} variant="primary">
-                저장
-              </Button>
-            </div>
           </div>
         )}
       </Modal>

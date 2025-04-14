@@ -30,11 +30,11 @@ interface CasinoGame {
 const CasinoGameManagement = () => {
   const [games, setGames] = useState<CasinoGame[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
   const [alertMessage, setAlertMessage] = useState<{
     type: "success" | "error" | "info";
     message: string;
   } | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   // 모달 관련 상태
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -56,7 +56,6 @@ const CasinoGameManagement = () => {
   // 게임 목록 조회
   const fetchGames = async () => {
     setLoading(true);
-    setError(null);
 
     try {
       const response = await axios.get("/casino");
@@ -92,11 +91,14 @@ const CasinoGameManagement = () => {
       } else {
         console.log("적절한 게임 데이터 배열을 찾지 못했습니다.");
         setGames([]);
-        setError("게임 목록을 불러오는데 실패했습니다. 응답 구조가 변경되었습니다.");
+        setAlertMessage({
+          type: "error",
+          message: "게임 목록을 불러오는데 실패했습니다. 응답 구조가 변경되었습니다.",
+        });
       }
     } catch (err) {
       console.error("Error fetching casino games:", err);
-      setError("게임 목록을 불러오는데 실패했습니다.");
+      setAlertMessage({ type: "error", message: "게임 목록을 불러오는데 실패했습니다." });
       setGames([]);
     } finally {
       setLoading(false);
@@ -217,35 +219,33 @@ const CasinoGameManagement = () => {
 
   // 게임 저장 처리
   const handleSaveGame = async () => {
+    setModalError(null);
+
     if (!title.trim()) {
-      setAlertMessage({ type: "error", message: "게임 제목을 입력해주세요." });
+      setModalError("게임 제목을 입력해주세요.");
       return;
     }
-
     if (!description.trim()) {
-      setAlertMessage({ type: "error", message: "게임 설명을 입력해주세요." });
+      setModalError("게임 설명을 입력해주세요.");
       return;
     }
-
-    // 새 게임 추가 시 썸네일 필수
     if (!isEditing && !thumbnailFile) {
-      setAlertMessage({ type: "error", message: "게임 썸네일 이미지를 업로드해주세요." });
+      setModalError("게임 썸네일 이미지를 업로드해주세요.");
+      return;
+    }
+    if (isDirectLinkEnabled && !directLinkUrl.trim()) {
+      setModalError("바로가기 URL을 입력해주세요.");
       return;
     }
 
-    // 바로가기 활성화 시 URL 필수
-    if (isDirectLinkEnabled && !directLinkUrl.trim()) {
-      setAlertMessage({ type: "error", message: "바로가기 URL을 입력해주세요." });
-      return;
-    }
+    setAlertMessage(null);
 
     try {
       setSaving(true);
 
-      // 폼 데이터 구성
       const formData = new FormData();
       formData.append("title", title.trim());
-      formData.append("content", description); // HTML 형식 그대로 전송
+      formData.append("content", description);
 
       formData.append("rating", rating.toString());
       formData.append("payoutRate", returnRate.toString());
@@ -257,50 +257,38 @@ const CasinoGameManagement = () => {
 
       formData.append("isPublic", isPublic.toString());
 
-      if (!isEditing) {
-        // 새 게임 생성
-        if (thumbnailFile) {
-          formData.append("image", thumbnailFile);
-        }
-
-        const response = await axios.post("/casino", formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        });
-
-        if (response.status === 201 || response.status === 200) {
-          setAlertMessage({ type: "success", message: "게임이 성공적으로 추가되었습니다." });
-        }
-      } else if (currentGame) {
-        // 기존 게임 수정
-        if (thumbnailFile) {
-          formData.append("image", thumbnailFile);
-        }
-
-        const response = await axios.put(`/casino/${currentGame.id}`, formData, {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        });
-
-        if (response.status === 200) {
-          setAlertMessage({ type: "success", message: "게임 정보가 수정되었습니다." });
-        }
+      if (thumbnailFile) {
+        formData.append("image", thumbnailFile);
       }
 
-      // 모달 닫기 및 목록 새로고침
-      setShowModal(false);
-      fetchGames();
+      if (!isEditing) {
+        if (!thumbnailFile) {
+          setModalError("새 게임에는 썸네일 이미지가 필수입니다.");
+          setSaving(false);
+          return;
+        }
+        const response = await axios.post("/casino", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        if (response.status === 201 || response.status === 200) {
+          setAlertMessage({ type: "success", message: "게임이 성공적으로 추가되었습니다." });
+          setShowModal(false);
+          fetchGames();
+        }
+      } else if (currentGame) {
+        const response = await axios.put(`/casino/${currentGame.id}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        if (response.status === 200) {
+          setAlertMessage({ type: "success", message: "게임 정보가 수정되었습니다." });
+          setShowModal(false);
+          fetchGames();
+        }
+      }
     } catch (err: any) {
       console.error("Error saving game:", err);
-
-      // 서버 오류 메시지 표시
       const errorMessage = err.response?.data?.message || "게임 저장 중 오류가 발생했습니다.";
-      setAlertMessage({
-        type: "error",
-        message: errorMessage,
-      });
+      setModalError(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -445,45 +433,81 @@ const CasinoGameManagement = () => {
     },
   ];
 
-  // 5. 모달 컨텐츠 - 게임 추가/수정 폼
+  // 모달 내용 렌더링 함수
   const renderModalContent = () => {
     return (
       <div className="space-y-4">
-        {/* 제목 */}
-        <Input
-          label="게임 제목"
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="게임 제목을 입력하세요"
-          required
-          maxLength={100}
-          disabled={saving}
-        />
+        {modalError && (
+          <div className="mb-4">
+            <Alert type="error" message={modalError} onClose={() => setModalError(null)} />
+          </div>
+        )}
 
-        {/* 썸네일 업로드 - 상단으로 이동 */}
-        <div>
-          <FileUpload
-            label="썸네일 이미지"
-            onChange={handleThumbnailUpload}
-            preview={true}
-            value={thumbnailPreview || undefined}
-            helperText="권장 크기: 600x400px, 최대 2MB"
-            accept="image/jpeg, image/png"
-            required={!isEditing}
-            disabled={saving}
-          />
-        </div>
+        <div className="flex justify-between items-center space-x-2 pt-2 pb-4 border-b border-gray-200 mb-4">
+          <div className="flex space-x-2">
+            <Button type="button" variant="primary" onClick={handleSaveGame} disabled={saving}>
+              {saving ? "저장 중..." : isEditing ? "수정" : "등록"}
+            </Button>
+            <Button type="button" variant="secondary" onClick={handleCloseModal} disabled={saving}>
+              취소
+            </Button>
+          </div>
 
-        {/* 게임 설명 */}
-        <div>
-          <label className="label">게임 설명</label>
-          <div className="border border-gray-300 rounded-md overflow-hidden">
-            <TextEditor content={description} setContent={setDescription} showImageAndLink={true} />
+          <div className="flex items-center space-x-3">
+            <label htmlFor="public-modal" className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                id="public-modal"
+                name="isPublicModal"
+                checked={isPublic === 1}
+                onChange={() => setIsPublic(1)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                disabled={saving}
+              />
+              <span className="ml-2 text-sm text-gray-900">공개</span>
+            </label>
+            <label htmlFor="private-modal" className="flex items-center cursor-pointer">
+              <input
+                type="radio"
+                id="private-modal"
+                name="isPublicModal"
+                checked={isPublic === 0}
+                onChange={() => setIsPublic(0)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                disabled={saving}
+              />
+              <span className="ml-2 text-sm text-gray-900">비공개</span>
+            </label>
           </div>
         </div>
 
-        {/* 별점 - 시각적 별 표시 추가 */}
+        <Input
+          label="게임 제목"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+          disabled={saving}
+        />
+
+        <Input
+          label="게임 설명"
+          type="textarea"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          disabled={saving}
+        />
+
+        <FileUpload
+          label="썸네일"
+          onChange={handleThumbnailUpload}
+          preview={true}
+          value={thumbnailPreview || undefined}
+          helperText="권장 크기: 600x400px, 최대 2MB"
+          accept="image/jpeg, image/png"
+          required={!isEditing}
+          disabled={saving}
+        />
+
         <div>
           <label className="label">별점 (0-5)</label>
           <div className="flex items-center">
@@ -511,7 +535,6 @@ const CasinoGameManagement = () => {
           </div>
         </div>
 
-        {/* 환수율 */}
         <Input
           label="환수율 (%)"
           type="number"
@@ -523,7 +546,6 @@ const CasinoGameManagement = () => {
           disabled={saving}
         />
 
-        {/* 바로가기 설정 */}
         <div>
           <label className="label">바로가기 설정</label>
           <div className="flex items-center space-x-4 mt-1">
@@ -552,7 +574,6 @@ const CasinoGameManagement = () => {
           </div>
         </div>
 
-        {/* 바로가기 URL */}
         {isDirectLinkEnabled && (
           <Input
             label="바로가기 URL"
@@ -564,39 +585,6 @@ const CasinoGameManagement = () => {
             required={isDirectLinkEnabled}
           />
         )}
-
-        {/* 공개 여부 */}
-        <div className="mt-4">
-          <span className="text-sm font-medium text-gray-700">공개 여부</span>
-          <div className="mt-2 space-y-2">
-            <div className="flex items-center">
-              <input
-                type="radio"
-                id="public"
-                name="isPublic"
-                checked={isPublic === 1}
-                onChange={() => setIsPublic(1)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-              />
-              <label htmlFor="public" className="ml-2 block text-sm text-gray-900">
-                공개
-              </label>
-            </div>
-            <div className="flex items-center">
-              <input
-                type="radio"
-                id="private"
-                name="isPublic"
-                checked={isPublic === 0}
-                onChange={() => setIsPublic(0)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-              />
-              <label htmlFor="private" className="ml-2 block text-sm text-gray-900">
-                비공개
-              </label>
-            </div>
-          </div>
-        </div>
       </div>
     );
   };
@@ -619,10 +607,6 @@ const CasinoGameManagement = () => {
         />
       )}
 
-      {error && (
-        <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
-      )}
-
       <DataTable
         columns={columns}
         data={games}
@@ -630,7 +614,6 @@ const CasinoGameManagement = () => {
         emptyMessage="등록된 게임이 없습니다."
       />
 
-      {/* 게임 추가/수정 모달 */}
       <Modal
         isOpen={showModal}
         onClose={handleCloseModal}
@@ -638,18 +621,6 @@ const CasinoGameManagement = () => {
         size="xl"
       >
         {renderModalContent()}
-
-        <div className="border-t border-gray-200 pt-5 mt-5 flex justify-center">
-          <Button
-            type="button"
-            variant="primary"
-            onClick={handleSaveGame}
-            disabled={saving}
-            className="px-8"
-          >
-            {saving ? "저장 중..." : "등록"}
-          </Button>
-        </div>
       </Modal>
     </div>
   );

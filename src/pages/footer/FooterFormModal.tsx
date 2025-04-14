@@ -21,7 +21,6 @@ function FooterFormModal({ isOpen, onClose, onSuccess, footerToEdit }: FooterFor
   const [isPublic, setIsPublic] = useState(false); // Use boolean for state, convert on submit
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
   const isEditMode = !!footerToEdit;
 
@@ -37,7 +36,6 @@ function FooterFormModal({ isOpen, onClose, onSuccess, footerToEdit }: FooterFor
 
       setIsPublic(footerToEdit ? footerToEdit.isPublic === 1 : false);
       setError(null);
-      setAlertMessage(null);
     }
   }, [isOpen, footerToEdit]);
 
@@ -45,7 +43,6 @@ function FooterFormModal({ isOpen, onClose, onSuccess, footerToEdit }: FooterFor
     event.preventDefault();
     setLoading(true);
     setError(null);
-    setAlertMessage(null);
 
     const payload = {
       title,
@@ -57,18 +54,13 @@ function FooterFormModal({ isOpen, onClose, onSuccess, footerToEdit }: FooterFor
       if (isEditMode && footerToEdit) {
         // Update existing footer
         await axios.put(`/footer/${footerToEdit.id}`, payload);
-        setAlertMessage("푸터 정보가 성공적으로 수정되었습니다.");
       } else {
         // Create new footer
         await axios.post("/footer", payload);
-        setAlertMessage("푸터 정보가 성공적으로 생성되었습니다.");
       }
 
-      // Delay closing and call onSuccess
-      setTimeout(() => {
-        onSuccess(); // Refresh list in parent
-        onClose();
-      }, 1000);
+      // Call onSuccess for parent component to handle refresh and closing
+      onSuccess();
     } catch (err: any) {
       console.error("Error saving footer:", err);
       const errorMessage =
@@ -85,9 +77,44 @@ function FooterFormModal({ isOpen, onClose, onSuccess, footerToEdit }: FooterFor
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={isEditMode ? "푸터 수정" : "푸터 생성"}>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
-        {alertMessage && (
-          <Alert type="success" message={alertMessage} onClose={() => setAlertMessage(null)} />
+        {/* Modal Error Alert - Moved below controls */}
+        {/* {error && (
+          <div className="mb-4">
+            <Alert type="error" message={error} onClose={() => setError(null)} />
+          </div>
+        )} */}
+
+        {/* Top Control Area */}
+        <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-4">
+          <div className="flex space-x-2">
+            <Button type="submit" variant="primary" disabled={loading}>
+              {loading ? (isEditMode ? "저장 중..." : "생성 중...") : isEditMode ? "저장" : "생성"}
+            </Button>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
+              취소
+            </Button>
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="footer-isPublic"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+              disabled={loading}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:cursor-not-allowed"
+            />
+            <label htmlFor="footer-isPublic" className="ml-2 block text-sm text-gray-900">
+              공개 여부
+            </label>
+          </div>
+        </div>
+
+        {/* Modal Error Alert (Positioned Below controls) */}
+        {error && (
+          <div className="mb-4">
+            <Alert type="error" message={error} onClose={() => setError(null)} />
+          </div>
         )}
 
         <Input
@@ -99,34 +126,9 @@ function FooterFormModal({ isOpen, onClose, onSuccess, footerToEdit }: FooterFor
           disabled={loading}
         />
 
-        {/* Use TextEditor instead of textarea */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
           <TextEditor content={content} setContent={setContent} />
-        </div>
-
-        {/* Use standard checkbox with styling from banner pages */}
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="footer-isPublic"
-            checked={isPublic}
-            onChange={(e) => setIsPublic(e.target.checked)}
-            disabled={loading}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:cursor-not-allowed"
-          />
-          <label htmlFor="footer-isPublic" className="ml-2 block text-sm text-gray-900">
-            공개 여부
-          </label>
-        </div>
-
-        <div className="flex justify-end space-x-2 pt-4 border-t border-gray-200">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
-            취소
-          </Button>
-          <Button type="submit" variant="primary" disabled={loading}>
-            {loading ? (isEditMode ? "저장 중..." : "생성 중...") : isEditMode ? "저장" : "생성"}
-          </Button>
         </div>
       </form>
     </Modal>

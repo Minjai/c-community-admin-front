@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import axios from "@/api/axios";
 import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
@@ -30,6 +30,16 @@ interface CasinoGame {
   // 다른 필드들...
 }
 
+// Payload type for creating/updating recommendations
+interface UpsertCasinoRecommendationPayload {
+  title: string;
+  isMainDisplay: boolean;
+  selectedGameIds: number[];
+  startDate: string; // ISO String
+  endDate: string; // ISO String
+  isPublic: boolean;
+}
+
 const CasinoRecommendationManagement = () => {
   const [recommendations, setRecommendations] = useState<CasinoRecommendation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -42,9 +52,7 @@ const CasinoRecommendationManagement = () => {
   // 모달 관련 상태
   const [showModal, setShowModal] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [currentRecommendation, setCurrentRecommendation] = useState<CasinoRecommendation | null>(
-    null
-  );
+  const [currentRecommendationId, setCurrentRecommendationId] = useState<number | null>(null);
 
   // 추천 게임 관련 상태
   const [title, setTitle] = useState<string>("");
@@ -207,7 +215,7 @@ const CasinoRecommendationManagement = () => {
 
   // 게임 추천 추가 모달 열기
   const handleAddRecommendation = () => {
-    setCurrentRecommendation(null);
+    setCurrentRecommendationId(null);
     // 초기화
     setTitle("");
     setIsMainDisplay(false);
@@ -229,30 +237,31 @@ const CasinoRecommendationManagement = () => {
     setShowModal(true);
   };
 
-  // 게임 추천 수정 모달 열기
-  const handleEditRecommendation = (recommendation: CasinoRecommendation) => {
-    setCurrentRecommendation(recommendation);
+  // Open Edit Modal
+  const handleOpenEditModal = (recommendation: CasinoRecommendation) => {
+    setIsEditing(true);
+    setCurrentRecommendationId(recommendation.id);
     setTitle(recommendation.title || "");
     setIsMainDisplay(recommendation.isMainDisplay || false);
-    setSelectedGames(recommendation.games || []);
-    setSelectedGameIds(recommendation.gameIds || []);
 
-    // 날짜 처리
-    if (recommendation.startDate) {
-      const startDateTime = new Date(recommendation.startDate);
-      setStartDate(startDateTime.toISOString().substring(0, 16));
-    }
+    const currentSelectedGames = availableGames.filter((g) =>
+      recommendation.gameIds?.includes(g.id)
+    );
+    setSelectedGames(currentSelectedGames.map((g) => g.title));
+    setSelectedGameIds(currentSelectedGames.map((g) => g.id));
 
-    if (recommendation.endDate) {
-      const endDateTime = new Date(recommendation.endDate);
-      setEndDate(endDateTime.toISOString().substring(0, 16));
-    }
-
-    // isPublic 처리 - 타입을 통일해 number 형태로 처리
-    setIsPublic(recommendation.isPublic);
+    setStartDate(
+      recommendation.startDate
+        ? new Date(recommendation.startDate).toISOString().substring(0, 16)
+        : ""
+    );
+    setEndDate(
+      recommendation.endDate ? new Date(recommendation.endDate).toISOString().substring(0, 16) : ""
+    );
     setPublicSettings(recommendation.isPublic === 1 ? "public" : "private");
-
-    setIsEditing(true);
+    setError(null);
+    setSaving(false);
+    setSearchQuery("");
     setShowModal(true);
   };
 
@@ -358,81 +367,50 @@ const CasinoRecommendationManagement = () => {
 
   // 폼 제출 처리
   const handleSaveRecommendation = async () => {
+    setError(null);
     if (!title.trim()) {
-      setAlertMessage({ type: "error", message: "카테고리 타이틀을 입력해주세요." });
+      setError("카테고리 타이틀을 입력해주세요.");
       return;
     }
-
     if (selectedGameIds.length === 0) {
-      setAlertMessage({ type: "error", message: "하나 이상의 게임을 선택해주세요." });
+      setError("추천 게임을 하나 이상 선택해주세요.");
+      return;
+    }
+    if (!startDate || !endDate) {
+      setError("노출 시작일시와 종료일시를 모두 설정해주세요.");
+      return;
+    }
+    if (new Date(startDate) >= new Date(endDate)) {
+      setError("노출 종료일시는 시작일시보다 이후여야 합니다.");
       return;
     }
 
-    if (!startDate || !endDate) {
-      setAlertMessage({ type: "error", message: "노출 기간을 설정해주세요." });
-      return;
-    }
+    setSaving(true);
+    setAlertMessage(null);
 
     try {
-      setSaving(true);
-
-      // 날짜 형식을 ISO 문자열로 변환
-      const formattedStartDate = new Date(startDate).toISOString();
-      const formattedEndDate = new Date(endDate).toISOString();
-
-      // 서버 요구사항에 맞는 요청 데이터
-      const requestData = {
-        title: title.trim(),
-        gameIds: selectedGameIds,
-        startDate: formattedStartDate,
-        endDate: formattedEndDate,
-        isPublic: isPublic, // 불리언 값 그대로 전송
-        isMainDisplay: isMainDisplay, // isMainFeatured 대신 isMainDisplay 사용
-        displayOrder: currentRecommendation?.position || 0, // position 대신 displayOrder 사용
+      const payload: UpsertCasinoRecommendationPayload = {
+        title,
+        isMainDisplay,
+        selectedGameIds,
+        startDate: new Date(startDate).toISOString(),
+        endDate: new Date(endDate).toISOString(),
+        isPublic: publicSettings === "public",
       };
 
-      console.log("서버 요청 데이터:", requestData);
-
-      if (!isEditing) {
-        // 새 추천 생성
-        const response = await axios.post("/casino-recommends", requestData);
-        console.log("응답:", response.data);
-
-        setAlertMessage({ type: "success", message: "게임 추천이 성공적으로 추가되었습니다." });
-        setShowModal(false);
-        fetchRecommendations();
-      } else if (currentRecommendation) {
-        // 기존 추천 수정
-        const response = await axios.put(
-          `/casino-recommends/${currentRecommendation.id}`,
-          requestData
-        );
-        console.log("응답:", response.data);
-
-        setAlertMessage({ type: "success", message: "게임 추천 정보가 수정되었습니다." });
-        setShowModal(false);
-        fetchRecommendations();
+      if (isEditing && currentRecommendationId !== null) {
+        await axios.put(`/casino-recommends/${currentRecommendationId}`, payload);
+        setAlertMessage({ type: "success", message: "게임 추천이 성공적으로 수정되었습니다." });
+      } else {
+        await axios.post("/casino-recommends", payload);
+        setAlertMessage({ type: "success", message: "새 게임 추천이 성공적으로 등록되었습니다." });
       }
-    } catch (err: any) {
-      console.error("오류 발생:", err);
-
-      // 상세 오류 정보 로깅
-      if (err.response) {
-        console.error(`상태 코드: ${err.response.status}`);
-        console.error("응답 데이터:", err.response.data);
-      }
-
-      // 서버에서 응답한 에러 메시지가 있으면 표시
-      const errorMessage =
-        err.response?.data?.message ||
-        (!isEditing
-          ? "게임 추천 추가 중 오류가 발생했습니다."
-          : "게임 추천 정보 수정 중 오류가 발생했습니다.");
-
-      setAlertMessage({
-        type: "error",
-        message: errorMessage,
-      });
+      fetchRecommendations();
+      handleCloseModal();
+    } catch (err: unknown) {
+      console.error("Failed to save casino recommendation:", err);
+      const errorMessage = err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.";
+      setError(`저장에 실패했습니다: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
@@ -518,7 +496,7 @@ const CasinoRecommendationManagement = () => {
         <div className="flex items-center space-x-2">
           <ActionButton
             label="수정"
-            onClick={() => handleEditRecommendation(row)}
+            onClick={() => handleOpenEditModal(row)}
             color="blue"
             action="edit"
           />
@@ -562,13 +540,63 @@ const CasinoRecommendationManagement = () => {
         emptyMessage="등록된 게임 추천이 없습니다."
       />
 
-      {/* 게임 추천 추가/수정 모달 */}
+      {/* Add/Edit Modal */}
       <Modal
         isOpen={showModal}
         onClose={handleCloseModal}
         title={isEditing ? "게임 추천 수정" : "새 게임 추천 추가"}
         size="xl"
       >
+        {/* Modal Error Alert (below title, above controls) */}
+        {error && (
+          <div className="my-4">
+            <Alert type="error" message={error} onClose={() => setError(null)} />
+          </div>
+        )}
+        {/* Top Control Area: Buttons and Public Toggle - Moved to top */}
+        <div className="flex justify-between items-center mb-6 border-b pb-4">
+          {/* Buttons (Left) - Modified order: Save/Edit first */}
+          <div className="flex space-x-2">
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleSaveRecommendation}
+              disabled={saving}
+            >
+              {saving ? "저장 중..." : isEditing ? "수정" : "등록"}
+            </Button>
+            <Button type="button" variant="secondary" onClick={handleCloseModal} disabled={saving}>
+              취소
+            </Button>
+          </div>
+          {/* Public/Private Toggle (Right) */}
+          <div className="flex items-center space-x-4">
+            <label className="inline-flex items-center">
+              <input
+                type="radio"
+                value="public"
+                checked={publicSettings === "public"}
+                onChange={() => setPublicSettings("public")}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                disabled={saving}
+              />
+              <span className="ml-2 text-sm text-gray-900">공개</span>
+            </label>
+            <label className="inline-flex items-center">
+              <input
+                type="radio"
+                value="private"
+                checked={publicSettings === "private"}
+                onChange={() => setPublicSettings("private")}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                disabled={saving}
+              />
+              <span className="ml-2 text-sm text-gray-900">비공개</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Modal Content Area */}
         <div className="space-y-6">
           {/* 카테고리 타이틀 */}
           <div>
@@ -691,48 +719,6 @@ const CasinoRecommendationManagement = () => {
                 />
               </div>
             </div>
-          </div>
-
-          {/* 공개 여부 */}
-          <div>
-            <h3 className="text-lg font-medium mb-2">공개 여부</h3>
-            <div className="flex items-center space-x-4">
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  value="public"
-                  checked={publicSettings === "public"}
-                  onChange={() => setPublicSettings("public")}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <span className="ml-2 text-sm text-gray-900">공개</span>
-              </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  value="private"
-                  checked={publicSettings === "private"}
-                  onChange={() => setPublicSettings("private")}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <span className="ml-2 text-sm text-gray-900">비공개</span>
-              </label>
-            </div>
-          </div>
-
-          {/* 버튼 영역 */}
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button type="button" variant="secondary" onClick={handleCloseModal} disabled={saving}>
-              취소
-            </Button>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={handleSaveRecommendation}
-              disabled={saving}
-            >
-              {saving ? "저장 중..." : isEditing ? "수정" : "등록"}
-            </Button>
           </div>
         </div>
       </Modal>

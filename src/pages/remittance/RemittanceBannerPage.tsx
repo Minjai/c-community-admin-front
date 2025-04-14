@@ -410,17 +410,63 @@ const RemittanceBannerPage: React.FC = () => {
         onClose={() => setShowModal(false)}
         title={isEditing ? "송금 배너 수정" : "새 송금 배너 추가"}
         size="md"
-        footer={
-          <div className="flex justify-end space-x-3">
+      >
+        {alertMessage && (
+          <div className="mb-4">
+            <Alert
+              type={alertMessage.type}
+              message={alertMessage.message}
+              onClose={() => setAlertMessage(null)}
+            />
+          </div>
+        )}
+
+        <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
+          <div className="flex space-x-3">
+            <Button onClick={handleSaveBanner} variant="primary">
+              {isEditing ? "저장" : "등록"}
+            </Button>
             <Button variant="outline" onClick={() => setShowModal(false)}>
               취소
             </Button>
-            <Button onClick={handleSaveBanner}>저장</Button>
           </div>
-        }
-      >
+          <div className="flex space-x-4">
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id="visibility-public-modal"
+                name="isPublicModal"
+                value="1"
+                checked={currentBanner?.isPublic === 1}
+                onChange={() =>
+                  setCurrentBanner((prev) => (prev ? { ...prev, isPublic: 1 } : null))
+                }
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+              />
+              <label htmlFor="visibility-public-modal" className="ml-2 text-sm text-gray-700">
+                공개
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id="visibility-private-modal"
+                name="isPublicModal"
+                value="0"
+                checked={currentBanner?.isPublic === 0}
+                onChange={() =>
+                  setCurrentBanner((prev) => (prev ? { ...prev, isPublic: 0 } : null))
+                }
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+              />
+              <label htmlFor="visibility-private-modal" className="ml-2 text-sm text-gray-700">
+                비공개
+              </label>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-4">
-          {/* 사이트명 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               사이트명 <span className="text-red-600">*</span>
@@ -436,7 +482,6 @@ const RemittanceBannerPage: React.FC = () => {
             />
           </div>
 
-          {/* 이동링크 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               이동링크 <span className="text-red-600">*</span>
@@ -452,7 +497,6 @@ const RemittanceBannerPage: React.FC = () => {
             />
           </div>
 
-          {/* 로고 이미지 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               로고 이미지 {!isEditing && <span className="text-red-600">*</span>}
@@ -465,7 +509,6 @@ const RemittanceBannerPage: React.FC = () => {
               />
               <p className="text-xs text-gray-500 mt-1">권장 크기: 400x200px, 최대 2MB</p>
             </div>
-            {/* 기존 이미지 미리보기 (수정 시) */}
             {isEditing && currentBanner?.imageUrl && (
               <div className="mt-2">
                 <p className="text-sm mb-1">현재 로고:</p>
@@ -478,45 +521,6 @@ const RemittanceBannerPage: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
-
-          {/* 공개 여부 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">공개 여부</label>
-            <div className="flex space-x-4">
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="visibility-public"
-                  name="isPublic"
-                  value="1"
-                  checked={currentBanner?.isPublic === 1}
-                  onChange={() =>
-                    setCurrentBanner((prev) => (prev ? { ...prev, isPublic: 1 } : null))
-                  }
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <label htmlFor="visibility-public" className="ml-2 text-sm text-gray-700">
-                  공개
-                </label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="visibility-private"
-                  name="isPublic"
-                  value="0"
-                  checked={currentBanner?.isPublic === 0}
-                  onChange={() =>
-                    setCurrentBanner((prev) => (prev ? { ...prev, isPublic: 0 } : null))
-                  }
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <label htmlFor="visibility-private" className="ml-2 text-sm text-gray-700">
-                  비공개
-                </label>
-              </div>
-            </div>
           </div>
         </div>
       </Modal>

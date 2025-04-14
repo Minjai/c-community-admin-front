@@ -9,6 +9,7 @@ import Input from "../../components/forms/Input";
 import DatePicker from "../../components/forms/DatePicker";
 import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
+import { toast } from "react-toastify";
 
 const MiniBannerPage: React.FC = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -17,10 +18,8 @@ const MiniBannerPage: React.FC = () => {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [currentBanner, setCurrentBanner] = useState<Partial<Banner> | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [alertMessage, setAlertMessage] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [pcImageFile, setPcImageFile] = useState<File | null>(null);
   const [mobileImageFile, setMobileImageFile] = useState<File | null>(null);
 
@@ -72,6 +71,7 @@ const MiniBannerPage: React.FC = () => {
 
   // 배너 추가 모달 열기
   const handleAddBanner = () => {
+    setModalError(null);
     setCurrentBanner({
       id: 0,
       title: "",
@@ -79,7 +79,7 @@ const MiniBannerPage: React.FC = () => {
       mUrl: "",
       startDate: "",
       endDate: "",
-      isPublic: true,
+      isPublic: 1,
       position: banners.length + 1, // 현재 배너 개수 + 1
       bannerType: "mini",
       linkUrl: "",
@@ -92,6 +92,7 @@ const MiniBannerPage: React.FC = () => {
 
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
+    setModalError(null);
     // ISO 날짜 문자열을 datetime-local 형식으로 변환
     const formattedStartDate = banner.startDate
       ? (() => {
@@ -141,9 +142,12 @@ const MiniBannerPage: React.FC = () => {
     try {
       // 필수 필드 검증
       if (!currentBanner.title || !currentBanner.startDate || !currentBanner.endDate) {
-        setAlertMessage({ type: "error", message: "제목, 시작일, 종료일은 필수 항목입니다." });
+        setModalError("제목, 시작일, 종료일은 필수 항목입니다.");
         return;
       }
+
+      setIsSaving(true);
+      setModalError(null);
 
       if (isEditing && currentBanner.id) {
         // 수정 모드일 때
@@ -182,7 +186,7 @@ const MiniBannerPage: React.FC = () => {
               title: currentBanner.title,
               startDate: startDate, // 변환된 ISO 형식 사용
               endDate: endDate, // 변환된 ISO 형식 사용
-              isPublic: currentBanner.isPublic,
+              isPublic: currentBanner.isPublic === 1 ? 1 : 0,
               position: currentBanner.position,
               bannerType: "mini",
               linkUrl: currentBanner.linkUrl,
@@ -191,37 +195,20 @@ const MiniBannerPage: React.FC = () => {
             mobileImageFile || undefined
           );
 
-          // 수정 후 데이터 즉시 확인 (변경 사항이 제대로 적용되었는지 확인)
-          try {
-            const response = await BannerApiService.getMiniBanners();
-            if (response && Array.isArray(response)) {
-              const updatedBanner = response.find((b) => b.id === currentBanner.id);
-              if (updatedBanner) {
-                console.log("미니 배너 수정 후 서버 데이터:", {
-                  id: updatedBanner.id,
-                  title: updatedBanner.title,
-                  startDate: updatedBanner.startDate,
-                  endDate: updatedBanner.endDate,
-                  변경되었는가:
-                    updatedBanner.startDate !== currentBanner.startDate ||
-                    updatedBanner.endDate !== currentBanner.endDate,
-                });
-              }
-            }
-          } catch (checkErr) {
-            console.error("수정 후 데이터 확인 중 오류(미니):", checkErr);
-          }
-
-          setAlertMessage({ type: "success", message: "배너가 수정되었습니다." });
+          toast.success("배너가 수정되었습니다.");
         } catch (err) {
           console.error("Error updating banner:", err);
-          setAlertMessage({ type: "error", message: "배너 수정 중 오류가 발생했습니다." });
+          const errorMsg =
+            (err as any)?.response?.data?.message || "배너 수정 중 오류가 발생했습니다.";
+          setModalError(errorMsg);
+          setIsSaving(false);
           return;
         }
       } else {
         // 추가 모드일 때 (pcImageFile과 mobileImageFile이 반드시 있어야 함)
         if (!pcImageFile || !mobileImageFile) {
-          setAlertMessage({ type: "error", message: "PC 이미지와 모바일 이미지가 필요합니다." });
+          setModalError("PC 이미지와 모바일 이미지가 필요합니다.");
+          setIsSaving(false);
           return;
         }
 
@@ -256,7 +243,7 @@ const MiniBannerPage: React.FC = () => {
               title: currentBanner.title,
               startDate: startDate, // 변환된 ISO 형식 사용
               endDate: endDate, // 변환된 ISO 형식 사용
-              isPublic: currentBanner.isPublic,
+              isPublic: currentBanner.isPublic === 1 ? 1 : 0,
               position: newPosition, // 현재 배너 개수 + 1
               bannerType: "mini",
               linkUrl: currentBanner.linkUrl,
@@ -265,10 +252,13 @@ const MiniBannerPage: React.FC = () => {
             mobileImageFile
           );
 
-          setAlertMessage({ type: "success", message: "배너가 추가되었습니다." });
+          toast.success("배너가 추가되었습니다.");
         } catch (err) {
           console.error("Error creating banner:", err);
-          setAlertMessage({ type: "error", message: "배너 추가 중 오류가 발생했습니다." });
+          const errorMsg =
+            (err as any)?.response?.data?.message || "배너 추가 중 오류가 발생했습니다.";
+          setModalError(errorMsg);
+          setIsSaving(false);
           return;
         }
       }
@@ -278,7 +268,9 @@ const MiniBannerPage: React.FC = () => {
       fetchBanners();
     } catch (error) {
       console.error("배너 저장 중 오류:", error);
-      setAlertMessage({ type: "error", message: "배너 저장 중 오류가 발생했습니다." });
+      setModalError("배너 저장 중 예상치 못한 오류가 발생했습니다.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -287,11 +279,11 @@ const MiniBannerPage: React.FC = () => {
     if (window.confirm("정말 이 배너를 삭제하시겠습니까?")) {
       try {
         await BannerApiService.deleteMiniBanner(id);
-        setAlertMessage({ type: "success", message: "배너가 삭제되었습니다." });
+        toast.success("배너가 삭제되었습니다.");
         fetchBanners();
       } catch (error) {
         console.error("배너 삭제 중 오류:", error);
-        setAlertMessage({ type: "error", message: "배너 삭제 중 오류가 발생했습니다." });
+        toast.error("배너 삭제 중 오류가 발생했습니다.");
       }
     }
   };
@@ -348,7 +340,7 @@ const MiniBannerPage: React.FC = () => {
     } catch (err) {
       // 에러 발생 시 원래 순서로 되돌림
       fetchBanners();
-      setAlertMessage({ type: "error", message: "배너 순서 변경 중 오류가 발생했습니다." });
+      toast.error("배너 순서 변경 중 오류가 발생했습니다.");
       console.error("Error updating banner order:", err);
     }
   };
@@ -404,9 +396,17 @@ const MiniBannerPage: React.FC = () => {
     } catch (err) {
       // 에러 발생 시 원래 순서로 되돌림
       fetchBanners();
-      setAlertMessage({ type: "error", message: "배너 순서 변경 중 오류가 발생했습니다." });
+      toast.error("배너 순서 변경 중 오류가 발생했습니다.");
       console.error("Error updating banner order:", err);
     }
+  };
+
+  // 모달 닫기 핸들러 추가
+  const handleCloseModal = () => {
+    setModalError(null);
+    setShowModal(false);
+    setPcImageFile(null);
+    setMobileImageFile(null);
   };
 
   // 테이블 컬럼 정의
@@ -524,15 +524,6 @@ const MiniBannerPage: React.FC = () => {
         </Button>
       </div>
 
-      {alertMessage && (
-        <Alert
-          type={alertMessage.type}
-          message={alertMessage.message}
-          onClose={() => setAlertMessage(null)}
-          className="mb-4"
-        />
-      )}
-
       {error && (
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
@@ -548,10 +539,45 @@ const MiniBannerPage: React.FC = () => {
       {currentBanner && (
         <Modal
           isOpen={showModal}
-          onClose={() => setShowModal(false)}
+          onClose={handleCloseModal}
           title={isEditing ? "배너 수정" : "새 배너 추가"}
           size="lg"
         >
+          {/* Modal Error Display (Above top controls) */}
+          {modalError && (
+            <div className="mb-4">
+              <Alert type="error" message={modalError} onClose={() => setModalError(null)} />
+            </div>
+          )}
+
+          {/* Container for top controls */}
+          <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-4">
+            <div className="flex space-x-2">
+              <Button onClick={handleSaveBanner} disabled={isSaving}>
+                {isSaving ? "저장 중..." : isEditing ? "저장" : "추가"}
+              </Button>
+              <Button variant="outline" onClick={handleCloseModal} disabled={isSaving}>
+                취소
+              </Button>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isPublic"
+                checked={currentBanner.isPublic === 1}
+                onChange={(e) =>
+                  setCurrentBanner({ ...currentBanner, isPublic: e.target.checked ? 1 : 0 })
+                }
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                disabled={isSaving}
+              />
+              <label htmlFor="isPublic" className="text-sm font-medium text-gray-700">
+                공개 여부
+              </label>
+            </div>
+          </div>
+
           <div className="space-y-4">
             <Input
               label="배너 제목"
@@ -568,7 +594,6 @@ const MiniBannerPage: React.FC = () => {
                 id="pUrl"
                 onChange={(file) => {
                   if (file) {
-                    // 파일 선택 시 미리보기 URL 생성
                     const reader = new FileReader();
                     reader.onloadend = () => {
                       setCurrentBanner({ ...currentBanner, pUrl: reader.result as string });
@@ -589,7 +614,6 @@ const MiniBannerPage: React.FC = () => {
                 id="mUrl"
                 onChange={(file) => {
                   if (file) {
-                    // 파일 선택 시 미리보기 URL 생성
                     const reader = new FileReader();
                     reader.onloadend = () => {
                       setCurrentBanner({ ...currentBanner, mUrl: reader.result as string });
@@ -626,26 +650,6 @@ const MiniBannerPage: React.FC = () => {
                 value={currentBanner.endDate || ""}
                 onChange={(date) => setCurrentBanner({ ...currentBanner, endDate: date })}
               />
-            </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="isPublic"
-                checked={currentBanner.isPublic}
-                onChange={(e) => setCurrentBanner({ ...currentBanner, isPublic: e.target.checked })}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="isPublic" className="ml-2 block text-sm text-gray-900">
-                공개 여부
-              </label>
-            </div>
-
-            <div className="flex justify-end space-x-2 pt-4 border-t border-gray-200">
-              <Button variant="outline" onClick={() => setShowModal(false)}>
-                취소
-              </Button>
-              <Button onClick={handleSaveBanner}>{isEditing ? "저장" : "추가"}</Button>
             </div>
           </div>
         </Modal>

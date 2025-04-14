@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, ReactNode } from "react";
 import {
   getSportRecommendations,
   createSportRecommendation,
@@ -69,6 +69,7 @@ export default function SportRecommendationsManagement() {
   const fetchRecommendations = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
       const result = await getSportRecommendations({ page, limit });
@@ -245,46 +246,74 @@ export default function SportRecommendationsManagement() {
         setSelectedGames(detailData.games);
 
         // 게임 ID 배열 생성
-        const gameIds = detailData.games.map((game) => game.id);
+        const gameIds = detailData.games.map((game: SportGame) => game.id);
 
         setFormData({
-          title: detailData.title,
+          title: detailData.title || "",
           sportGameIds: gameIds,
           startTime: formatDateForInput(detailData.startTime),
           endTime: formatDateForInput(detailData.endTime),
-          isPublic: detailData.isPublic,
-          displayOrder: detailData.displayOrder,
+          isPublic:
+            typeof detailData.isPublic === "boolean"
+              ? detailData.isPublic
+                ? 1
+                : 0
+              : detailData.isPublic === 1
+              ? 1
+              : 0,
+          displayOrder: detailData.displayOrder || 0,
         });
       } else {
         // 서버에서 games 배열이 없는 경우, 기존 방식 사용
-        const gameIds = detailData.sportGameIds || [detailData.sportGameId];
+        const gameIds =
+          detailData.sportGameIds || (detailData.sportGameId ? [detailData.sportGameId] : []);
         const games = sportGames.filter((g) => gameIds.includes(g.id));
         setSelectedGames(games);
 
         setFormData({
-          title: detailData.title,
+          title: detailData.title || "",
           sportGameIds: gameIds,
           startTime: formatDateForInput(detailData.startTime),
           endTime: formatDateForInput(detailData.endTime),
-          isPublic: detailData.isPublic,
-          displayOrder: detailData.displayOrder,
+          isPublic:
+            typeof detailData.isPublic === "boolean"
+              ? detailData.isPublic
+                ? 1
+                : 0
+              : detailData.isPublic === 1
+              ? 1
+              : 0,
+          displayOrder: detailData.displayOrder || 0,
         });
       }
     } catch (err) {
       console.error("Error loading recommendation details:", err);
-      // 기본 데이터로 폴백
-      const gameIds = recommendation.sportGameIds || [recommendation.sportGameId];
+      setError("추천 상세 정보를 불러오는데 실패했습니다.");
+      // Fallback to using the initial recommendation data if detail fetch fails
+      const gameIds =
+        recommendation.sportGameIds ||
+        (recommendation.sportGameId ? [recommendation.sportGameId] : []);
       const games = sportGames.filter((g) => gameIds.includes(g.id));
       setSelectedGames(games);
 
       setFormData({
-        title: recommendation.title,
+        title: recommendation.title || "",
         sportGameIds: gameIds,
         startTime: formatDateForInput(recommendation.startTime),
         endTime: formatDateForInput(recommendation.endTime),
-        isPublic: recommendation.isPublic,
-        displayOrder: recommendation.displayOrder,
+        // Ensure the comparison handles boolean or number correctly -> 1 or 0
+        isPublic:
+          typeof recommendation.isPublic === "boolean"
+            ? recommendation.isPublic
+              ? 1
+              : 0
+            : recommendation.isPublic === 1
+            ? 1
+            : 0,
+        displayOrder: recommendation.displayOrder || 0,
       });
+    } finally {
+      setLoading(false);
     }
 
     setShowModal(true);
@@ -344,6 +373,7 @@ export default function SportRecommendationsManagement() {
 
     setLoading(true);
     setError(null);
+    setSuccess(null);
 
     try {
       // 주의: 서버 API가 단일 sportGameId만 지원하는 경우 아래 주석 부분으로 변경해야 합니다.
@@ -379,7 +409,7 @@ export default function SportRecommendationsManagement() {
 
   // 게임 정보 가져오기
   const getGameInfo = (gameId: number) => {
-    const game = sportGames.find((g) => g.id === gameId);
+    const game: SportGame | undefined = sportGames.find((g: SportGame) => g.id === gameId);
     return game || null;
   };
 
@@ -519,52 +549,43 @@ export default function SportRecommendationsManagement() {
   const columns = [
     {
       header: "제목",
-      accessor: "title",
+      accessor: "title" as keyof SportRecommendation,
     },
     {
       header: "등록 경기",
-      accessor: (item: SportRecommendation) => {
-        // 서버에서 반환된 games 배열 사용
+      accessor: (item: SportRecommendation): ReactNode => {
         if (item.games && Array.isArray(item.games)) {
-          const count = item.games.length;
-          return count + "개의 경기";
+          return `${item.games.length}개의 경기`;
         }
-
-        // 기존 방식 (대체)
-        const gameIds = item.sportGameIds || [item.sportGameId];
-        return gameIds.length + "개의 경기";
+        const gameIds = item.sportGameIds || (item.sportGameId ? [item.sportGameId] : []);
+        return `${gameIds.length}개의 경기`;
       },
     },
     {
       header: "기간",
-      accessor: "startTime",
-      cell: (value: string, row: SportRecommendation) => (
+      accessor: (item: SportRecommendation): ReactNode => (
         <span>
-          {formatDate(row.startTime)} ~ {formatDate(row.endTime)}
+          {formatDate(item.startTime)} ~ {formatDate(item.endTime)}
         </span>
       ),
     },
     {
       header: "공개 상태",
-      accessor: "isPublic",
-      cell: (value: number, row: SportRecommendation) => {
-        if (!value) {
+      accessor: "isPublic" as keyof SportRecommendation,
+      cell: (value: number | boolean, row: SportRecommendation): ReactNode => {
+        const isCurrentlyPublic = value === 1 || value === true;
+        if (!isCurrentlyPublic) {
           return (
             <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
               비공개
             </span>
           );
         }
-
-        // 현재 시간과 시작일/종료일 비교
         const now = new Date();
         const startTime = row.startTime ? new Date(row.startTime) : null;
         const endTime = row.endTime ? new Date(row.endTime) : null;
-
-        // 공개 상태 결정
         let status = "공개";
         let colorClass = "bg-green-100 text-green-800";
-
         if (startTime && now < startTime) {
           status = "공개 전";
           colorClass = "bg-gray-100 text-gray-800";
@@ -572,7 +593,6 @@ export default function SportRecommendationsManagement() {
           status = "공개 종료";
           colorClass = "bg-gray-100 text-gray-800";
         }
-
         return (
           <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
             {status}
@@ -582,8 +602,8 @@ export default function SportRecommendationsManagement() {
     },
     {
       header: "관리",
-      accessor: "id",
-      cell: (value: number, row: SportRecommendation, index: number) => (
+      accessor: "id" as keyof SportRecommendation,
+      cell: (value: number, row: SportRecommendation, index: number): ReactNode => (
         <div className="flex space-x-2">
           <ActionButton
             label="위로"
@@ -672,15 +692,58 @@ export default function SportRecommendationsManagement() {
         onClose={() => setShowModal(false)}
         title={modalType === "add" ? "새 게임 추천 추가" : "게임 추천 수정"}
         size="lg"
-        footer={
-          <div className="flex justify-end space-x-3">
+      >
+        {/* Modal Error Alert (Above controls) */}
+        {error && (
+          <div className="my-4">
+            <Alert type="error" message={error} onClose={() => setError(null)} />
+          </div>
+        )}
+
+        {/* Top Control Area */}
+        <div className="flex justify-between items-center pb-4 border-b border-gray-200 mb-6">
+          {/* Buttons (Left) */}
+          <div className="flex space-x-3">
+            <Button onClick={handleSaveRecommendation}>
+              {modalType === "add" ? "등록" : "저장"}
+            </Button>
             <Button variant="outline" onClick={() => setShowModal(false)}>
               취소
             </Button>
-            <Button onClick={handleSaveRecommendation}>저장</Button>
           </div>
-        }
-      >
+          {/* Public Toggle (Right) - Moved from form content below */}
+          <div className="flex space-x-4">
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id="visibility-public-modal"
+                name="isPublicModal"
+                value="1"
+                checked={formData.isPublic === 1}
+                onChange={handleInputChange} // Assuming handleChange handles radio correctly by name
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+              />
+              <label htmlFor="visibility-public-modal" className="ml-2 text-sm text-gray-700">
+                공개
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id="visibility-private-modal"
+                name="isPublicModal"
+                value="0"
+                checked={formData.isPublic === 0}
+                onChange={handleInputChange} // Assuming handleChange handles radio correctly by name
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+              />
+              <label htmlFor="visibility-private-modal" className="ml-2 text-sm text-gray-700">
+                비공개
+              </label>
+            </div>
+          </div>
+        </div>
+
         <div className="space-y-6">
           {/* 1. 제목 입력 */}
           <div>
@@ -809,41 +872,6 @@ export default function SportRecommendationsManagement() {
                 onChange={handleInputChange}
                 className="w-full p-2 border border-gray-300 rounded-md"
               />
-            </div>
-          </div>
-
-          {/* 5. 공개여부 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">공개여부</label>
-            <div className="flex space-x-4">
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="visibility-public"
-                  name="isPublic"
-                  value="1"
-                  checked={formData.isPublic === 1}
-                  onChange={handleInputChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <label htmlFor="visibility-public" className="ml-2 text-sm text-gray-700">
-                  공개
-                </label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="visibility-private"
-                  name="isPublic"
-                  value="0"
-                  checked={formData.isPublic === 0}
-                  onChange={handleInputChange}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                />
-                <label htmlFor="visibility-private" className="ml-2 text-sm text-gray-700">
-                  비공개
-                </label>
-              </div>
             </div>
           </div>
         </div>

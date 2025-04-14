@@ -199,11 +199,17 @@ const CasinoCompanyPage: React.FC = () => {
   const handleSaveCompany = async () => {
     if (!currentCompany) return;
 
+    // Clear modal error first
+    setError(null);
+    // Clear alert message at the beginning
+    setAlertMessage(null);
+
     try {
       setIsSaving(true);
       // 필수 필드 검증
       if (!currentCompany.companyName || !currentCompany.description) {
-        setAlertMessage({ type: "error", message: "업체명과 업체소개는 필수 항목입니다." });
+        setError("업체명과 업체소개는 필수 항목입니다."); // Use setError for modal alert
+        setIsSaving(false); // Stop saving process
         return;
       }
 
@@ -225,16 +231,18 @@ const CasinoCompanyPage: React.FC = () => {
             },
             imageFile || undefined
           );
-          setAlertMessage({ type: "success", message: "업체 정보가 수정되었습니다." });
+          setAlertMessage({ type: "success", message: "업체 정보가 수정되었습니다." }); // Use alertMessage for page level success
+          setShowModal(false); // Close modal on success
+          fetchCompanies(); // Refresh list
         } catch (err) {
           console.error("Error updating casino company:", err);
-          setAlertMessage({ type: "error", message: "업체 정보 수정 중 오류가 발생했습니다." });
-          return;
+          setError("업체 정보 수정 중 오류가 발생했습니다."); // Use setError for modal alert
         }
       } else {
         // 추가 모드일 때 (imageFile이 반드시 있어야 함)
         if (!imageFile) {
-          setAlertMessage({ type: "error", message: "업체 이미지가 필요합니다." });
+          setError("업체 이미지가 필요합니다."); // Use setError for modal alert
+          setIsSaving(false); // Stop saving process
           return;
         }
 
@@ -250,20 +258,17 @@ const CasinoCompanyPage: React.FC = () => {
             },
             imageFile
           );
-          setAlertMessage({ type: "success", message: "새로운 업체가 추가되었습니다." });
+          setAlertMessage({ type: "success", message: "새로운 업체가 추가되었습니다." }); // Use alertMessage for page level success
+          setShowModal(false); // Close modal on success
+          fetchCompanies(); // Refresh list
         } catch (err) {
           console.error("Error creating casino company:", err);
-          setAlertMessage({ type: "error", message: "업체 추가 중 오류가 발생했습니다." });
-          return;
+          setError("업체 추가 중 오류가 발생했습니다."); // Use setError for modal alert
         }
       }
-
-      // 모달 닫고 목록 새로고침
-      setShowModal(false);
-      fetchCompanies();
     } catch (error) {
       console.error("Error saving casino company:", error);
-      setAlertMessage({ type: "error", message: "업체 정보 저장 중 오류가 발생했습니다." });
+      setError("업체 정보 저장 중 오류가 발생했습니다."); // Use setError for modal alert
     } finally {
       setIsSaving(false);
     }
@@ -474,12 +479,6 @@ const CasinoCompanyPage: React.FC = () => {
         />
       )}
 
-      {error && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-300 text-red-700 rounded-md">
-          {error}
-        </div>
-      )}
-
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -499,6 +498,48 @@ const CasinoCompanyPage: React.FC = () => {
           title={isEditing ? "업체 정보 수정" : "새 업체 추가"}
           size="xl"
         >
+          {/* Modal Error Alert (Above controls) */}
+          {error && (
+            <div className="my-4">
+              <Alert type="error" message={error} onClose={() => setError(null)} />
+            </div>
+          )}
+
+          {/* Top Control Area */}
+          <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
+            {/* Buttons (Left) */}
+            <div className="flex space-x-3">
+              <Button onClick={handleSaveCompany} variant="primary">
+                {isEditing ? "저장" : "등록"}
+              </Button>
+              <Button onClick={() => setShowModal(false)} variant="secondary">
+                취소
+              </Button>
+            </div>
+            {/* Public Toggle Checkbox (Right) */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isPublic-modal"
+                checked={currentCompany?.isPublic === 1}
+                onChange={(e) =>
+                  setCurrentCompany(
+                    currentCompany
+                      ? {
+                          ...currentCompany,
+                          isPublic: e.target.checked ? 1 : 0,
+                        }
+                      : null
+                  )
+                }
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="isPublic-modal" className="ml-2 block text-sm text-gray-900">
+                공개 여부
+              </label>
+            </div>
+          </div>
+
           <div className="space-y-4">
             <Input
               label="업체명"
@@ -592,37 +633,6 @@ const CasinoCompanyPage: React.FC = () => {
             />
 
             {renderCasinoInfoField()}
-
-            <div className="flex items-center mt-4">
-              <input
-                type="checkbox"
-                id="isPublic"
-                checked={currentCompany?.isPublic === 1}
-                onChange={(e) =>
-                  setCurrentCompany(
-                    currentCompany
-                      ? {
-                          ...currentCompany,
-                          isPublic: e.target.checked ? 1 : 0,
-                        }
-                      : null
-                  )
-                }
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="isPublic" className="ml-2 block text-sm text-gray-900">
-                공개 여부
-              </label>
-            </div>
-
-            <div className="flex justify-end pt-4 space-x-3">
-              <Button onClick={() => setShowModal(false)} variant="secondary">
-                취소
-              </Button>
-              <Button onClick={handleSaveCompany} variant="primary">
-                저장
-              </Button>
-            </div>
           </div>
         </Modal>
       )}

@@ -303,34 +303,6 @@ const NewsManagementPage = () => {
           maxLength={255}
           disabled={saving}
         />
-
-        {/* 공개 여부 */}
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="isPublic"
-            checked={isPublic === 1}
-            onChange={(e) => setIsPublic(e.target.checked ? 1 : 0)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          />
-          <label htmlFor="isPublic" className="ml-2 block text-sm text-gray-900">
-            공개 상태
-          </label>
-        </div>
-
-        {/* 선택 여부 */}
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="isSelected"
-            checked={isSelected === 1}
-            onChange={(e) => setIsSelected(e.target.checked ? 1 : 0)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          />
-          <label htmlFor="isSelected" className="ml-2 block text-sm text-gray-900">
-            Most View 여부
-          </label>
-        </div>
       </div>
     );
   };
@@ -457,29 +429,110 @@ const NewsManagementPage = () => {
         isOpen={showModal}
         onClose={handleCloseModal}
         title={isEditing ? "뉴스 수정" : "새 뉴스 추가"}
-        size="xl"
+        size="lg"
       >
-        {renderModalContent()}
+        {/* Modal Error Alert (Above controls) */}
+        {alertMessage?.type === "error" && (
+          <div className="mb-4">
+            <Alert
+              type="error"
+              message={alertMessage.message}
+              onClose={() => setAlertMessage(null)}
+            />
+          </div>
+        )}
 
-        <div className="border-t border-gray-200 pt-5 mt-5 flex justify-center">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleCloseModal}
+        {/* Top Control Area */}
+        <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
+          {/* Buttons (Left) */}
+          <div className="flex space-x-3">
+            <Button onClick={handleSaveNews} variant="primary" disabled={saving}>
+              {saving ? "저장 중..." : isEditing ? "수정" : "등록"}
+            </Button>
+            <Button onClick={handleCloseModal} variant="secondary" disabled={saving}>
+              취소
+            </Button>
+          </div>
+          {/* Toggles (Right) */}
+          <div className="flex items-center space-x-4">
+            {/* 공개 여부 */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isPublic-modal"
+                checked={isPublic === 1}
+                onChange={(e) => setIsPublic(e.target.checked ? 1 : 0)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="isPublic-modal" className="ml-2 block text-sm text-gray-900">
+                공개 상태
+              </label>
+            </div>
+            {/* 선택 여부 */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isSelected-modal"
+                checked={isSelected === 1}
+                onChange={(e) => setIsSelected(e.target.checked ? 1 : 0)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="isSelected-modal" className="ml-2 block text-sm text-gray-900">
+                Most View 여부
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Form content */}
+        <div className="space-y-4">
+          {/* 제목 */}
+          <Input
+            label="뉴스 제목"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="뉴스 제목을 입력하세요"
+            required
+            maxLength={255}
             disabled={saving}
-            className="mr-2"
-          >
-            취소
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={handleSaveNews}
+          />
+
+          {/* 링크 */}
+          <Input
+            label="뉴스 링크"
+            type="text"
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="뉴스 링크를 입력하세요"
+            required
+            maxLength={255}
             disabled={saving}
-            className="px-8"
-          >
-            {saving ? "저장 중..." : "등록"}
-          </Button>
+          />
+
+          {/* 설명 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">뉴스 설명</label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="뉴스 설명을 입력하세요"
+              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              rows={4}
+              disabled={saving}
+            />
+          </div>
+
+          {/* 썸네일 URL */}
+          <Input
+            label="썸네일 URL"
+            type="text"
+            value={thumbnailUrl}
+            onChange={(e) => setThumbnailUrl(e.target.value)}
+            placeholder="뉴스 썸네일 URL을 입력하세요"
+            maxLength={255}
+            disabled={saving}
+          />
         </div>
       </Modal>
     </div>

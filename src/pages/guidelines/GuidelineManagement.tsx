@@ -11,6 +11,7 @@ import TextEditor from "../../components/forms/TextEditor";
 import FileUpload from "@/components/forms/FileUpload";
 import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
+import { toast } from "react-toastify";
 
 // Guideline 타입에 position과 displayOrder가 선택적으로 포함될 수 있도록 확장
 interface GuidelineWithOrder extends Guideline {
@@ -27,10 +28,8 @@ const GuidelineManagement = ({ boardId = 3 }) => {
     null
   ); // GuidelineWithOrder 사용
   const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [alertMessage, setAlertMessage] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null); // Modal specific error
+  const [isSaving, setIsSaving] = useState<boolean>(false); // Add isSaving state
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -270,6 +269,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
   // 모달 열기 (추가)
   const handleAddGuideline = () => {
+    setModalError(null); // Reset modal error
     setCurrentGuideline({
       title: "",
       content: "",
@@ -286,6 +286,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
   // 모달 열기 (수정)
   const handleEditGuideline = (guideline: GuidelineWithOrder) => {
+    setModalError(null); // Reset modal error
     // Boolean 타입인 isPublic을 Number 타입으로 변환
     const convertedGuideline = {
       ...guideline,
@@ -304,9 +305,12 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
     try {
       if (!currentGuideline.title || !currentGuideline.content) {
-        setAlertMessage({ type: "error", message: "제목과 내용은 필수 항목입니다." });
+        setModalError("제목과 내용은 필수 항목입니다.");
         return;
       }
+
+      setIsSaving(true); // Set saving state
+      setModalError(null); // Clear previous modal error
 
       // isPublic 값을 확실히 number로 변환
       const isPublicValue =
@@ -324,17 +328,21 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
       if (isEditing && currentGuideline.id) {
         await GuidelineApiService.updateGuideline(currentGuideline.id, dataToSend);
-        setAlertMessage({ type: "success", message: "가이드라인이 수정되었습니다." });
+        toast.success("가이드라인이 수정되었습니다.");
       } else {
         await GuidelineApiService.createGuideline(dataToSend);
-        setAlertMessage({ type: "success", message: "새 가이드라인이 추가되었습니다." });
+        toast.success("새 가이드라인이 추가되었습니다.");
       }
 
       setShowModal(false);
       fetchGuidelines();
     } catch (error) {
       // Error logging removed
-      setAlertMessage({ type: "error", message: "가이드라인 저장 중 오류가 발생했습니다." });
+      const errorMsg =
+        (error as any)?.response?.data?.message || "가이드라인 저장 중 오류가 발생했습니다.";
+      setModalError(errorMsg);
+    } finally {
+      setIsSaving(false); // Ensure saving state is reset
     }
   };
 
@@ -344,11 +352,11 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
     try {
       await GuidelineApiService.deleteGuideline(id);
-      setAlertMessage({ type: "success", message: "가이드라인이 삭제되었습니다." });
+      toast.success("가이드라인이 삭제되었습니다.");
       fetchGuidelines();
     } catch (err) {
       // Error logging removed
-      setAlertMessage({ type: "error", message: "가이드라인 삭제 중 오류가 발생했습니다." });
+      toast.error("가이드라인 삭제 중 오류가 발생했습니다.");
     }
   };
 
@@ -371,7 +379,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       fetchGuidelines(); // 목록 새로고침
     } catch (err) {
       // Error logging removed
-      setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+      toast.error("순서 변경 중 오류가 발생했습니다.");
       fetchGuidelines(); // 에러 시 원상복구
     }
   };
@@ -393,9 +401,17 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       fetchGuidelines();
     } catch (err) {
       // Error logging removed
-      setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+      toast.error("순서 변경 중 오류가 발생했습니다.");
       fetchGuidelines();
     }
+  };
+
+  // 모달 닫기 핸들러 추가
+  const handleCloseModal = () => {
+    setModalError(null);
+    setShowModal(false);
+    setImageFile(null); // Reset image file on close
+    setPreviewUrl(null);
   };
 
   // DataTable 컬럼 정의
@@ -479,15 +495,6 @@ const GuidelineManagement = ({ boardId = 3 }) => {
         </Button>
       </div>
 
-      {alertMessage && (
-        <Alert
-          type={alertMessage.type}
-          message={alertMessage.message}
-          onClose={() => setAlertMessage(null)}
-          className="mb-4"
-        />
-      )}
-
       {error && (
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
@@ -503,11 +510,51 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       {currentGuideline && (
         <Modal
           isOpen={showModal}
-          onClose={() => setShowModal(false)}
+          onClose={handleCloseModal}
           title={isEditing ? "가이드라인 수정" : "새 가이드라인 추가"}
           size="xl"
         >
+          {/* Modal Error Display (Above top controls) */}
+          {modalError && (
+            <div className="mb-4">
+              <Alert type="error" message={modalError} onClose={() => setModalError(null)} />
+            </div>
+          )}
+
+          {/* New container for top controls - Reordered */}
+          <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-4">
+            {/* Left side: Action Buttons */}
+            <div className="flex space-x-3">
+              <Button variant="primary" onClick={handleSaveGuideline} disabled={isSaving}>
+                {isSaving ? "저장 중..." : isEditing ? "저장" : "추가"}
+              </Button>
+              <Button variant="secondary" onClick={handleCloseModal} disabled={isSaving}>
+                취소
+              </Button>
+            </div>
+
+            {/* Right side: Public toggle */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isPublicModal"
+                checked={currentGuideline.isPublic === true || currentGuideline.isPublic === 1}
+                onChange={(e) =>
+                  setCurrentGuideline({
+                    ...currentGuideline,
+                    isPublic: e.target.checked ? 1 : 0,
+                  })
+                }
+                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              <label htmlFor="isPublicModal" className="ml-2 block text-sm text-gray-900">
+                공개 여부
+              </label>
+            </div>
+          </div>
+
           <div className="space-y-4">
+            {/* Form fields below */}
             <Input
               label="제목"
               value={currentGuideline.title || ""}
@@ -517,7 +564,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
             <FileUpload
               label="썸네일 이미지"
-              id="guidelineImage"
+              id="guidelineImageModal"
               onChange={handleFile}
               value={previewUrl || currentGuideline.imageUrl}
             />
@@ -537,32 +584,6 @@ const GuidelineManagement = ({ boardId = 3 }) => {
                 />
               </div>
             </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="isPublic"
-                checked={currentGuideline.isPublic === true || currentGuideline.isPublic === 1}
-                onChange={(e) =>
-                  setCurrentGuideline({
-                    ...currentGuideline,
-                    isPublic: e.target.checked ? 1 : 0,
-                  })
-                }
-                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-              />
-              <label htmlFor="isPublic" className="ml-2 block text-sm text-gray-900">
-                공개 여부
-              </label>
-            </div>
-          </div>
-          <div className="mt-6 flex justify-end space-x-3">
-            <Button variant="secondary" onClick={() => setShowModal(false)}>
-              취소
-            </Button>
-            <Button variant="primary" onClick={handleSaveGuideline}>
-              저장
-            </Button>
           </div>
         </Modal>
       )}

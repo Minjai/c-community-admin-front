@@ -204,12 +204,14 @@ export default function SportsManagement() {
 
   const handleSaveCategory = async () => {
     if (!selectedSport) {
-      setError("종목 경기를 선택해주세요.");
+      // setError("종목 경기를 선택해주세요.");
+      setError("종목 경기를 선택해주세요."); // Maintain setError for immediate feedback in modal
       return;
     }
 
     setLoading(true);
-    setError(null);
+    setError(null); // Clear modal error before saving
+    setSuccess(null); // Clear success message before saving
 
     try {
       if (modalType === "add") {
@@ -236,7 +238,8 @@ export default function SportsManagement() {
         fetchSportCategories();
       }
     } catch (err) {
-      setError(modalType === "add" ? "카테고리 추가 실패" : "카테고리 수정 실패");
+      // setError(modalType === "add" ? "카테고리 추가 실패" : "카테고리 수정 실패");
+      setError(modalType === "add" ? "카테고리 추가 실패" : "카테고리 수정 실패"); // Maintain setError for immediate feedback in modal
       console.error("Error saving sport category:", err);
     } finally {
       setLoading(false);
@@ -356,22 +359,22 @@ export default function SportsManagement() {
   const columns = [
     {
       header: "종목명",
-      accessor: "sportName",
+      accessor: "sportName" as keyof SportCategory,
       cell: (value: string, row: SportCategory) => getKoreanSportName(value),
     },
     {
       header: "표시 이름",
-      accessor: "displayName",
+      accessor: "displayName" as keyof SportCategory,
       cell: (value: string, row: SportCategory) => value || getKoreanSportName(row.sportName),
     },
     {
       header: "등록일자",
-      accessor: "createdAt",
+      accessor: "createdAt" as keyof SportCategory,
       cell: (value: string) => formatDate(value),
     },
     {
       header: "공개여부",
-      accessor: "isPublic",
+      accessor: "isPublic" as keyof SportCategory,
       cell: (value: number) => (
         <span
           className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -384,7 +387,7 @@ export default function SportsManagement() {
     },
     {
       header: "관리",
-      accessor: "id",
+      accessor: "id" as keyof SportCategory,
       cell: (value: number, row: SportCategory, index: number) => (
         <div className="flex space-x-2">
           <ActionButton
@@ -472,18 +475,61 @@ export default function SportsManagement() {
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        title={modalType === "add" ? "새 종목 추가" : "종목 수정"}
-        size="md"
-        footer={
-          <div className="flex justify-end space-x-3">
-            <Button variant="outline" onClick={() => setShowModal(false)}>
+        title={modalType === "add" ? "종목 추가" : "종목 수정"}
+      >
+        {/* Modal Error Alert (Above controls) */}
+        {error && (
+          <div className="mb-4">
+            <Alert type="error" message={error} onClose={() => setError(null)} />
+          </div>
+        )}
+
+        {/* Top Control Area */}
+        <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-4">
+          {/* Buttons (Left) */}
+          <div className="flex space-x-2">
+            <Button variant="primary" onClick={handleSaveCategory}>
+              {modalType === "add" ? "등록" : "저장"}
+            </Button>
+            <Button variant="secondary" onClick={() => setShowModal(false)}>
               취소
             </Button>
-            <Button onClick={handleSaveCategory}>저장</Button>
           </div>
-        }
-      >
-        <div className="space-y-6">
+          {/* Public Toggle (Right) */}
+          <div className="flex space-x-5">
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id="visibility-public-modal"
+                name="isPublicModal"
+                value="1"
+                checked={formData.isPublic === 1}
+                onChange={handleChange} // Assuming handleChange handles radio correctly by name
+                className="form-radio h-4 w-4 text-blue-600"
+              />
+              <label htmlFor="visibility-public-modal" className="ml-2 text-sm">
+                공개
+              </label>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id="visibility-private-modal"
+                name="isPublicModal"
+                value="0"
+                checked={formData.isPublic === 0}
+                onChange={handleChange} // Assuming handleChange handles radio correctly by name
+                className="form-radio h-4 w-4 text-blue-600"
+              />
+              <label htmlFor="visibility-private-modal" className="ml-2 text-sm">
+                비공개
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Form content */}
+        <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">스포츠 종목명</label>
             <input
@@ -514,40 +560,6 @@ export default function SportsManagement() {
                 </div>
               ))}
               <div className="col-span-4 text-xs text-gray-500 mt-1">※ flashscore 기준 종목</div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">공개여부</label>
-            <div className="flex space-x-5">
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="visibility-public"
-                  name="isPublic"
-                  value="1"
-                  checked={formData.isPublic === 1}
-                  onChange={handleChange}
-                  className="form-radio h-4 w-4 text-blue-600"
-                />
-                <label htmlFor="visibility-public" className="ml-2 text-sm">
-                  공개
-                </label>
-              </div>
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  id="visibility-private"
-                  name="isPublic"
-                  value="0"
-                  checked={formData.isPublic === 0}
-                  onChange={handleChange}
-                  className="form-radio h-4 w-4 text-blue-600"
-                />
-                <label htmlFor="visibility-private" className="ml-2 text-sm">
-                  비공개
-                </label>
-              </div>
             </div>
           </div>
         </div>

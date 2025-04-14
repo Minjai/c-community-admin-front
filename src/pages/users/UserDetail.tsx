@@ -478,13 +478,37 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
     <>
       <Modal isOpen={isOpen} onClose={onClose} title="회원 정보 관리 상세" size="xl">
         <div className="space-y-6">
+          {/* Alert Message (Above controls) */}
           {alertMessage && (
-            <Alert
-              type={alertMessage.type}
-              message={alertMessage.message}
-              onClose={() => setAlertMessage(null)}
-            />
+            <div className="my-4">
+              <Alert
+                type={alertMessage.type}
+                message={alertMessage.message}
+                onClose={() => setAlertMessage(null)}
+              />
+            </div>
           )}
+
+          {/* Top Control Area */}
+          <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
+            {/* Buttons (Left) */}
+            <div className="flex space-x-3">
+              {isEditing ? (
+                <Button variant="primary" onClick={handleSaveEdit}>
+                  저장
+                </Button>
+              ) : (
+                <Button variant="primary" onClick={handleEditMode}>
+                  수정
+                </Button>
+              )}
+              <Button variant="secondary" onClick={onClose}>
+                목록
+              </Button>
+            </div>
+            {/* Right side controls placeholder - Add status, rank, point controls here later */}
+            <div>{/* TODO: Add status, rank, point controls */}</div>
+          </div>
 
           <div className="flex flex-col space-y-6">
             <div className="flex items-center mb-4">
@@ -651,21 +675,6 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
                 </div>
               </div>
             </div>
-          </div>
-
-          <div className="flex justify-center mt-8 space-x-4">
-            <Button variant="secondary" onClick={onClose}>
-              목록
-            </Button>
-            {isEditing ? (
-              <Button variant="primary" onClick={handleSaveEdit}>
-                저장
-              </Button>
-            ) : (
-              <Button variant="primary" onClick={handleEditMode}>
-                수정
-              </Button>
-            )}
           </div>
         </div>
       </Modal>
