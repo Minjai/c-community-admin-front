@@ -342,7 +342,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
   showImageAndLink = true,
   customModules,
   customFormats,
-  height = "400px",
+  height = "200px",
   onChange,
   onFocus,
 }) => {
@@ -834,8 +834,8 @@ const TextEditor: React.FC<TextEditorProps> = ({
   }, [imageHandler, videoHandler]);
 
   return (
-    <div ref={editorRef} className="quill-editor-container">
-      <ErrorBoundary>
+    <ErrorBoundary>
+      <div className="text-editor-wrapper mb-0 pb-0">
         <ReactQuill
           ref={quillRef}
           value={content || ""}
@@ -890,31 +890,48 @@ const TextEditor: React.FC<TextEditorProps> = ({
             "video",
           ]}
         />
-      </ErrorBoundary>
+      </div>
       <style>
         {`
-          .quill-editor-container {
-            border-radius: 0.375rem;
-            overflow: hidden;
-          }
-          .ql-toolbar.ql-snow {
-            border-top-left-radius: 0.375rem;
-            border-top-right-radius: 0.375rem;
-            background-color: #f9fafb;
-          }
-          .ql-container.ql-snow {
+          .text-editor-wrapper .ql-container {
+            height: ${height}; /* Apply fixed height to the container */
+            overflow: hidden; /* Hide editor overflow within the container */
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important; /* Ensure container has no bottom padding */
             border-bottom-left-radius: 0.375rem;
             border-bottom-right-radius: 0.375rem;
             background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-top: none;
           }
-          .ql-editor {
-            min-height: ${height};
-            max-height: ${height};
+          .text-editor-wrapper .ql-editor {
+            /* Let editor fill the container */
+            height: 100%;
+            padding-bottom: 0 !important;
             overflow-y: auto;
-            direction: ltr; /* 명시적으로 왼쪽에서 오른쪽으로 텍스트 방향 설정 */
+            box-sizing: border-box;
+            direction: ltr;
             text-align: left;
             background-color: #ffffff;
             cursor: text;
+          }
+           .quill-editor-container {
+             border-radius: 0.375rem;
+             overflow: hidden;
+           }
+           .ql-toolbar.ql-snow {
+             border-top-left-radius: 0.375rem;
+             border-top-right-radius: 0.375rem;
+             background-color: #f9fafb;
+             border: 1px solid #e5e7eb;
+             border-bottom: none;
+           }
+           .ql-container.ql-snow {
+            border-bottom-left-radius: 0.375rem;
+            border-bottom-right-radius: 0.375rem;
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-top: none;
           }
           .ql-editor.ql-blank::before {
             content: "";
@@ -932,49 +949,55 @@ const TextEditor: React.FC<TextEditorProps> = ({
             height: 315px;
             margin: 10px 0;
           }
-          /* 에디터가 비정상적으로 사라지는 것을 방지하는 스타일 */
           .quill-editor-maintain-focus {
-            min-height: ${height};
-            opacity: 1 !important;
-            visibility: visible !important;
-          }
-          .quill-editor-maintain-focus .ql-editor {
-            visibility: visible !important;
-            display: block !important;
-          }
-          /* 툴바 버튼들의 정렬 수정 */
-          .ql-toolbar.ql-snow .ql-formats {
-            display: inline-flex;
-            align-items: center;
-            vertical-align: middle;
-            margin-right: 8px;
-          }
-          .ql-toolbar.ql-snow button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            height: 24px;
-            vertical-align: middle;
-          }
-          .ql-toolbar.ql-snow button svg {
-            width: 18px;
-            height: 18px;
-          }
-          /* 특히 이미지와 링크 버튼 정렬 수정 */
-          .ql-toolbar.ql-snow .ql-formats button.ql-link,
-          .ql-toolbar.ql-snow .ql-formats button.ql-image,
-          .ql-toolbar.ql-snow .ql-formats button.ql-video {
-            padding: 0;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            height: 24px;
-            width: 28px;
-            vertical-align: middle;
-          }
+             /* Remove min-height from this potentially conflicting class */
+             /* min-height: ${height}; */
+             opacity: 1 !important;
+             visibility: visible !important;
+           }
+           .quill-editor-maintain-focus .ql-editor {
+             visibility: visible !important;
+             display: block !important;
+           }
+           .ql-toolbar.ql-snow .ql-formats {
+             display: inline-flex;
+             align-items: center;
+             vertical-align: middle;
+             margin-right: 8px;
+           }
+           .ql-toolbar.ql-snow button {
+             display: inline-flex;
+             align-items: center;
+             justify-content: center;
+             height: 24px;
+             vertical-align: middle;
+           }
+           .ql-toolbar.ql-snow button svg {
+             width: 18px;
+             height: 18px;
+           }
+           .ql-toolbar.ql-snow .ql-formats button.ql-link,
+           .ql-toolbar.ql-snow .ql-formats button.ql-image,
+           .ql-toolbar.ql-snow .ql-formats button.ql-video {
+             padding: 0;
+             display: inline-flex;
+             align-items: center;
+             justify-content: center;
+             height: 24px;
+             width: 28px;
+             vertical-align: middle;
+           }
+           /* Remove margin from the last element inside the editor */
+           .text-editor-wrapper .ql-editor > *:last-child {
+             margin-bottom: 0 !important; /* Target last child element directly */
+           }
+           /* Remove margin from the last paragraph (redundant but harmless) */
+           .text-editor-wrapper .ql-editor p:last-of-type {
+             margin-bottom: 0 !important;
+           }
         `}
       </style>
-    </div>
+    </ErrorBoundary>
   );
 };
 

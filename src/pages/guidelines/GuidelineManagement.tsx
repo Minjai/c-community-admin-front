@@ -576,11 +576,11 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
-              <div className="min-h-[300px] border border-gray-300 rounded-md bg-white">
+              <div className="border border-gray-300 rounded-md bg-white">
                 <TextEditor
                   content={currentGuideline.content || ""}
                   setContent={handleEditorContentChange}
-                  height="400px"
+                  height="200px"
                 />
               </div>
             </div>
