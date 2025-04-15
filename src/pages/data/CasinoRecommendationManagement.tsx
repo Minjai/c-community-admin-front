@@ -250,14 +250,33 @@ const CasinoRecommendationManagement = () => {
     setSelectedGames(currentSelectedGames.map((g) => g.title));
     setSelectedGameIds(currentSelectedGames.map((g) => g.id));
 
-    setStartDate(
-      recommendation.startDate
-        ? new Date(recommendation.startDate).toISOString().substring(0, 16)
-        : ""
-    );
-    setEndDate(
-      recommendation.endDate ? new Date(recommendation.endDate).toISOString().substring(0, 16) : ""
-    );
+    // Helper function to format date string for datetime-local input
+    const formatForInput = (dateString: string | null | undefined): string => {
+      if (!dateString) return "";
+      try {
+        const date = new Date(dateString); // Parse the date string (likely ISO/UTC from server)
+        if (isNaN(date.getTime())) {
+          console.warn("Received invalid date string for input formatting:", dateString);
+          return "";
+        }
+        // Get local time components
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, "0");
+        const day = date.getDate().toString().padStart(2, "0");
+        const hours = date.getHours().toString().padStart(2, "0");
+        const minutes = date.getMinutes().toString().padStart(2, "0");
+        // Format as YYYY-MM-DDTHH:mm
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+      } catch (e) {
+        console.error("Error formatting date string for input:", dateString, e);
+        return "";
+      }
+    };
+
+    // Use the helper function to set the state
+    setStartDate(formatForInput(recommendation.startDate));
+    setEndDate(formatForInput(recommendation.endDate));
+
     setPublicSettings(recommendation.isPublic === 1 ? "public" : "private");
     setError(null);
     setSaving(false);
