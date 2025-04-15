@@ -34,10 +34,11 @@ interface CasinoGame {
 interface UpsertCasinoRecommendationPayload {
   title: string;
   isMainDisplay: boolean;
-  selectedGameIds: number[];
+  gameIds: number[];
   startDate: string; // ISO String
   endDate: string; // ISO String
   isPublic: boolean;
+  displayOrder?: number;
 }
 
 const CasinoRecommendationManagement = () => {
@@ -281,58 +282,57 @@ const CasinoRecommendationManagement = () => {
     }
   };
 
-  // 게임 추천 순서 위로 이동
+  // 게임 추천 순서 위로 이동 (기존 로직 재활용 및 수정)
   const handleMoveUp = async (index: number) => {
-    if (index <= 0) return; // 이미 첫 번째 항목이면 이동하지 않음
+    if (index <= 0) return;
 
     try {
       const recommendationToMove = recommendations[index];
       const recommendationAbove = recommendations[index - 1];
 
-      // 위치 교환
-      const newDisplayOrder = recommendationAbove.position; // position 값을 가져옴
-      const oldDisplayOrder = recommendationToMove.position; // position 값을 가져옴
+      // position 값 교환 (API는 displayOrder 필드를 기대할 수 있음 - 확인 필요)
+      const newDisplayOrder = recommendationAbove.position; // 기존 position 값 사용
+      const oldDisplayOrder = recommendationToMove.position;
 
-      // API 요청시 displayOrder 필드로 전송
-      await axios.patch(`/casino-recommends/${recommendationToMove.id}`, {
+      // 서버 API 엔드포인트 및 필드명 확인 필요
+      await axios.put(`/casino-recommends/${recommendationToMove.id}`, {
         displayOrder: newDisplayOrder,
       });
-      await axios.patch(`/casino-recommends/${recommendationAbove.id}`, {
+      await axios.put(`/casino-recommends/${recommendationAbove.id}`, {
         displayOrder: oldDisplayOrder,
       });
 
       setAlertMessage({ type: "success", message: "게임 추천 순서가 변경되었습니다." });
-      fetchRecommendations(); // 목록 새로고침
+      fetchRecommendations();
     } catch (err: any) {
-      console.error("게임 추천 순서 변경 오류:", err);
+      console.error("게임 추천 순서 변경 오류 (위로):", err);
       setAlertMessage({ type: "error", message: "게임 추천 순서 변경 중 오류가 발생했습니다." });
     }
   };
 
-  // 게임 추천 순서 아래로 이동
+  // 게임 추천 순서 아래로 이동 (기존 로직 재활용 및 수정)
   const handleMoveDown = async (index: number) => {
-    if (index >= recommendations.length - 1) return; // 이미 마지막 항목이면 이동하지 않음
+    if (index >= recommendations.length - 1) return;
 
     try {
       const recommendationToMove = recommendations[index];
       const recommendationBelow = recommendations[index + 1];
 
-      // 위치 교환
-      const newDisplayOrder = recommendationBelow.position; // position 값을 가져옴
-      const oldDisplayOrder = recommendationToMove.position; // position 값을 가져옴
+      const newDisplayOrder = recommendationBelow.position;
+      const oldDisplayOrder = recommendationToMove.position;
 
-      // API 요청시 displayOrder 필드로 전송
-      await axios.patch(`/casino-recommends/${recommendationToMove.id}`, {
+      // 서버 API 엔드포인트 및 필드명 확인 필요
+      await axios.put(`/casino-recommends/${recommendationToMove.id}`, {
         displayOrder: newDisplayOrder,
       });
-      await axios.patch(`/casino-recommends/${recommendationBelow.id}`, {
+      await axios.put(`/casino-recommends/${recommendationBelow.id}`, {
         displayOrder: oldDisplayOrder,
       });
 
       setAlertMessage({ type: "success", message: "게임 추천 순서가 변경되었습니다." });
-      fetchRecommendations(); // 목록 새로고침
+      fetchRecommendations();
     } catch (err: any) {
-      console.error("게임 추천 순서 변경 오류:", err);
+      console.error("게임 추천 순서 변경 오류 (아래로):", err);
       setAlertMessage({ type: "error", message: "게임 추천 순서 변경 중 오류가 발생했습니다." });
     }
   };
@@ -388,6 +388,13 @@ const CasinoRecommendationManagement = () => {
     setAlertMessage(null);
 
     try {
+      // 새 항목의 displayOrder 계산 (기존 항목들의 position 값 기반)
+      const newDisplayOrder = isEditing
+        ? recommendations.find((rec) => rec.id === currentRecommendationId)?.position // 수정 시 기존 position 유지 또는 필요시 업데이트 로직 추가
+        : recommendations.length > 0
+        ? Math.max(...recommendations.map((rec) => rec.position || 0)) + 1
+        : 1;
+
       const payload = {
         title,
         isMainDisplay,
@@ -395,13 +402,17 @@ const CasinoRecommendationManagement = () => {
         startDate: new Date(startDate).toISOString(),
         endDate: new Date(endDate).toISOString(),
         isPublic: publicSettings === "public",
+        displayOrder: newDisplayOrder, // displayOrder 포함
       };
 
       if (isEditing && currentRecommendationId !== null) {
-        await axios.put(`/casino-recommends/${currentRecommendationId}`, payload);
+        // 수정 시 payload에서 displayOrder 제외 필요 여부 확인 (순서 변경은 별도 API 사용)
+        const updatePayload = { ...payload };
+        // delete updatePayload.displayOrder; // 순서 변경 로직과 분리 시 주석 해제
+        await axios.put(`/casino-recommends/${currentRecommendationId}`, updatePayload);
         setAlertMessage({ type: "success", message: "게임 추천이 성공적으로 수정되었습니다." });
       } else {
-        await axios.post("/casino-recommends", { ...payload, gameIds: selectedGameIds });
+        await axios.post("/casino-recommends", payload); // 생성 시 displayOrder 포함
         setAlertMessage({ type: "success", message: "새 게임 추천이 성공적으로 등록되었습니다." });
       }
       fetchRecommendations();
@@ -415,7 +426,7 @@ const CasinoRecommendationManagement = () => {
     }
   };
 
-  // DataTable 컬럼 정의
+  // DataTable 컬럼 정의 - '관리' 컬럼 수정
   const columns = [
     {
       header: "타이틀",
@@ -491,19 +502,37 @@ const CasinoRecommendationManagement = () => {
     {
       header: "관리",
       accessor: "id" as keyof CasinoRecommendation,
-      cell: (value: number, row: CasinoRecommendation) => (
-        <div className="flex items-center space-x-2">
+      cell: (value: number, row: CasinoRecommendation, index: number) => (
+        <div className="flex items-center space-x-1">
+          {/* 위로 버튼 */}
+          <ActionButton
+            label="위로"
+            onClick={() => handleMoveUp(index)}
+            action="up"
+            size="sm"
+            disabled={index === 0}
+          />
+          {/* 아래로 버튼 */}
+          <ActionButton
+            label="아래로"
+            onClick={() => handleMoveDown(index)}
+            action="down"
+            size="sm"
+            disabled={index === recommendations.length - 1}
+          />
+          {/* 수정 버튼 */}
           <ActionButton
             label="수정"
             onClick={() => handleOpenEditModal(row)}
-            color="blue"
             action="edit"
+            size="sm"
           />
+          {/* 삭제 버튼 */}
           <ActionButton
             label="삭제"
             onClick={() => handleDeleteRecommendation(value)}
-            color="red"
             action="delete"
+            size="sm"
           />
         </div>
       ),

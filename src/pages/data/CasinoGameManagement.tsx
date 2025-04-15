@@ -477,32 +477,21 @@ const CasinoGameManagement = () => {
           </div>
         </div>
 
-        <Input
-          label="게임 제목"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-          disabled={saving}
-        />
-
-        <Input
-          label="게임 설명"
-          type="textarea"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          disabled={saving}
-        />
-
         <FileUpload
           label="썸네일"
           onChange={handleThumbnailUpload}
           preview={true}
           value={thumbnailPreview || undefined}
-          helperText="권장 크기: 600x400px, 최대 2MB"
+          helperText="권장 크기: 150x200px, 최대 2MB"
           accept="image/jpeg, image/png"
           required={!isEditing}
           disabled={saving}
         />
+
+        <div>
+          <label className="label">게임 설명</label>
+          <TextEditor content={description} setContent={setDescription} height="200px" />
+        </div>
 
         <div>
           <label className="label">별점 (0-5)</label>
