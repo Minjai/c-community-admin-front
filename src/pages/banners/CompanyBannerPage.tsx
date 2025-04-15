@@ -394,6 +394,11 @@ const CompanyBannerPage: React.FC = () => {
     {
       header: "제목",
       accessor: "title" as keyof Banner,
+      cell: (value: string) => (
+        <div className="max-w-xs truncate" title={value}>
+          {value}
+        </div>
+      ),
     },
     // 2. PC 이미지
     {

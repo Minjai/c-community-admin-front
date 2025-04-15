@@ -411,7 +411,15 @@ const MiniBannerPage: React.FC = () => {
 
   // 테이블 컬럼 정의
   const columns = [
-    { header: "제목", accessor: "title" as keyof Banner },
+    {
+      header: "제목",
+      accessor: "title" as keyof Banner,
+      cell: (value: string) => (
+        <div className="max-w-xs truncate" title={value}>
+          {value}
+        </div>
+      ),
+    },
     {
       header: "이미지",
       accessor: "pUrl" as keyof Banner,

@@ -237,32 +237,9 @@ const CasinoRecommendationManagement = () => {
     setSelectedGames(currentSelectedGames.map((g) => g.title));
     setSelectedGameIds(currentSelectedGames.map((g) => g.id));
 
-    // Helper function to format date string for datetime-local input
-    const formatForInput = (dateString: string | null | undefined): string => {
-      if (!dateString) return "";
-      try {
-        const date = new Date(dateString); // Parse the date string (likely ISO/UTC from server)
-        if (isNaN(date.getTime())) {
-          console.warn("Received invalid date string for input formatting:", dateString);
-          return "";
-        }
-        // Get local time components
-        const year = date.getFullYear();
-        const month = (date.getMonth() + 1).toString().padStart(2, "0");
-        const day = date.getDate().toString().padStart(2, "0");
-        const hours = date.getHours().toString().padStart(2, "0");
-        const minutes = date.getMinutes().toString().padStart(2, "0");
-        // Format as YYYY-MM-DDTHH:mm
-        return `${year}-${month}-${day}T${hours}:${minutes}`;
-      } catch (e) {
-        console.error("Error formatting date string for input:", dateString, e);
-        return "";
-      }
-    };
-
-    // Use the helper function to set the state
-    setStartDate(formatForInput(recommendation.startDate));
-    setEndDate(formatForInput(recommendation.endDate));
+    // Convert UTC ISO from server to local datetime-local for input
+    setStartDate(formatISODateToDateTimeLocal(recommendation.startDate));
+    setEndDate(formatISODateToDateTimeLocal(recommendation.endDate));
 
     setPublicSettings(recommendation.isPublic === 1 ? "public" : "private");
     setError(null);
@@ -390,6 +367,7 @@ const CasinoRecommendationManagement = () => {
 
     setSaving(true);
     setAlertMessage(null);
+    setError(null);
 
     try {
       // 새 항목의 displayOrder 계산 (기존 항목들의 position 값 기반)
@@ -399,24 +377,22 @@ const CasinoRecommendationManagement = () => {
         ? Math.max(...recommendations.map((rec) => rec.position || 0)) + 1
         : 1;
 
-      const payload = {
+      // Convert local datetime-local input strings to UTC ISO strings for saving
+      const payload: UpsertCasinoRecommendationPayload = {
         title,
         isMainDisplay,
         gameIds: selectedGameIds,
-        startDate: new Date(startDate).toISOString(),
-        endDate: new Date(endDate).toISOString(),
+        startDate: convertDateTimeLocalToISOUTC(startDate),
+        endDate: convertDateTimeLocalToISOUTC(endDate),
         isPublic: publicSettings === "public",
-        displayOrder: newDisplayOrder, // displayOrder 포함
+        displayOrder: newDisplayOrder,
       };
 
       if (isEditing && currentRecommendationId !== null) {
-        // 수정 시 payload에서 displayOrder 제외 필요 여부 확인 (순서 변경은 별도 API 사용)
-        const updatePayload = { ...payload };
-        // delete updatePayload.displayOrder; // 순서 변경 로직과 분리 시 주석 해제
-        await axios.put(`/casino-recommends/${currentRecommendationId}`, updatePayload);
+        await axios.put(`/casino-recommends/${currentRecommendationId}`, payload);
         setAlertMessage({ type: "success", message: "게임 추천이 성공적으로 수정되었습니다." });
       } else {
-        await axios.post("/casino-recommends", payload); // 생성 시 displayOrder 포함
+        await axios.post("/casino-recommends", payload);
         setAlertMessage({ type: "success", message: "새 게임 추천이 성공적으로 등록되었습니다." });
       }
       fetchRecommendations();
@@ -433,6 +409,11 @@ const CasinoRecommendationManagement = () => {
     {
       header: "타이틀",
       accessor: "title" as keyof CasinoRecommendation,
+      cell: (value: string) => (
+        <div className="max-w-xs truncate" title={value}>
+          {value}
+        </div>
+      ),
     },
     {
       header: "메인 노출",
@@ -463,12 +444,12 @@ const CasinoRecommendationManagement = () => {
     {
       header: "시작일자",
       accessor: "startDate" as keyof CasinoRecommendation,
-      cell: (value: string) => formatDate(value),
+      cell: (value: string) => formatDateForDisplay(value),
     },
     {
       header: "종료일자",
       accessor: "endDate" as keyof CasinoRecommendation,
-      cell: (value: string) => formatDate(value),
+      cell: (value: string) => formatDateForDisplay(value),
     },
     {
       header: "공개 여부",

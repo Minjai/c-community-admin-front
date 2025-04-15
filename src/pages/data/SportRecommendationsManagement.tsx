@@ -14,10 +14,9 @@ import ActionButton from "@/components/ActionButton";
 import Modal from "@/components/Modal";
 import Alert from "@/components/Alert";
 import {
-  formatDate,
+  formatDateForDisplay,
   formatISODateToDateTimeLocal,
   convertDateTimeLocalToISOUTC,
-  formatDateForDisplay,
 } from "@/utils/dateUtils";
 
 // 스포츠 종목 추천 관리 컴포넌트
@@ -335,14 +334,11 @@ export default function SportRecommendationsManagement() {
     setSuccess(null);
 
     try {
-      // Convert local datetime-local input strings to UTC ISO strings for saving
       const payload = {
         ...formData,
         startTime: convertDateTimeLocalToISOUTC(formData.startTime),
         endTime: convertDateTimeLocalToISOUTC(formData.endTime),
       };
-
-      console.log("Saving Sport Recommendation Payload:", payload);
 
       let result;
       if (modalType === "add") {
@@ -508,6 +504,11 @@ export default function SportRecommendationsManagement() {
     {
       header: "제목",
       accessor: "title" as keyof SportRecommendation,
+      cell: (value: string) => (
+        <div className="max-w-xs truncate" title={value}>
+          {value}
+        </div>
+      ),
     },
     {
       header: "등록 경기",
@@ -792,7 +793,7 @@ export default function SportRecommendationsManagement() {
                             {game.homeTeam} vs {game.awayTeam}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {game.league} ({game.sport}) | {formatDate(game.dateTime)}
+                            {game.league} ({game.sport}) | {formatDateForDisplay(game.dateTime)}
                           </div>
                         </div>
                       </div>
