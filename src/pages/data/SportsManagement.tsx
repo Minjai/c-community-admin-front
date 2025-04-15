@@ -183,19 +183,20 @@ export default function SportsManagement() {
 
     setLoading(true);
     setError(null);
+    setSuccess(null); // Clear previous success message
 
     try {
-      const success = await deleteSportCategory(id);
+      // API Call
+      await deleteSportCategory(id);
 
-      if (success) {
-        setSuccess("스포츠 카테고리가 삭제되었습니다.");
-        // 삭제 후 목록 다시 불러오기
-        fetchSportCategories();
-      } else {
-        setError("크롤링된 스포츠 종목은 삭제할 수 없습니다.");
-      }
+      // If the above line doesn't throw an error, assume success
+      setSuccess("스포츠 카테고리가 삭제되었습니다.");
+      fetchSportCategories(); // Reload list after successful deletion
     } catch (err) {
-      setError("크롤링된 스포츠 종목은 삭제할 수 없습니다.");
+      // Set a more generic error or try to extract from the error object
+      const apiError =
+        (err as any)?.response?.data?.message || "스포츠 카테고리 삭제 중 오류가 발생했습니다.";
+      setError(apiError);
       console.error("Error deleting sport category:", err);
     } finally {
       setLoading(false);
