@@ -13,7 +13,12 @@ import Button from "@/components/Button";
 import ActionButton from "@/components/ActionButton";
 import Modal from "@/components/Modal";
 import Alert from "@/components/Alert";
-import { formatDate } from "@/utils/dateUtils";
+import {
+  formatDate,
+  formatISODateToDateTimeLocal,
+  convertDateTimeLocalToISOUTC,
+  formatDateForDisplay,
+} from "@/utils/dateUtils";
 
 // 스포츠 종목 추천 관리 컴포넌트
 export default function SportRecommendationsManagement() {
@@ -139,7 +144,13 @@ export default function SportRecommendationsManagement() {
     console.log("Filtering games with query:", query);
     console.log("Total games before filter:", games.length);
 
-    const normalizedQuery = query.toLowerCase();
+    const normalizedQuery = query.toLowerCase().trim();
+
+    // 검색어가 비어있으면 모든 게임 반환
+    if (!normalizedQuery) {
+      setFilteredGames(games);
+      return;
+    }
 
     // 검색어에 해당하는 다른 언어 키워드 가져오기
     let alternativeTerms: string[] = [];
@@ -157,15 +168,21 @@ export default function SportRecommendationsManagement() {
     const allSearchTerms = [normalizedQuery, ...alternativeTerms];
     console.log("Searching for terms:", allSearchTerms);
 
-    // 내용 검색 대신 모든 필드에서 포괄적 검색
+    // 게임 필터링 - 여러 필드에서 검색
     const filtered = games.filter((game) => {
       if (!game) return false;
 
-      // 게임 객체를 JSON 문자열로 변환하여 검색
-      const gameStr = JSON.stringify(game).toLowerCase();
+      // 검색 대상 필드들
+      const searchableFields = [
+        game.matchName,
+        game.homeTeam,
+        game.awayTeam,
+        game.league,
+        game.sport,
+      ].map((field) => (field || "").toLowerCase());
 
-      // 검색어가 JSON 문자열 내에 포함되어 있는지 확인
-      return allSearchTerms.some((term) => gameStr.includes(term));
+      // 검색어가 어떤 필드에도 포함되어 있는지 확인
+      return allSearchTerms.some((term) => searchableFields.some((field) => field.includes(term)));
     });
 
     console.log("Filtered games count:", filtered.length);
@@ -225,97 +242,39 @@ export default function SportRecommendationsManagement() {
     setModalType("edit");
     setCurrentRecommendation(recommendation);
 
-    // ISO 형식의 날짜를 input datetime-local 형식으로 변환
-    const formatDateForInput = (dateString: string) => {
-      if (!dateString) return "";
-      const date = new Date(dateString);
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, "0");
-      const day = String(date.getDate()).padStart(2, "0");
-      const hours = String(date.getHours()).padStart(2, "0");
-      const minutes = String(date.getMinutes()).padStart(2, "0");
-      return `${year}-${month}-${day}T${hours}:${minutes}`;
-    };
-
     try {
-      // 상세 정보 가져오기
       const detailData = await getSportRecommendationById(recommendation.id);
-
-      // 서버에서 반환된 games 배열 사용
-      if (detailData.games && Array.isArray(detailData.games)) {
-        setSelectedGames(detailData.games);
-
-        // 게임 ID 배열 생성
-        const gameIds = detailData.games.map((game: SportGame) => game.id);
-
-        setFormData({
-          title: detailData.title || "",
-          sportGameIds: gameIds,
-          startTime: formatDateForInput(detailData.startTime),
-          endTime: formatDateForInput(detailData.endTime),
-          isPublic:
-            typeof detailData.isPublic === "boolean"
-              ? detailData.isPublic
-                ? 1
-                : 0
-              : detailData.isPublic === 1
-              ? 1
-              : 0,
-          displayOrder: detailData.displayOrder || 0,
-        });
-      } else {
-        // 서버에서 games 배열이 없는 경우, 기존 방식 사용
-        const gameIds =
-          detailData.sportGameIds || (detailData.sportGameId ? [detailData.sportGameId] : []);
-        const games = sportGames.filter((g) => gameIds.includes(g.id));
-        setSelectedGames(games);
-
-        setFormData({
-          title: detailData.title || "",
-          sportGameIds: gameIds,
-          startTime: formatDateForInput(detailData.startTime),
-          endTime: formatDateForInput(detailData.endTime),
-          isPublic:
-            typeof detailData.isPublic === "boolean"
-              ? detailData.isPublic
-                ? 1
-                : 0
-              : detailData.isPublic === 1
-              ? 1
-              : 0,
-          displayOrder: detailData.displayOrder || 0,
-        });
-      }
-    } catch (err) {
-      console.error("Error loading recommendation details:", err);
-      setError("추천 상세 정보를 불러오는데 실패했습니다.");
-      // Fallback to using the initial recommendation data if detail fetch fails
-      const gameIds =
-        recommendation.sportGameIds ||
-        (recommendation.sportGameId ? [recommendation.sportGameId] : []);
-      const games = sportGames.filter((g) => gameIds.includes(g.id));
+      const gameIds = detailData.games ? detailData.games.map((game: SportGame) => game.id) : [];
+      const games = detailData.games || [];
       setSelectedGames(games);
 
       setFormData({
+        title: detailData.title || "",
+        sportGameIds: gameIds,
+        startTime: formatISODateToDateTimeLocal(detailData.startTime),
+        endTime: formatISODateToDateTimeLocal(detailData.endTime),
+        isPublic: detailData.isPublic === 1 ? 1 : 0,
+        displayOrder: detailData.displayOrder || 0,
+      });
+    } catch (err) {
+      console.error("Error loading recommendation details:", err);
+      setError("추천 상세 정보를 불러오는데 실패했습니다.");
+      // Fallback
+      const gameIds =
+        recommendation.sportGameIds ||
+        (recommendation.sportGameId ? [recommendation.sportGameId] : []);
+      setSelectedGames(sportGames.filter((g) => gameIds.includes(g.id)));
+      setFormData({
         title: recommendation.title || "",
         sportGameIds: gameIds,
-        startTime: formatDateForInput(recommendation.startTime),
-        endTime: formatDateForInput(recommendation.endTime),
-        // Ensure the comparison handles boolean or number correctly -> 1 or 0
-        isPublic:
-          typeof recommendation.isPublic === "boolean"
-            ? recommendation.isPublic
-              ? 1
-              : 0
-            : recommendation.isPublic === 1
-            ? 1
-            : 0,
+        startTime: formatISODateToDateTimeLocal(recommendation.startTime),
+        endTime: formatISODateToDateTimeLocal(recommendation.endTime),
+        isPublic: recommendation.isPublic === 1 ? 1 : 0,
         displayOrder: recommendation.displayOrder || 0,
       });
     } finally {
       setLoading(false);
     }
-
     setShowModal(true);
   };
 
@@ -376,24 +335,21 @@ export default function SportRecommendationsManagement() {
     setSuccess(null);
 
     try {
-      // 주의: 서버 API가 단일 sportGameId만 지원하는 경우 아래 주석 부분으로 변경해야 합니다.
-      // 현재는 sportGameIds 배열을 전달하는 형태로 구현되어 있습니다.
-
-      /*
-      // 서버가 단일 ID만 지원하는 경우
-      const firstGameId = formData.sportGameIds[0] || 0;
-      const dataToSend = {
+      // Convert local datetime-local input strings to UTC ISO strings for saving
+      const payload = {
         ...formData,
-        sportGameId: firstGameId
+        startTime: convertDateTimeLocalToISOUTC(formData.startTime),
+        endTime: convertDateTimeLocalToISOUTC(formData.endTime),
       };
-      */
+
+      console.log("Saving Sport Recommendation Payload:", payload);
 
       let result;
       if (modalType === "add") {
-        result = await createSportRecommendation(formData);
+        result = await createSportRecommendation(payload);
         setSuccess("새 스포츠 종목 추천이 등록되었습니다.");
       } else if (currentRecommendation) {
-        result = await updateSportRecommendation(currentRecommendation.id, formData);
+        result = await updateSportRecommendation(currentRecommendation.id, payload);
         setSuccess("스포츠 종목 추천이 수정되었습니다.");
       }
 
@@ -401,7 +357,9 @@ export default function SportRecommendationsManagement() {
       fetchRecommendations();
     } catch (err) {
       console.error("Error saving sport recommendation:", err);
-      setError("스포츠 종목 추천 저장 중 오류가 발생했습니다.");
+      const apiError =
+        (err as any)?.response?.data?.message || "스포츠 종목 추천 저장 중 오류가 발생했습니다.";
+      setError(apiError);
     } finally {
       setLoading(false);
     }
@@ -565,7 +523,7 @@ export default function SportRecommendationsManagement() {
       header: "기간",
       accessor: (item: SportRecommendation): ReactNode => (
         <span>
-          {formatDate(item.startTime)} ~ {formatDate(item.endTime)}
+          {formatDateForDisplay(item.startTime)} ~ {formatDateForDisplay(item.endTime)}
         </span>
       ),
     },

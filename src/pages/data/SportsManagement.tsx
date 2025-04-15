@@ -170,11 +170,11 @@ export default function SportsManagement() {
     setCurrentCategory(category);
     setFormData({
       sportName: getKoreanSportName(category.sportName),
-      displayName: category.displayName || "",
+      displayName: getKoreanSportName(category.sportName),
       icon: category.icon || "",
       isPublic: category.isPublic,
     });
-    setSelectedSport(category.sportName);
+    setSelectedSport(getKoreanSportName(category.sportName));
     setShowModal(true);
   };
 
@@ -192,10 +192,10 @@ export default function SportsManagement() {
         // 삭제 후 목록 다시 불러오기
         fetchSportCategories();
       } else {
-        setError("스포츠 카테고리 삭제에 실패했습니다.");
+        setError("크롤링된 스포츠 종목은 삭제할 수 없습니다.");
       }
     } catch (err) {
-      setError("스포츠 카테고리 삭제에 실패했습니다.");
+      setError("크롤링된 스포츠 종목은 삭제할 수 없습니다.");
       console.error("Error deleting sport category:", err);
     } finally {
       setLoading(false);
@@ -204,8 +204,7 @@ export default function SportsManagement() {
 
   const handleSaveCategory = async () => {
     if (!selectedSport) {
-      // setError("종목 경기를 선택해주세요.");
-      setError("종목 경기를 선택해주세요."); // Maintain setError for immediate feedback in modal
+      setError("종목 경기를 선택해주세요.");
       return;
     }
 
@@ -218,6 +217,7 @@ export default function SportsManagement() {
         await createSportCategory({
           ...formData,
           sportName: getEnglishSportCode(selectedSport),
+          displayName: selectedSport,
           displayOrder:
             categories.length > 0 ? Math.max(...categories.map((c) => c.displayOrder)) + 1 : 1,
         });
@@ -230,6 +230,7 @@ export default function SportsManagement() {
         await updateSportCategory(currentCategory.id, {
           ...formData,
           sportName: getEnglishSportCode(selectedSport),
+          displayName: selectedSport,
         });
 
         setSuccess("스포츠 카테고리가 업데이트되었습니다.");
@@ -238,8 +239,9 @@ export default function SportsManagement() {
         fetchSportCategories();
       }
     } catch (err) {
-      // setError(modalType === "add" ? "카테고리 추가 실패" : "카테고리 수정 실패");
-      setError(modalType === "add" ? "카테고리 추가 실패" : "카테고리 수정 실패"); // Maintain setError for immediate feedback in modal
+      setError(
+        modalType === "add" ? "카테고리 추가에 실패했습니다." : "카테고리 수정에 실패했습니다."
+      );
       console.error("Error saving sport category:", err);
     } finally {
       setLoading(false);

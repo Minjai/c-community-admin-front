@@ -591,7 +591,7 @@ const BottomBannerPage: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FileUpload
-                label="PC 이미지 (권장 크기: 1920x400)"
+                label="PC 이미지 (권장 크기: 260x260)"
                 name="pUrl"
                 id="pUrl"
                 onChange={(file) => {
@@ -611,7 +611,7 @@ const BottomBannerPage: React.FC = () => {
               />
 
               <FileUpload
-                label="모바일 이미지 (권장 크기: 640x400)"
+                label="모바일 이미지 (권장 크기: 260x260)"
                 name="mUrl"
                 id="mUrl"
                 onChange={(file) => {

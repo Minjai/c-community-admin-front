@@ -388,9 +388,14 @@ const CompanyBannerPage: React.FC = () => {
     setMobileImageFile(null);
   };
 
-  // 테이블 컬럼 정의
+  // 데이터 테이블 컬럼 정의
   const columns = [
-    { header: "제목", accessor: "title" as keyof Banner },
+    // 1. 제목
+    {
+      header: "제목",
+      accessor: "title" as keyof Banner,
+    },
+    // 2. PC 이미지
     {
       header: "이미지",
       accessor: "pUrl" as keyof Banner,
@@ -404,6 +409,7 @@ const CompanyBannerPage: React.FC = () => {
         </div>
       ),
     },
+    // 3. 모바일 이미지
     {
       header: "모바일 이미지",
       accessor: "mUrl" as keyof Banner,
@@ -417,67 +423,89 @@ const CompanyBannerPage: React.FC = () => {
         </div>
       ),
     },
+    // 4. 시작일자
     {
-      header: "링크 URL",
-      accessor: "linkUrl" as keyof Banner,
-    },
-    {
-      header: "링크 URL2",
-      accessor: "linkUrl2" as keyof Banner,
-    },
-    {
-      header: "시작일",
+      header: "시작일자",
       accessor: "startDate" as keyof Banner,
       cell: (value: string) => formatDate(value),
     },
+    // 5. 종료일자
     {
-      header: "종료일",
+      header: "종료일자",
       accessor: "endDate" as keyof Banner,
       cell: (value: string) => formatDate(value),
     },
+    // 6. 공개 여부
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof Banner,
-      cell: (value: number) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}
-        >
-          {value === 1 ? "공개" : "비공개"}
-        </span>
-      ),
+      cell: (value: number | boolean, row: Banner) => {
+        const isCurrentlyPublic = value === 1 || value === true;
+
+        if (!isCurrentlyPublic) {
+          return (
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              비공개
+            </span>
+          );
+        }
+
+        const now = new Date();
+        const startTime = row.startDate ? new Date(row.startDate) : null;
+        const endTime = row.endDate ? new Date(row.endDate) : null;
+        let status = "공개";
+        let colorClass = "bg-green-100 text-green-800";
+
+        if (startTime && now < startTime) {
+          status = "공개 전";
+          colorClass = "bg-gray-100 text-gray-800";
+        } else if (endTime && now > endTime) {
+          status = "공개 종료";
+          colorClass = "bg-gray-100 text-gray-800";
+        }
+
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+            {status}
+          </span>
+        );
+      },
     },
+    // 7. 관리
     {
       header: "관리",
       accessor: "id" as keyof Banner,
-      cell: (value: number, row: Banner, index: number) => (
+      cell: (id: number, row: Banner, index: number) => (
         <div className="flex space-x-2">
+          {/* 위로 이동 버튼 */}
           <ActionButton
+            label="위로"
+            action="up"
+            size="sm"
             onClick={() => handleMoveUp(index)}
             disabled={index === 0}
-            action="up"
-            label="위로"
-            size="sm"
           />
+          {/* 아래로 이동 버튼 */}
           <ActionButton
+            label="아래로"
+            action="down"
+            size="sm"
             onClick={() => handleMoveDown(index)}
             disabled={index === banners.length - 1}
-            action="down"
-            label="아래로"
-            size="sm"
           />
+          {/* 수정 버튼 */}
           <ActionButton
-            onClick={() => handleEditBanner(row)}
-            action="edit"
             label="수정"
+            action="edit"
             size="sm"
+            onClick={() => handleEditBanner(row)}
           />
+          {/* 삭제 버튼 */}
           <ActionButton
-            onClick={() => handleDeleteBanner(value)}
-            action="delete"
             label="삭제"
+            action="delete"
             size="sm"
+            onClick={() => handleDeleteBanner(row.id)}
           />
         </div>
       ),
@@ -497,12 +525,14 @@ const CompanyBannerPage: React.FC = () => {
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
-      <DataTable
-        columns={columns}
-        data={banners}
-        loading={loading}
-        emptyMessage="등록된 배너가 없습니다."
-      />
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={banners}
+          loading={loading}
+          emptyMessage="등록된 배너가 없습니다."
+        />
+      </div>
 
       {/* 배너 추가/수정 모달 */}
       {currentBanner && (
@@ -553,7 +583,7 @@ const CompanyBannerPage: React.FC = () => {
           </div>
 
           <div className="space-y-4">
-            {/* Form fields below */}
+            {/* Title */}
             <Input
               label="배너 제목"
               name="title"
@@ -563,9 +593,10 @@ const CompanyBannerPage: React.FC = () => {
               disabled={isSaving}
             />
 
+            {/* PC and Mobile Images */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FileUpload
-                label="PC 이미지 (권장 크기: 1920x400)"
+                label="PC 이미지 (권장 크기: 280x90)"
                 name="pUrl"
                 id="pUrl"
                 onChange={(file) => {
@@ -586,7 +617,7 @@ const CompanyBannerPage: React.FC = () => {
               />
 
               <FileUpload
-                label="모바일 이미지 (권장 크기: 640x400)"
+                label="모바일 이미지 (권장 크기: 370x150)"
                 name="mUrl"
                 id="mUrl"
                 onChange={(file) => {
@@ -607,21 +638,27 @@ const CompanyBannerPage: React.FC = () => {
               />
             </div>
 
-            <Input
-              label="링크 URL"
-              name="linkUrl"
-              value={currentBanner.linkUrl || ""}
-              onChange={(e) => setCurrentBanner({ ...currentBanner, linkUrl: e.target.value })}
-              disabled={isSaving}
-            />
-            <Input
-              label="링크 URL2"
-              name="linkUrl2"
-              value={currentBanner.linkUrl2 || ""}
-              onChange={(e) => setCurrentBanner({ ...currentBanner, linkUrl2: e.target.value })}
-              disabled={isSaving}
-            />
+            {/* Link URLs - Placed side-by-side in a grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="링크 URL"
+                name="linkUrl"
+                value={currentBanner.linkUrl || ""}
+                onChange={(e) => setCurrentBanner({ ...currentBanner, linkUrl: e.target.value })}
+                placeholder="https://example.com"
+                disabled={isSaving}
+              />
+              <Input
+                label="링크 URL2"
+                name="linkUrl2"
+                value={currentBanner.linkUrl2 || ""}
+                onChange={(e) => setCurrentBanner({ ...currentBanner, linkUrl2: e.target.value })}
+                placeholder="https://example2.com"
+                disabled={isSaving}
+              />
+            </div>
 
+            {/* Start and End Dates */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <DatePicker
                 label="시작일"

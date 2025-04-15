@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, ReactNode } from "react";
 import axios from "@/api/axios";
 import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
@@ -6,7 +6,12 @@ import ActionButton from "@/components/ActionButton";
 import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
-import { formatDate } from "@/utils/dateUtils";
+import {
+  formatDate,
+  formatDateForDisplay,
+  formatISODateToDateTimeLocal,
+  convertDateTimeLocalToISOUTC,
+} from "@/utils/dateUtils";
 import { extractDataArray } from "../../api/util";
 
 // 카지노 게임 추천 타입 정의
@@ -83,18 +88,10 @@ const CasinoRecommendationManagement = () => {
   const fetchRecommendations = async () => {
     setLoading(true);
     setError(null);
-
     try {
-      // API 호출
       const response = await axios.get("/casino-recommends");
-      console.log("카지노 추천 응답 구조:", response);
-
-      // 유틸리티 함수를 사용하여 데이터 배열 추출
       const recommendationData = extractDataArray(response.data, true);
-
       if (recommendationData && recommendationData.length > 0) {
-        console.log("추출된 추천 데이터:", recommendationData);
-
         // 서버 응답을 컴포넌트에서 사용하는 형식으로 변환
         const transformedRecommendations = recommendationData.map((item: any) => {
           // 각 게임의 제목 추출 - 서로 다른 구조 처리
@@ -150,11 +147,9 @@ const CasinoRecommendationManagement = () => {
 
         setRecommendations(sortedRecommendations);
       } else {
-        console.log("적절한 추천 데이터를 찾지 못했습니다.");
         setRecommendations([]);
       }
     } catch (err: any) {
-      console.error("게임 추천 목록 조회 오류:", err);
       setError("게임 추천 목록을 불러오는데 실패했습니다.");
       setRecommendations([]);
     } finally {
@@ -166,14 +161,8 @@ const CasinoRecommendationManagement = () => {
   const fetchAvailableGames = async () => {
     try {
       const response = await axios.get("/casino");
-      console.log("사용 가능한 게임 응답 구조:", response);
-
-      // 유틸리티 함수를 사용하여 데이터 배열 추출
       const gameData = extractDataArray(response.data, true);
-
       if (gameData && gameData.length > 0) {
-        console.log("추출된 사용 가능한 게임 데이터:", gameData);
-
         // 필드 매핑 및 처리
         const processedGames = gameData.map((game: any) => ({
           id: game.id,
@@ -185,13 +174,11 @@ const CasinoRecommendationManagement = () => {
         setAvailableGames(processedGames);
         setFilteredGames(processedGames);
       } else {
-        console.log("적절한 게임 데이터를 찾지 못했습니다.");
         setAvailableGames([]);
         setFilteredGames([]);
         setError("게임 목록을 불러오는데 실패했습니다.");
       }
     } catch (err: any) {
-      console.error("Error fetching available games:", err);
       setError("게임 목록을 불러오는데 실패했습니다.");
     }
   };
@@ -324,7 +311,6 @@ const CasinoRecommendationManagement = () => {
       setAlertMessage({ type: "success", message: "게임 추천 순서가 변경되었습니다." });
       fetchRecommendations();
     } catch (err: any) {
-      console.error("게임 추천 순서 변경 오류 (위로):", err);
       setAlertMessage({ type: "error", message: "게임 추천 순서 변경 중 오류가 발생했습니다." });
     }
   };
@@ -351,7 +337,6 @@ const CasinoRecommendationManagement = () => {
       setAlertMessage({ type: "success", message: "게임 추천 순서가 변경되었습니다." });
       fetchRecommendations();
     } catch (err: any) {
-      console.error("게임 추천 순서 변경 오류 (아래로):", err);
       setAlertMessage({ type: "error", message: "게임 추천 순서 변경 중 오류가 발생했습니다." });
     }
   };
@@ -437,9 +422,7 @@ const CasinoRecommendationManagement = () => {
       fetchRecommendations();
       handleCloseModal();
     } catch (err: unknown) {
-      console.error("Failed to save casino recommendation:", err);
-      const errorMessage = err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.";
-      setError(`저장에 실패했습니다: ${errorMessage}`);
+      setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
     } finally {
       setSaving(false);
     }

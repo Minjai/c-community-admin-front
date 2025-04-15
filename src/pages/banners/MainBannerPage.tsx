@@ -194,8 +194,10 @@ const MainBannerPage: React.FC = () => {
           console.log("Banner data being sent:", {
             id: currentBanner.id,
             title: currentBanner.title,
-            startDate: startDate, // 변환된 ISO 형식 사용
-            endDate: endDate, // 변환된 ISO 형식 사용
+            linkUrl: currentBanner.linkUrl,
+            linkUrl2: currentBanner.linkUrl2,
+            startDate: startDate,
+            endDate: endDate,
             isPublic: currentBanner.isPublic,
             position: currentBanner.position,
             bannerType: "main",
@@ -207,14 +209,16 @@ const MainBannerPage: React.FC = () => {
             {
               id: currentBanner.id,
               title: currentBanner.title,
-              startDate: startDate, // 변환된 ISO 형식 사용
-              endDate: endDate, // 변환된 ISO 형식 사용
+              linkUrl: currentBanner.linkUrl,
+              linkUrl2: currentBanner.linkUrl2,
+              startDate: startDate,
+              endDate: endDate,
               isPublic: currentBanner.isPublic,
               position: currentBanner.position,
               bannerType: "main",
             },
-            pcImageFile, // 이미지 파일 전송
-            mobileImageFile // 이미지 파일 전송
+            pcImageFile,
+            mobileImageFile
           );
 
           toast.success("배너가 수정되었습니다.");
@@ -238,6 +242,8 @@ const MainBannerPage: React.FC = () => {
           console.log("Creating banner:", {
             data: {
               title: currentBanner.title,
+              linkUrl: currentBanner.linkUrl,
+              linkUrl2: currentBanner.linkUrl2,
               startDate: currentBanner.startDate,
               endDate: currentBanner.endDate,
               isPublic: currentBanner.isPublic,
@@ -249,6 +255,8 @@ const MainBannerPage: React.FC = () => {
           await BannerApiService.createMainBanner(
             {
               title: currentBanner.title,
+              linkUrl: currentBanner.linkUrl,
+              linkUrl2: currentBanner.linkUrl2,
               startDate: currentBanner.startDate,
               endDate: currentBanner.endDate,
               isPublic: currentBanner.isPublic,
@@ -561,38 +569,44 @@ const MainBannerPage: React.FC = () => {
           title={isEditing ? "배너 수정" : "새 배너 추가"}
           size="lg"
         >
-          {/* Modal Error Display */}
+          {/* Modal Error Display (Above top controls) */}
           {modalError && (
             <div className="mb-4">
               <Alert type="error" message={modalError} onClose={() => setModalError(null)} />
             </div>
           )}
-          <div className="space-y-4">
-            <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-4">
-              <div className="flex space-x-2">
-                <Button onClick={handleSaveBanner} disabled={isSaving}>
-                  {isSaving ? "저장 중..." : isEditing ? "저장" : "추가"}
-                </Button>
-                <Button variant="outline" onClick={handleCloseModal} disabled={isSaving}>
-                  취소
-                </Button>
-              </div>
 
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="isPublic"
-                  checked={currentBanner.isPublic === 1}
-                  onChange={(e) => handleInputChange("isPublic", e.target.checked ? 1 : 0)}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  disabled={isSaving}
-                />
-                <label htmlFor="isPublic" className="text-sm font-medium text-gray-700">
-                  공개 여부
-                </label>
-              </div>
+          {/* Container for top controls - Similar to CompanyBannerPage */}
+          <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-4">
+            {/* Left side: Action Buttons */}
+            <div className="flex space-x-2">
+              <Button onClick={handleSaveBanner} disabled={isSaving}>
+                {isSaving ? "저장 중..." : isEditing ? "저장" : "추가"}
+              </Button>
+              <Button variant="outline" onClick={handleCloseModal} disabled={isSaving}>
+                취소
+              </Button>
             </div>
 
+            {/* Right side: Public toggle */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isPublic"
+                checked={currentBanner.isPublic === 1}
+                onChange={(e) => handleInputChange("isPublic", e.target.checked ? 1 : 0)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                disabled={isSaving}
+              />
+              <label htmlFor="isPublic" className="text-sm font-medium text-gray-700">
+                공개 여부
+              </label>
+            </div>
+          </div>
+
+          {/* Form content - Similar to CompanyBannerPage */}
+          <div className="space-y-4">
+            {/* Title */}
             <Input
               label="배너 제목"
               name="title"
@@ -602,11 +616,12 @@ const MainBannerPage: React.FC = () => {
               disabled={isSaving}
             />
 
+            {/* PC and Mobile Images */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FileUpload
-                label="PC 이미지 (권장 크기: 1920x400)"
-                name="pcImageUrl"
-                id="pcImageUrl"
+                label="PC 이미지 (권장 크기: 1260x270, 라운드 사이즈)"
+                name="pUrl"
+                id="pUrl"
                 onChange={(file) => {
                   if (file) {
                     const reader = new FileReader();
@@ -625,9 +640,9 @@ const MainBannerPage: React.FC = () => {
               />
 
               <FileUpload
-                label="모바일 이미지 (권장 크기: 640x400)"
-                name="mobileImageUrl"
-                id="mobileImageUrl"
+                label="모바일 이미지 (권장 크기: 370x140, 라운드 사이즈)"
+                name="mUrl"
+                id="mUrl"
                 onChange={(file) => {
                   if (file) {
                     const reader = new FileReader();
@@ -646,17 +661,38 @@ const MainBannerPage: React.FC = () => {
               />
             </div>
 
+            {/* Link URLs - Added */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="링크 URL"
+                name="linkUrl"
+                value={currentBanner.linkUrl || ""}
+                onChange={(e) => handleInputChange("linkUrl", e.target.value)}
+                placeholder="https://example.com"
+                disabled={isSaving}
+              />
+              <Input
+                label="링크 URL2"
+                name="linkUrl2"
+                value={currentBanner.linkUrl2 || ""}
+                onChange={(e) => handleInputChange("linkUrl2", e.target.value)}
+                placeholder="https://example2.com"
+                disabled={isSaving}
+              />
+            </div>
+
+            {/* Start and End Dates */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <DatePicker
                 label="시작일"
-                value={currentBanner.startDate}
-                onChange={(date) => setCurrentBanner({ ...currentBanner, startDate: date })}
+                value={currentBanner.startDate || ""}
+                onChange={(date) => handleInputChange("startDate", date)}
                 disabled={isSaving}
               />
               <DatePicker
                 label="종료일"
-                value={currentBanner.endDate}
-                onChange={(date) => setCurrentBanner({ ...currentBanner, endDate: date })}
+                value={currentBanner.endDate || ""}
+                onChange={(date) => handleInputChange("endDate", date)}
                 disabled={isSaving}
               />
             </div>
