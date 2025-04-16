@@ -36,36 +36,35 @@ const CompanyBannerPage: React.FC = () => {
     position: 0,
   };
 
-  // 날짜 표시 포맷 변환 함수 (UI 표시용)
+  // 날짜 표시 포맷 변환 함수 (UI 표시용, UTC 기준)
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
 
-    // ISO 형식 문자열을 Date 객체로 변환 (UTC 시간 기준)
+    // ISO 형식 문자열을 Date 객체로 변환
     const date = new Date(dateStr);
 
-    // 로컬 시간대로 변환
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
+    // UTC 기준으로 날짜 및 시간 구성 요소 추출
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    const hours = String(date.getUTCHours()).padStart(2, "0");
+    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
 
-    return `${year}.${month}.${day} ${hours}:${minutes}`;
+    return `${year}.${month}.${day} ${hours}:${minutes}`; // UTC 기준이지만 "(UTC)" 제거
   };
 
-  // 날짜를 yyyy-MM-dd 형식으로 변환하는 함수 (폼 입력용)
+  // 날짜를 yyyy-MM-ddTHH:mm 형식으로 변환하는 함수 (폼 입력용, UTC 기준)
   const formatDateForInput = (dateStr: string) => {
     if (!dateStr) return "";
 
     const date = new Date(dateStr);
 
-    // Create a date-time string in the format required by datetime-local input
-    // Format: yyyy-MM-ddThh:mm
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
+    // UTC 기준 년/월/일/시/분 추출
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    const hours = String(date.getUTCHours()).padStart(2, "0");
+    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
 
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
@@ -124,14 +123,14 @@ const CompanyBannerPage: React.FC = () => {
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
     setModalError(null);
-    console.log("수정할 배너 데이터:", banner);
+    console.log("수정할 배너 데이터 (원본 UTC):", banner);
 
-    // 서버에서 받은 날짜 형식을 폼에 맞게 변환
+    // 서버에서 받은 UTC 날짜 형식을 폼 입력 형식(yyyy-MM-ddTHH:mm)으로 변환 (UTC 기준)
     const formattedStartDate = formatDateForInput(banner.startDate);
     const formattedEndDate = formatDateForInput(banner.endDate);
 
-    console.log("변환된 시작일:", formattedStartDate);
-    console.log("변환된 종료일:", formattedEndDate);
+    console.log("DatePicker 표시용 시작일(UTC):", formattedStartDate);
+    console.log("DatePicker 표시용 종료일(UTC):", formattedEndDate);
 
     setCurrentBanner({
       ...banner,
@@ -164,18 +163,9 @@ const CompanyBannerPage: React.FC = () => {
       if (isEditing && currentBanner.id) {
         // 수정 모드일 때
         try {
-          // 날짜 형식 변환 - 로컬 시간 유지하면서 ISO 형식으로 변환
-          const tzOffset = new Date().getTimezoneOffset();
-
-          // 시작일 변환
-          const startDateObj = new Date(currentBanner.startDate);
-          startDateObj.setMinutes(startDateObj.getMinutes() - tzOffset);
-          const startDate = startDateObj.toISOString();
-
-          // 종료일 변환
-          const endDateObj = new Date(currentBanner.endDate);
-          endDateObj.setMinutes(endDateObj.getMinutes() - tzOffset);
-          const endDate = endDateObj.toISOString();
+          // 날짜 형식 변환 - 로컬 시간 -> UTC ISO 문자열
+          const startDate = new Date(currentBanner.startDate).toISOString();
+          const endDate = new Date(currentBanner.endDate).toISOString();
 
           await BannerApiService.updateCompanyBanner(
             currentBanner.id,
@@ -188,7 +178,7 @@ const CompanyBannerPage: React.FC = () => {
               position: currentBanner.position,
               bannerType: "company",
               linkUrl: currentBanner.linkUrl,
-              linkUrl2: currentBanner.linkUrl2,
+              linkUrl2: null,
             },
             pcImageFile,
             mobileImageFile
@@ -212,18 +202,22 @@ const CompanyBannerPage: React.FC = () => {
         }
 
         try {
+          // 날짜 형식 변환 - 로컬 시간 -> UTC ISO 문자열
+          const startDate = new Date(currentBanner.startDate).toISOString();
+          const endDate = new Date(currentBanner.endDate).toISOString();
+
           // 현재 배너 개수 + 1을 position으로 설정
           const newPosition = banners.length + 1;
           await BannerApiService.createCompanyBanner(
             {
               title: currentBanner.title,
-              startDate: currentBanner.startDate,
-              endDate: currentBanner.endDate,
+              startDate: startDate,
+              endDate: endDate,
               isPublic: currentBanner.isPublic,
-              position: newPosition, // 현재 배너 개수 + 1
+              position: newPosition,
               bannerType: "company",
               linkUrl: currentBanner.linkUrl,
-              linkUrl2: currentBanner.linkUrl2,
+              linkUrl2: null,
             },
             pcImageFile,
             mobileImageFile
@@ -646,22 +640,14 @@ const CompanyBannerPage: React.FC = () => {
               />
             </div>
 
-            {/* Link URLs - Placed side-by-side in a grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Link URLs - 수정 */}
+            <div>
               <Input
                 label="링크 URL"
                 name="linkUrl"
                 value={currentBanner.linkUrl || ""}
                 onChange={(e) => setCurrentBanner({ ...currentBanner, linkUrl: e.target.value })}
                 placeholder="https://example.com"
-                disabled={isSaving}
-              />
-              <Input
-                label="링크 URL2"
-                name="linkUrl2"
-                value={currentBanner.linkUrl2 || ""}
-                onChange={(e) => setCurrentBanner({ ...currentBanner, linkUrl2: e.target.value })}
-                placeholder="https://example2.com"
                 disabled={isSaving}
               />
             </div>

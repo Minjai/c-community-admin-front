@@ -382,20 +382,23 @@ export default function SportsManagement() {
     {
       header: "종목명",
       accessor: "sportName" as keyof SportCategory,
-      cell: (value: string, row: SportCategory) => (
-        <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
-          onClick={() => handleEditCategory(row)}
-          title={value}
-        >
-          {row.displayName || getKoreanSportName(value)}
-        </span>
-      ),
+      cell: (value: string, row: SportCategory) => {
+        const koreanSportName = getKoreanSportName(value);
+        return (
+          <span
+            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
+            onClick={() => handleEditCategory(row)}
+            title={koreanSportName}
+          >
+            {koreanSportName}
+          </span>
+        );
+      },
     },
     {
       header: "표시 이름",
       accessor: "displayName" as keyof SportCategory,
-      cell: (value: string, row: SportCategory) => value || getKoreanSportName(row.sportName),
+      cell: (value: string, row: SportCategory) => value,
     },
     {
       header: "등록일자",

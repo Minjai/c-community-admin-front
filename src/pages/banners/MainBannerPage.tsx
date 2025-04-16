@@ -27,21 +27,21 @@ const MainBannerPage: React.FC = () => {
   const [pcImageFile, setPcImageFile] = useState<File | null>(null);
   const [mobileImageFile, setMobileImageFile] = useState<File | null>(null);
 
-  // 날짜 형식 변환 함수 추가
+  // 날짜 형식 변환 함수 추가 (UTC 기준)
   const formatDate = (dateString: string) => {
     if (!dateString) return "";
 
-    // ISO 형식 문자열을 Date 객체로 변환 (UTC 시간 기준)
+    // ISO 형식 문자열을 Date 객체로 변환
     const date = new Date(dateString);
 
-    // 로컬 시간대로 변환
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
+    // UTC 기준으로 날짜 및 시간 구성 요소 추출
+    const year = date.getUTCFullYear();
+    const month = String(date.getUTCMonth() + 1).padStart(2, "0"); // getUTCMonth()는 0부터 시작
+    const day = String(date.getUTCDate()).padStart(2, "0");
+    const hours = String(date.getUTCHours()).padStart(2, "0");
+    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
 
-    return `${year}.${month}.${day} ${hours}:${minutes}`;
+    return `${year}.${month}.${day} ${hours}:${minutes}`; // UTC 기준이지만 "(UTC)" 제거
   };
 
   // 날짜 입력 처리 함수
@@ -105,36 +105,41 @@ const MainBannerPage: React.FC = () => {
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
     setModalError(null);
-    // ISO 날짜 문자열을 datetime-local 형식으로 변환
-    const formattedStartDate = banner.startDate
-      ? (() => {
-          // UTC 시간을 로컬 시간으로 변환
-          const date = new Date(banner.startDate);
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, "0");
-          const day = String(date.getDate()).padStart(2, "0");
-          const hours = String(date.getHours()).padStart(2, "0");
-          const minutes = String(date.getMinutes()).padStart(2, "0");
-          const formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
-          console.log("원본 시작일:", banner.startDate, "변환된 시작일:", formattedDate);
-          return formattedDate;
-        })()
+    // 서버에서 받은 UTC ISO 문자열을 Date 객체로 변환
+    const startDateUTC = banner.startDate ? new Date(banner.startDate) : null;
+    const endDateUTC = banner.endDate ? new Date(banner.endDate) : null;
+
+    // Date 객체에서 UTC 기준 년/월/일/시/분 추출하여 yyyy-MM-ddTHH:mm 형식으로 변환
+    const formattedStartDate = startDateUTC
+      ? `${startDateUTC.getUTCFullYear()}-${String(startDateUTC.getUTCMonth() + 1).padStart(
+          2,
+          "0"
+        )}-${String(startDateUTC.getUTCDate()).padStart(2, "0")}T${String(
+          startDateUTC.getUTCHours()
+        ).padStart(2, "0")}:${String(startDateUTC.getUTCMinutes()).padStart(2, "0")}`
       : "";
 
-    const formattedEndDate = banner.endDate
-      ? (() => {
-          // UTC 시간을 로컬 시간으로 변환
-          const date = new Date(banner.endDate);
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, "0");
-          const day = String(date.getDate()).padStart(2, "0");
-          const hours = String(date.getHours()).padStart(2, "0");
-          const minutes = String(date.getMinutes()).padStart(2, "0");
-          const formattedDate = `${year}-${month}-${day}T${hours}:${minutes}`;
-          console.log("원본 종료일:", banner.endDate, "변환된 종료일:", formattedDate);
-          return formattedDate;
-        })()
+    const formattedEndDate = endDateUTC
+      ? `${endDateUTC.getUTCFullYear()}-${String(endDateUTC.getUTCMonth() + 1).padStart(
+          2,
+          "0"
+        )}-${String(endDateUTC.getUTCDate()).padStart(2, "0")}T${String(
+          endDateUTC.getUTCHours()
+        ).padStart(2, "0")}:${String(endDateUTC.getUTCMinutes()).padStart(2, "0")}`
       : "";
+
+    console.log(
+      "원본 시작일(UTC):",
+      banner.startDate,
+      "DatePicker 표시용 UTC 시간:",
+      formattedStartDate
+    );
+    console.log(
+      "원본 종료일(UTC):",
+      banner.endDate,
+      "DatePicker 표시용 UTC 시간:",
+      formattedEndDate
+    );
 
     setCurrentBanner({
       ...banner,
@@ -163,31 +168,15 @@ const MainBannerPage: React.FC = () => {
       if (isEditing && currentBanner.id) {
         // 수정 모드일 때
         try {
-          // 날짜 형식 변환 - 로컬 시간 유지하면서 ISO 형식으로 변환
-          // 브라우저에서 new Date()는 로컬 시간을 기준으로 하지만, toISOString()은 항상 UTC로 변환
-          // 따라서 시간대 차이를 보정해야 함
-
-          // 시간대 오프셋 계산 (분 단위)
-          const tzOffset = new Date().getTimezoneOffset(); // 예: 한국은 -540 (UTC+9)
-
-          // 시작일 변환
-          const startDateObj = new Date(currentBanner.startDate);
-          // 로컬 시간 유지를 위해 타임존 오프셋 적용 (UTC로 변환될 때 오프셋을 적용)
-          startDateObj.setMinutes(startDateObj.getMinutes() - tzOffset);
-          const startDate = startDateObj.toISOString();
-
-          // 종료일 변환
-          const endDateObj = new Date(currentBanner.endDate);
-          // 로컬 시간 유지를 위해 타임존 오프셋 적용
-          endDateObj.setMinutes(endDateObj.getMinutes() - tzOffset);
-          const endDate = endDateObj.toISOString();
+          // 날짜 형식 변환 - 로컬 시간 -> UTC ISO 문자열
+          const startDate = new Date(currentBanner.startDate).toISOString();
+          const endDate = new Date(currentBanner.endDate).toISOString();
 
           console.log("날짜 변환 전/후 비교:", {
             원래_시작일: currentBanner.startDate,
             변환된_시작일: startDate,
             원래_종료일: currentBanner.endDate,
             변환된_종료일: endDate,
-            타임존_오프셋: tzOffset,
           });
 
           // 서버 측 500 에러 디버깅을 위해 추가 로깅
@@ -195,7 +184,7 @@ const MainBannerPage: React.FC = () => {
             id: currentBanner.id,
             title: currentBanner.title,
             linkUrl: currentBanner.linkUrl,
-            linkUrl2: currentBanner.linkUrl2,
+            linkUrl2: null,
             startDate: startDate,
             endDate: endDate,
             isPublic: currentBanner.isPublic,
@@ -210,7 +199,7 @@ const MainBannerPage: React.FC = () => {
               id: currentBanner.id,
               title: currentBanner.title,
               linkUrl: currentBanner.linkUrl,
-              linkUrl2: currentBanner.linkUrl2,
+              linkUrl2: null,
               startDate: startDate,
               endDate: endDate,
               isPublic: currentBanner.isPublic,
@@ -237,15 +226,19 @@ const MainBannerPage: React.FC = () => {
         }
 
         try {
+          // 날짜 형식 변환 - 로컬 시간 -> UTC ISO 문자열
+          const startDate = new Date(currentBanner.startDate).toISOString();
+          const endDate = new Date(currentBanner.endDate).toISOString();
+
           // 현재 배너 개수 + 1을 position으로 설정
           const newPosition = banners.length + 1;
           console.log("Creating banner:", {
             data: {
               title: currentBanner.title,
               linkUrl: currentBanner.linkUrl,
-              linkUrl2: currentBanner.linkUrl2,
-              startDate: currentBanner.startDate,
-              endDate: currentBanner.endDate,
+              linkUrl2: null,
+              startDate: startDate,
+              endDate: endDate,
               isPublic: currentBanner.isPublic,
               position: newPosition,
               bannerType: "main",
@@ -256,11 +249,11 @@ const MainBannerPage: React.FC = () => {
             {
               title: currentBanner.title,
               linkUrl: currentBanner.linkUrl,
-              linkUrl2: currentBanner.linkUrl2,
-              startDate: currentBanner.startDate,
-              endDate: currentBanner.endDate,
+              linkUrl2: null,
+              startDate: startDate,
+              endDate: endDate,
               isPublic: currentBanner.isPublic,
-              position: newPosition, // 현재 배너 개수 + 1
+              position: newPosition,
               bannerType: "main",
             },
             pcImageFile,
@@ -672,22 +665,16 @@ const MainBannerPage: React.FC = () => {
               />
             </div>
 
-            {/* Link URLs - Added */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Link URLs - 수정 */}
+            <div>
+              {" "}
+              {/* 그리드 제거, 별도 div로 감싸기 */}
               <Input
                 label="링크 URL"
                 name="linkUrl"
                 value={currentBanner.linkUrl || ""}
                 onChange={(e) => handleInputChange("linkUrl", e.target.value)}
                 placeholder="https://example.com"
-                disabled={isSaving}
-              />
-              <Input
-                label="링크 URL2"
-                name="linkUrl2"
-                value={currentBanner.linkUrl2 || ""}
-                onChange={(e) => handleInputChange("linkUrl2", e.target.value)}
-                placeholder="https://example2.com"
                 disabled={isSaving}
               />
             </div>

@@ -187,9 +187,46 @@ VideoBlot.blotName = "video";
 VideoBlot.tagName = "iframe";
 VideoBlot.className = "ql-video";
 
+// 커스텀 Link Blot 정의
+const Link = Quill.import("formats/link");
+
+class CustomLink extends Link {
+  static create(value: string) {
+    const node = super.create(value);
+    value = this.sanitize(value);
+    node.setAttribute("href", value);
+    // target="_blank" 및 보안 속성 추가 (선택 사항)
+    node.setAttribute("target", "_blank");
+    node.setAttribute("rel", "noopener noreferrer");
+    return node;
+  }
+
+  static sanitize(url: string): string {
+    // 기본 Link sanitize 호출 (XSS 방지 등)
+    let sanitizedUrl = super.sanitize(url);
+    // 프로토콜 추가
+    if (
+      sanitizedUrl &&
+      !sanitizedUrl.startsWith("http://") &&
+      !sanitizedUrl.startsWith("https://")
+    ) {
+      // mailto:, tel: 등 다른 프로토콜은 그대로 둠
+      if (!sanitizedUrl.startsWith("mailto:") && !sanitizedUrl.startsWith("tel:")) {
+        sanitizedUrl = `https://${sanitizedUrl}`;
+      }
+    }
+    return sanitizedUrl;
+  }
+}
+
+// 비디오 URL 감지 정규식 (붙여넣기용)
+const VIDEO_URL_REGEX =
+  /^(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/|vimeo\.com\/|player\.vimeo\.com\/video\/|twitch\.tv\/(?:videos\/|\S+))[^\s]+)$/i;
+
 // 글로벌 등록은 한 번만 수행
 try {
   Quill.register(VideoBlot, true);
+  Quill.register(CustomLink, true); // 커스텀 Link Blot 등록
 } catch (error) {
   // 이미 등록된 경우 무시
 }
@@ -255,6 +292,21 @@ const setupMutationObserver = (editorRoot: HTMLElement) => {
   });
 
   return observer;
+};
+
+// URL인지 확인하는 함수
+const isValidURL = (str: string): boolean => {
+  try {
+    new URL(str);
+    return true;
+  } catch {
+    // 단순 URL 패턴 매칭 추가 (http/https 필수 아님)
+    return (
+      str.match(
+        /^((https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/[^\s]*)?|([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(\/[^\s]*)?)$/i
+      ) !== null
+    );
+  }
 };
 
 // 에디터 초기화 함수 수정
@@ -712,19 +764,21 @@ const TextEditor: React.FC<TextEditorProps> = ({
           if (!clipboardData) return;
 
           let imageFound = false;
+          let videoUrlFound = false;
 
+          // 1. 이미지 파일 확인
           for (let i = 0; i < clipboardData.items.length; i++) {
             const item = clipboardData.items[i];
             if (item.type.match(/^image\//)) {
               const file = item.getAsFile();
               if (file) {
                 e.preventDefault();
+                imageFound = true; // 이미지 발견 플래그 설정
 
                 // 이미지 유형 및 크기 확인
                 if (isImageTypeSupported(file) && checkImageSize(file)) {
                   // GIF 이미지 검사 및 최적화
                   if (file.type === "image/gif") {
-                    // 비동기 처리를 위해 즉시 실행 함수 사용
                     (async () => {
                       try {
                         const optimizedFile = await optimizeGifImage(file);
@@ -738,14 +792,32 @@ const TextEditor: React.FC<TextEditorProps> = ({
                     insertBase64Image(file);
                   }
                 }
-
-                imageFound = true;
-                break;
+                break; // 이미지 처리 후 루프 종료
               }
             }
           }
 
-          if (imageFound) {
+          // 2. 이미지가 아닐 경우, 텍스트 확인 (동영상 URL)
+          if (!imageFound) {
+            const pastedText = clipboardData.getData("text/plain");
+            if (pastedText && VIDEO_URL_REGEX.test(pastedText)) {
+              e.preventDefault();
+              videoUrlFound = true; // 비디오 URL 발견 플래그 설정
+
+              const range = editor.getSelection(true);
+              if (range) {
+                // 현재 선택된 텍스트가 있다면 삭제
+                editor.deleteText(range.index, range.length, "user");
+                // 비디오 삽입
+                editor.insertEmbed(range.index, "video", pastedText, "user");
+                // 커서 위치 조정
+                editor.setSelection(range.index + 1, 0, "user");
+              }
+            }
+          }
+
+          // 이미지나 비디오 URL이 처리되었다면 기본 동작 막음
+          if (imageFound || videoUrlFound) {
             e.preventDefault();
           }
         } catch (error) {
@@ -780,6 +852,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
       };
 
       const observer = setupMutationObserver();
+
       const pasteHandler = handlePaste as unknown as EventListener;
       editor.root.addEventListener("paste", pasteHandler);
 
@@ -851,14 +924,12 @@ const TextEditor: React.FC<TextEditorProps> = ({
                     [{ list: "ordered" }, { list: "bullet" }],
                     [{ align: [] }],
                     ["link", "image", "video"],
-                    ["clean"],
                   ]
                 : [
                     [{ header: [1, 2, 3, false] }],
                     ["bold", "italic", "underline", "strike"],
                     [{ list: "ordered" }, { list: "bullet" }],
                     [{ align: [] }],
-                    ["clean"],
                   ],
               handlers: {
                 image: imageHandler,
