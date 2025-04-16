@@ -174,12 +174,15 @@ const CasinoRecommendationManagement = () => {
         setAvailableGames(processedGames);
         setFilteredGames(processedGames);
       } else {
+        // Game list is empty, but not an error
         setAvailableGames([]);
         setFilteredGames([]);
-        setError("게임 목록을 불러오는데 실패했습니다.");
       }
     } catch (err: any) {
+      // Actual error during fetch
       setError("게임 목록을 불러오는데 실패했습니다.");
+      setAvailableGames([]); // Ensure lists are empty on error
+      setFilteredGames([]);
     }
   };
 
