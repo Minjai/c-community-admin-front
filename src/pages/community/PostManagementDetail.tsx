@@ -4,6 +4,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Post, Comment } from "@/types";
 import axios from "@/api/axios";
 import { AxiosProgressEvent } from "axios";
+import Alert from "@/components/Alert";
+import Button from "@/components/Button";
 
 // replaceAsync 유틸리티 함수 추가
 const replaceAsync = async (
@@ -137,8 +139,9 @@ const PostDetail = () => {
   const isNewPost = id === "new";
   const isEditMode = !isNewPost;
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent<HTMLFormElement>) => {
+    if (e) e.preventDefault();
+    setError(null);
 
     try {
       // 폼 유효성 검사
@@ -207,24 +210,17 @@ const PostDetail = () => {
         },
       });
 
-      if (response.data && response.data.success) {
+      if (response.data && (response.data.success || response.data.post)) {
         console.log("게시물 저장 성공:", response.data);
         setLoading(false);
         alert(isEditMode ? "게시물이 수정되었습니다." : "게시물이 작성되었습니다.");
         navigate("/community/posts");
-      } else if (response.data && response.data.post) {
-        // 서버에서 'message'와 'post' 객체를 반환하는 경우도 성공으로 처리
-        console.log("게시물 저장 성공:", response.data);
-        setLoading(false);
-        alert(
-          response.data.message ||
-            (isEditMode ? "게시물이 수정되었습니다." : "게시물이 작성되었습니다.")
-        );
-        navigate("/community/posts");
       } else {
         console.error("게시물 저장 실패:", response.data);
-        setLoading(false);
-        alert(isEditMode ? "수정 중 오류가 발생했습니다." : "등록 중 오류가 발생했습니다.");
+        setError(
+          response.data?.message ||
+            (isEditMode ? "수정 중 오류가 발생했습니다." : "등록 중 오류가 발생했습니다.")
+        );
       }
     } catch (error: any) {
       console.error("처리 중 오류 발생:", error);
@@ -584,170 +580,154 @@ const PostDetail = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-bold mb-6">{isNewPost ? "새 게시물 작성" : "게시물 수정"}</h1>
+      <h1 className="text-3xl font-bold mb-6">{isNewPost ? "새 게시물 작성" : "게시물 수정"}</h1>
 
+      {/* Error Alert Area */}
       {error && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-300 text-red-700 rounded-md">
-          {error}
+        <div className="mb-4">
+          <Alert type="error" message={error} onClose={() => setError(null)} />
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-            제목
-          </label>
-          <input
-            type="text"
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            required
-          />
-        </div>
+      {/* Top Control Area */}
+      <div className="flex justify-start items-center mb-4 pb-4 border-b border-gray-200 space-x-2">
+        {/* Buttons on the left, Edit/Register first, then Cancel */}
+        <Button
+          variant="primary"
+          onClick={() => handleSubmit()} // Trigger submit handler directly
+          disabled={saving}
+        >
+          {saving ? `저장 중... (${uploadProgress.toFixed(0)}%)` : isEditMode ? "수정" : "등록"}
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => navigate(-1)} // Go back
+          disabled={saving}
+        >
+          취소
+        </Button>
+      </div>
 
-        <div ref={editorContainerRef}>
-          <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
-          <div className="min-h-[400px] border border-gray-300 rounded-md bg-white">
-            <TextEditor content={content} setContent={setContent} height="400px" />
-          </div>
-          <p className="mt-1 text-xs text-gray-500">
-            이미지는 에디터에 직접 드래그 앤 드롭하여 첨부할 수 있습니다.
-          </p>
-        </div>
+      {/* Title Input */}
+      <div className="mb-4">
+        <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+          제목
+        </label>
+        <input
+          type="text"
+          id="title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+          placeholder="제목을 입력하세요"
+          disabled={saving}
+        />
+      </div>
 
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="isPopular"
-            checked={isPopular}
-            onChange={(e) => setIsPopular(e.target.checked)}
-            className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-          />
-          <label htmlFor="isPopular" className="ml-2 block text-sm text-gray-700">
-            인기 게시물로 등록
-          </label>
-        </div>
+      {/* Text Editor */}
+      <div ref={editorContainerRef} className="mb-6">
+        <TextEditor content={content} setContent={setContent} height="400px" />
+      </div>
 
-        {/* 업로드 진행 상태 표시 */}
-        {saving && uploadProgress > 0 && (
-          <div className="mb-4">
-            <div className="text-sm font-medium text-gray-700 mb-1">
-              업로드 진행률: {uploadProgress}%
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div
-                className="bg-blue-600 h-2.5 rounded-full"
-                style={{ width: `${uploadProgress}%` }}
-              ></div>
-            </div>
-          </div>
-        )}
+      {/* Popular Post Toggle - Moved Below Editor */}
+      <div className="mb-6 flex items-center">
+        {" "}
+        {/* Adjusted margin */}
+        <input
+          type="checkbox"
+          id="isPopular"
+          checked={isPopular}
+          onChange={(e) => setIsPopular(e.target.checked)}
+          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          disabled={saving}
+        />
+        <label htmlFor="isPopular" className="ml-2 block text-sm text-gray-900">
+          인기 게시물 지정
+        </label>
+      </div>
 
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={() => navigate("/community/posts")}
-            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            취소
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70"
-          >
-            {saving ? "저장 중..." : "저장"}
-          </button>
-        </div>
-      </form>
-
-      {/* 댓글 목록 */}
-      {!isNewPost && (
-        <div className="mt-8">
-          <h2 className="text-xl font-semibold mb-4">댓글 목록</h2>
-
-          {/* 댓글 추가 폼 */}
+      {/* Comments Section (only in edit mode) */}
+      {isEditMode && post && (
+        <div className="mt-12">
+          <h2 className="text-2xl font-semibold mb-4">댓글 ({comments.length})</h2>
+          {/* Add comment form */}
           <form onSubmit={handleAddComment} className="mb-6">
-            <div className="flex flex-col space-y-2">
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="댓글을 입력하세요"
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                rows={3}
-              ></textarea>
-              <button
-                type="submit"
-                className="self-end px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                댓글 추가
-              </button>
+            <textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="댓글을 입력하세요..."
+              rows={3}
+              className="w-full p-2 border border-gray-300 rounded-md mb-2 focus:ring-indigo-500 focus:border-indigo-500"
+              required
+            />
+            <div className="text-right">
+              <Button type="submit" variant="primary" size="sm">
+                댓글 등록
+              </Button>
             </div>
           </form>
 
+          {/* Comments list */}
           <div className="space-y-4">
-            {comments.length > 0 ? (
-              comments.map((comment) => (
-                <div
-                  key={comment.id}
-                  className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
-                >
-                  {editingCommentId === comment.id ? (
-                    <div className="space-y-2">
-                      <textarea
-                        value={editCommentContent}
-                        onChange={(e) => setEditCommentContent(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
-                        rows={2}
-                      ></textarea>
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => cancelEditComment()}
-                          className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-100"
-                        >
-                          취소
-                        </button>
-                        <button
-                          onClick={() => handleUpdateComment(comment.id)}
-                          className="px-3 py-1 text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                        >
-                          저장
-                        </button>
-                      </div>
+            {comments.map((comment) => (
+              <div key={comment.id} className="bg-gray-50 p-4 rounded-lg shadow-sm">
+                {editingCommentId === comment.id ? (
+                  // Editing Comment
+                  <div>
+                    <textarea
+                      value={editCommentContent}
+                      onChange={(e) => setEditCommentContent(e.target.value)}
+                      rows={3}
+                      className="w-full p-2 border border-gray-300 rounded-md mb-2"
+                      required
+                    />
+                    <div className="flex justify-end space-x-2">
+                      <Button variant="secondary" size="sm" onClick={cancelEditComment}>
+                        취소
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={() => handleUpdateComment(comment.id)}
+                      >
+                        저장
+                      </Button>
                     </div>
-                  ) : (
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm text-gray-900">{comment.content}</p>
-                        <div className="mt-2 flex items-center text-sm text-gray-500">
-                          <span>{comment.author?.nickname || "알 수 없음"}</span>
-                          <span className="mx-2">•</span>
-                          <span>{new Date(comment.createdAt).toLocaleString()}</span>
-                        </div>
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => startEditComment(comment)}
-                          className="text-sm text-blue-500 hover:text-blue-700"
-                        >
-                          수정
-                        </button>
-                        <button
-                          onClick={() => handleDeleteComment(comment.id)}
-                          className="text-sm text-red-500 hover:text-red-700"
-                        >
-                          삭제
-                        </button>
-                      </div>
+                  </div>
+                ) : (
+                  // Displaying Comment
+                  <div>
+                    <div className="flex justify-between items-start mb-1">
+                      <span className="font-semibold text-sm text-gray-800">
+                        {comment.authorName || comment.User?.nickname || "익명"}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(comment.createdAt).toLocaleString()}
+                      </span>
                     </div>
-                  )}
-                </div>
-              ))
-            ) : (
-              <p className="text-gray-500 text-center py-4">등록된 댓글이 없습니다.</p>
-            )}
+                    <p className="text-gray-700 text-sm mb-2 whitespace-pre-wrap">
+                      {comment.content}
+                    </p>
+                    {/* Add Edit/Delete buttons if user has permission */}
+                    <div className="text-right space-x-2">
+                      <button
+                        onClick={() => startEditComment(comment)}
+                        className="text-xs text-blue-500 hover:underline"
+                      >
+                        수정
+                      </button>
+                      <button
+                        onClick={() => handleDeleteComment(comment.id)}
+                        className="text-xs text-red-500 hover:underline"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+            {comments.length === 0 && <p className="text-center text-gray-500">댓글이 없습니다.</p>}
           </div>
         </div>
       )}

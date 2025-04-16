@@ -439,22 +439,21 @@ const CasinoGameManagement = () => {
           </div>
         )}
 
-        <div className="flex justify-between items-center space-x-2 pt-2 pb-4 border-b border-gray-200 mb-4">
+        <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200">
           <div className="flex space-x-2">
-            <Button type="button" variant="primary" onClick={handleSaveGame} disabled={saving}>
+            <Button variant="primary" onClick={handleSaveGame} disabled={saving}>
               {saving ? "저장 중..." : isEditing ? "수정" : "등록"}
             </Button>
-            <Button type="button" variant="secondary" onClick={handleCloseModal} disabled={saving}>
+            <Button variant="secondary" onClick={handleCloseModal} disabled={saving}>
               취소
             </Button>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <label htmlFor="public-modal" className="flex items-center cursor-pointer">
+          <div className="flex items-center space-x-4">
+            <label className="inline-flex items-center">
               <input
                 type="radio"
-                id="public-modal"
-                name="isPublicModal"
+                value="1"
                 checked={isPublic === 1}
                 onChange={() => setIsPublic(1)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
@@ -462,11 +461,10 @@ const CasinoGameManagement = () => {
               />
               <span className="ml-2 text-sm text-gray-900">공개</span>
             </label>
-            <label htmlFor="private-modal" className="flex items-center cursor-pointer">
+            <label className="inline-flex items-center">
               <input
                 type="radio"
-                id="private-modal"
-                name="isPublicModal"
+                value="0"
                 checked={isPublic === 0}
                 onChange={() => setIsPublic(0)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
@@ -476,6 +474,14 @@ const CasinoGameManagement = () => {
             </label>
           </div>
         </div>
+
+        <Input
+          label="게임 제목"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          required
+          disabled={saving}
+        />
 
         <FileUpload
           label="썸네일"
@@ -523,38 +529,38 @@ const CasinoGameManagement = () => {
         <Input
           label="환수율 (%)"
           type="number"
-          value={returnRate}
+          value={returnRate.toString()}
           onChange={handleReturnRateChange}
           min={0}
           max={100}
-          step={0.1}
+          step={0.01}
           disabled={saving}
         />
 
         <div>
           <label className="label">바로가기 설정</label>
-          <div className="flex items-center space-x-4 mt-1">
-            <label className="flex items-center">
+          <div className="flex space-x-4 mt-1">
+            <label className="inline-flex items-center">
               <input
                 type="radio"
                 name="directLinkEnabled"
                 checked={!isDirectLinkEnabled}
                 onChange={() => handleDirectLinkToggle(false)}
-                className="mr-2"
                 disabled={saving}
+                className="form-radio h-4 w-4 text-blue-600"
               />
-              <span>사용 안함</span>
+              <span className="ml-2 text-sm">미노출</span>
             </label>
-            <label className="flex items-center">
+            <label className="inline-flex items-center">
               <input
                 type="radio"
                 name="directLinkEnabled"
                 checked={isDirectLinkEnabled}
                 onChange={() => handleDirectLinkToggle(true)}
-                className="mr-2"
                 disabled={saving}
+                className="form-radio h-4 w-4 text-blue-600"
               />
-              <span>사용</span>
+              <span className="ml-2 text-sm">노출</span>
             </label>
           </div>
         </div>
@@ -565,9 +571,9 @@ const CasinoGameManagement = () => {
             type="url"
             value={directLinkUrl}
             onChange={(e) => setDirectLinkUrl(e.target.value)}
-            placeholder="예: https://example.com/"
-            disabled={saving}
             required={isDirectLinkEnabled}
+            disabled={saving}
+            placeholder="https://..."
           />
         )}
       </div>

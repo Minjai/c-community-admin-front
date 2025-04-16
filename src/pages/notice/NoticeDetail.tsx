@@ -3,6 +3,8 @@ import TextEditor from "../../components/forms/TextEditor";
 import { useParams, useNavigate } from "react-router-dom";
 import { Post } from "@/types";
 import axios from "@/api/axios";
+import Alert from "@/components/Alert";
+import Button from "@/components/Button";
 
 const NoticeDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -19,8 +21,8 @@ const NoticeDetail = () => {
   const isNewPost = id === "new";
   const isEditMode = !isNewPost;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
 
     // 빈 HTML인지 확인 (ReactQuill은 빈 내용일 때도 <p><br></p>와 같은 HTML을 생성함)
     const isContentEmpty = !content || content === "<p><br></p>" || content.trim() === "";
@@ -42,42 +44,33 @@ const NoticeDetail = () => {
     setError(null);
 
     try {
+      const requestData = {
+        title: trimmedTitle,
+        content: trimmedContent,
+        boardId: 1, // Notice board ID
+        isPublic: isPublic.toString(), // Use state value
+        tags: tags.trim() ? tags : undefined,
+      };
+
+      let response;
       if (isEditMode) {
-        // 기존 공지사항 수정
-        const requestData = {
-          title: trimmedTitle,
-          content: trimmedContent,
-          boardId: 1, // 공지사항
-          isPublic: isPublic.toString(),
-          tags: tags.trim() ? tags : undefined,
-        };
-
-        const response = await axios.put<Post>(`/post/${id}`, requestData);
-
-        if (response.status === 200) {
-          alert("공지사항이 수정되었습니다.");
-          navigate("/notice");
-        } else {
-          setError("공지사항 수정 중 오류가 발생했습니다.");
-        }
+        response = await axios.put<Post>(`/post/${id}`, requestData);
       } else {
-        // 새 공지사항 작성
-        const requestData = {
-          title: trimmedTitle,
-          content: trimmedContent,
-          boardId: 1, // 공지사항
-          isPublic: isPublic.toString(),
-          tags: tags.trim() ? tags : undefined,
-        };
+        response = await axios.post<Post>("/post", requestData);
+      }
 
-        const response = await axios.post<Post>("/post", requestData);
-
-        if (response.status === 201 || response.status === 200) {
-          alert("공지사항이 작성되었습니다.");
-          navigate("/notice");
-        } else {
-          setError("공지사항 작성 중 오류가 발생했습니다.");
-        }
+      if (
+        (isEditMode && response.status === 200) ||
+        (!isEditMode && (response.status === 201 || response.status === 200))
+      ) {
+        alert(isEditMode ? "공지사항이 수정되었습니다." : "공지사항이 작성되었습니다.");
+        navigate("/notice");
+      } else {
+        setError(
+          isEditMode
+            ? "공지사항 수정 중 오류가 발생했습니다."
+            : "공지사항 작성 중 오류가 발생했습니다."
+        );
       }
     } catch (error: any) {
       // 인증 오류 처리
@@ -163,84 +156,80 @@ const NoticeDetail = () => {
       </h1>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-100 border border-red-300 text-red-700 rounded-md">
-          {error}
+        <div className="mb-4">
+          <Alert type="error" message={error} onClose={() => setError(null)} />
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-            제목
-          </label>
-          <input
-            type="text"
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-            required
-          />
+      <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+        <div className="flex space-x-2">
+          <Button variant="primary" onClick={() => handleSubmit()} disabled={saving}>
+            {saving ? "저장 중..." : isEditMode ? "수정" : "등록"}
+          </Button>
+          <Button variant="secondary" onClick={() => navigate("/notice")} disabled={saving}>
+            취소
+          </Button>
         </div>
 
-        <div ref={editorContainerRef}>
-          <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
-          <div className="min-h-[400px] border border-gray-300 rounded-md">
-            <TextEditor content={content} setContent={setContent} />
-          </div>
-          <p className="mt-1 text-xs text-gray-500">
-            이미지는 에디터에 직접 드래그 앤 드롭하여 첨부할 수 있습니다.
-          </p>
-        </div>
-
-        <div>
-          <label htmlFor="tags" className="block text-sm font-medium text-gray-700">
-            태그
-          </label>
-          <input
-            type="text"
-            id="tags"
-            value={tags}
-            onChange={(e) => setTags(e.target.value)}
-            placeholder="태그는 쉼표(,)로 구분하여 입력해주세요"
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-          />
-          <p className="mt-1 text-xs text-gray-500">예시: 중요,공지,업데이트</p>
-        </div>
-
-        <div className="flex items-center mt-4">
+        <div className="flex items-center">
           <input
             type="checkbox"
             id="isPublic"
             checked={isPublic === 1}
-            onChange={(e) => {
-              const newValue = e.target.checked ? 1 : 0;
-              setIsPublic(newValue);
-            }}
+            onChange={(e) => setIsPublic(e.target.checked ? 1 : 0)}
             className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            disabled={saving}
           />
           <label htmlFor="isPublic" className="ml-2 block text-sm text-gray-900">
             공개 상태
           </label>
         </div>
+      </div>
 
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={() => navigate("/notice")}
-            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            취소
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70"
-          >
-            {saving ? "저장 중..." : "저장"}
-          </button>
+      <div>
+        <div className="space-y-6">
+          <div>
+            <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+              제목
+            </label>
+            <input
+              type="text"
+              id="title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              required
+              disabled={saving}
+            />
+          </div>
+
+          <div ref={editorContainerRef}>
+            <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
+            <div className="min-h-[400px] border border-gray-300 rounded-md">
+              <TextEditor content={content} setContent={setContent} />
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              이미지는 에디터에 직접 드래그 앤 드롭하여 첨부할 수 있습니다.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="tags" className="block text-sm font-medium text-gray-700">
+              태그
+            </label>
+            <input
+              type="text"
+              id="tags"
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="태그는 쉼표(,)로 구분하여 입력해주세요"
+              className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+              disabled={saving}
+            />
+            <p className="mt-1 text-xs text-gray-500">예시: 중요,공지,업데이트</p>
+          </div>
         </div>
-      </form>
+      </div>
     </div>
   );
 };
