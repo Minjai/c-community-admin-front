@@ -35,6 +35,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
+  const [currentTagInput, setCurrentTagInput] = useState<string>(""); // State for current tag input
 
   // TextEditor의 content를 업데이트하는 함수를 useCallback으로 감싸기
   const handleEditorContentChange = useCallback(
@@ -424,6 +425,42 @@ const GuidelineManagement = ({ boardId = 3 }) => {
     setPreviewUrl(null);
   };
 
+  // --- New Hashtag Handlers ---
+  const handleTagInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCurrentTagInput(e.target.value);
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if ([",", " ", "Enter"].includes(e.key)) {
+      e.preventDefault(); // Prevent default form submission on Enter
+      const newTag = currentTagInput.trim();
+
+      if (newTag && currentGuideline?.tags && !currentGuideline.tags.includes(newTag)) {
+        setCurrentGuideline((prev) =>
+          prev
+            ? {
+                ...prev,
+                tags: [...(prev.tags || []), newTag],
+              }
+            : null
+        );
+      }
+      setCurrentTagInput(""); // Clear input field
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setCurrentGuideline((prev) =>
+      prev
+        ? {
+            ...prev,
+            tags: (prev.tags || []).filter((tag) => tag !== tagToRemove),
+          }
+        : null
+    );
+  };
+  // --- End of New Hashtag Handlers ---
+
   // DataTable 컬럼 정의
   const columns = [
     {
@@ -580,7 +617,12 @@ const GuidelineManagement = ({ boardId = 3 }) => {
             <Input
               label="제목"
               value={currentGuideline.title || ""}
-              onChange={(e) => setCurrentGuideline({ ...currentGuideline, title: e.target.value })}
+              onChange={(e) =>
+                setCurrentGuideline({
+                  ...currentGuideline,
+                  title: e.target.value,
+                })
+              }
               required
             />
 
@@ -596,33 +638,54 @@ const GuidelineManagement = ({ boardId = 3 }) => {
               </p>
             )}
 
-            {/* Hashtags Input Field - value/onChange 수정 */}
-            <Input
-              label="해시태그 (콤마로 구분)"
-              id="guidelineTagsModal"
-              // Display tags array as comma-separated string in input
-              value={currentGuideline.tags?.join(",") || ""}
-              // Convert comma-separated string from input back to array for state
-              onChange={(e) => {
-                const tagsArray = e.target.value
-                  .split(",")
-                  .map((t) => t.trim())
-                  .filter(Boolean);
-                setCurrentGuideline({ ...currentGuideline, tags: tagsArray });
-              }}
-              placeholder="예: 카지노,가이드,팁"
-            />
-
+            {/* --- New Hashtag Input UI --- */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
-              <div className="border border-gray-300 rounded-md bg-white">
-                <TextEditor
-                  content={currentGuideline.content || ""}
-                  setContent={handleEditorContentChange}
-                  height="200px"
+              <label htmlFor="tags-input" className="block text-sm font-medium text-gray-700 mb-1">
+                해시태그 (콤마, 스페이스, 엔터로 구분)
+              </label>
+              <div className="flex flex-wrap items-center gap-2 border border-gray-300 rounded-md p-2">
+                {(currentGuideline.tags || []).map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center bg-gray-200 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full"
+                  >
+                    {tag}
+                    <button
+                      type="button"
+                      className="ml-1.5 inline-flex text-gray-500 hover:text-gray-700 focus:outline-none"
+                      onClick={() => removeTag(tag)}
+                      aria-label={`Remove ${tag}`}
+                    >
+                      <svg
+                        className="h-2.5 w-2.5"
+                        stroke="currentColor"
+                        fill="none"
+                        viewBox="0 0 8 8"
+                      >
+                        <path strokeLinecap="round" strokeWidth="1.5" d="M1 1l6 6m0-6L1 7" />
+                      </svg>
+                    </button>
+                  </span>
+                ))}
+                <input
+                  id="tags-input"
+                  type="text"
+                  value={currentTagInput}
+                  onChange={handleTagInputChange}
+                  onKeyDown={handleTagInputKeyDown}
+                  placeholder={(currentGuideline.tags?.length || 0) > 0 ? "" : "태그 입력..."}
+                  className="flex-grow p-1 outline-none text-sm"
                 />
               </div>
             </div>
+            {/* --- End of New Hashtag Input UI --- */}
+
+            <TextEditor
+              content={currentGuideline.content || ""}
+              setContent={handleEditorContentChange}
+              height="300px"
+              disabled={isSaving}
+            />
           </div>
         </Modal>
       )}
