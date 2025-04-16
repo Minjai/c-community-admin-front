@@ -414,10 +414,13 @@ const MiniBannerPage: React.FC = () => {
     {
       header: "제목",
       accessor: "title" as keyof Banner,
-      cell: (value: string) => (
-        <div className="max-w-xs truncate" title={value}>
+      cell: (value: string, row: Banner) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          onClick={() => handleEditBanner(row)}
+        >
           {value}
-        </div>
+        </span>
       ),
     },
     {
@@ -459,64 +462,64 @@ const MiniBannerPage: React.FC = () => {
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof Banner,
-      cell: (value: boolean, row: Banner) => {
-        // 공개 여부가 false인 경우 단순히 "비공개"로 표시
-        if (!value) {
+      cell: (value: number, row: Banner) => {
+        const isCurrentlyPublic = value === 1;
+        if (!isCurrentlyPublic) {
           return (
-            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">비공개</span>
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              비공개
+            </span>
           );
         }
-
-        // 현재 시간과 시작일/종료일 비교
         const now = new Date();
-        const startDate = row.startDate ? new Date(row.startDate) : null;
-        const endDate = row.endDate ? new Date(row.endDate) : null;
-
-        // 공개 상태 결정
+        const startTime = row.startDate ? new Date(row.startDate) : null;
+        const endTime = row.endDate ? new Date(row.endDate) : null;
         let status = "공개";
         let colorClass = "bg-green-100 text-green-800";
-
-        if (startDate && now < startDate) {
+        if (startTime && now < startTime) {
           status = "공개 전";
           colorClass = "bg-gray-100 text-gray-800";
-        } else if (endDate && now > endDate) {
+        } else if (endTime && now > endTime) {
           status = "공개 종료";
           colorClass = "bg-gray-100 text-gray-800";
         }
-
-        return <span className={`px-2 py-1 rounded-full text-xs ${colorClass}`}>{status}</span>;
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+            {status}
+          </span>
+        );
       },
     },
     {
       header: "관리",
       accessor: "id" as keyof Banner,
       cell: (value: number, row: Banner, index: number) => (
-        <div className="flex space-x-2">
+        <div className="flex space-x-1">
           <ActionButton
+            label="위로"
+            action="up"
+            size="sm"
             onClick={() => handleMoveUp(index)}
             disabled={index === 0}
-            action="up"
-            label="위로"
-            size="sm"
           />
           <ActionButton
+            label="아래로"
+            action="down"
+            size="sm"
             onClick={() => handleMoveDown(index)}
             disabled={index === banners.length - 1}
-            action="down"
-            label="아래로"
-            size="sm"
           />
           <ActionButton
-            onClick={() => handleEditBanner(row)}
-            action="edit"
             label="수정"
+            action="edit"
             size="sm"
+            onClick={() => handleEditBanner(row)}
           />
           <ActionButton
-            onClick={() => handleDeleteBanner(value)}
-            action="delete"
             label="삭제"
+            action="delete"
             size="sm"
+            onClick={() => handleDeleteBanner(value)}
           />
         </div>
       ),

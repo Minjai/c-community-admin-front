@@ -10,7 +10,7 @@ import Input from "@/components/forms/Input";
 import TextEditor from "../../components/forms/TextEditor";
 import FileUpload from "@/components/forms/FileUpload";
 import Alert from "@/components/Alert";
-import { formatDate } from "@/utils/dateUtils";
+import { formatDate, formatDateForDisplay } from "@/utils/dateUtils";
 import { toast } from "react-toastify";
 
 // Guideline 타입에 position과 displayOrder, tags 추가
@@ -430,14 +430,13 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       header: "제목",
       accessor: "title" as keyof GuidelineWithOrder,
       cell: (value: string, row: GuidelineWithOrder) => (
-        <button
-          type="button"
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block w-[300px] truncate text-left"
           onClick={() => handleEditGuideline(row)}
           title={value}
-          className="block w-[300px] truncate text-left cursor-pointer hover:text-primary-600 transition-colors focus:outline-none"
         >
           {value}
-        </button>
+        </span>
       ),
     },
     {
@@ -456,7 +455,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
     {
       header: "등록일자",
       accessor: "createdAt" as keyof GuidelineWithOrder,
-      cell: (value: string) => formatDate(value),
+      cell: (value: string) => formatDateForDisplay(value),
     },
     {
       header: "공개 여부",

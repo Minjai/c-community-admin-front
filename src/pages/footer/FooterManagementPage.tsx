@@ -163,6 +163,15 @@ function FooterManagementPage() {
     {
       header: "제목",
       accessor: "title",
+      cell: (value: string, row: Footer) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
+          onClick={() => handleEditClick(row)}
+          title={value}
+        >
+          {value}
+        </span>
+      ),
       size: 200,
     },
     {

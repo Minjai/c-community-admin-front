@@ -258,29 +258,20 @@ const RemittanceBannerPage: React.FC = () => {
     }
   };
 
-  // 테이블 컬럼 정의
+  // DataTable 컬럼 정의
   const columns = [
     {
       header: "순서",
       accessor: "displayOrder" as keyof RemittanceBanner,
-      cell: (value: number, row: RemittanceBanner, index: number) => (
-        <div className="text-center">
-          <span className="font-medium">{index + 1}번째</span>
-        </div>
-      ),
+      cell: (value: number, row: RemittanceBanner, index: number) => <span>{index + 1}</span>, // Display index + 1 for visual order
+      size: 50,
     },
     {
       header: "로고",
       accessor: "imageUrl" as keyof RemittanceBanner,
-      cell: (value: string) => (
-        <div className="w-16 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
-          {value ? (
-            <img src={value} alt="로고" className="max-w-full max-h-full object-contain" />
-          ) : (
-            <span className="text-xs text-gray-500">이미지 없음</span>
-          )}
-        </div>
-      ),
+      cell: (value: string) =>
+        value ? <img src={value} alt="로고" className="h-10 w-auto object-contain" /> : "-",
+      size: 100,
     },
     {
       header: "사이트명",
@@ -290,18 +281,29 @@ const RemittanceBannerPage: React.FC = () => {
       header: "이동링크",
       accessor: "link" as keyof RemittanceBanner,
       cell: (value: string) => (
-        <div className="max-w-xs truncate">
-          <a
-            href={value}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-600 hover:underline hover:text-blue-800"
-            title={value}
-          >
-            {value}
-          </a>
-        </div>
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:underline truncate block max-w-xs"
+        >
+          {value}
+        </a>
       ),
+    },
+    {
+      header: "공개 여부",
+      accessor: "isPublic" as keyof RemittanceBanner,
+      cell: (value: number) => (
+        <span
+          className={`px-2 py-1 rounded ${
+            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+          } text-xs font-medium`}
+        >
+          {value === 1 ? "공개" : "비공개"}
+        </span>
+      ),
+      size: 100,
     },
     {
       header: "등록일자",
@@ -309,51 +311,40 @@ const RemittanceBannerPage: React.FC = () => {
       cell: (value: string) => formatDate(value),
     },
     {
-      header: "공개 여부",
-      accessor: "isPublic" as keyof RemittanceBanner,
-      cell: (value: number) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs ${
-            value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}
-        >
-          {value ? "공개" : "비공개"}
-        </span>
-      ),
-    },
-    {
       header: "관리",
       accessor: "id" as keyof RemittanceBanner,
       cell: (value: number, row: RemittanceBanner, index: number) => (
-        <div className="flex space-x-2">
+        // Ensure the div uses flex and centers items vertically
+        <div className="flex items-center space-x-2">
           <ActionButton
+            label="위로"
+            action="up"
+            size="sm"
             onClick={() => handleMoveUp(index)}
             disabled={index === 0}
-            action="up"
-            label="위로"
-            size="sm"
           />
           <ActionButton
+            label="아래로"
+            action="down"
+            size="sm"
             onClick={() => handleMoveDown(index)}
             disabled={index === banners.length - 1}
-            action="down"
-            label="아래로"
-            size="sm"
           />
           <ActionButton
-            onClick={() => handleEditBanner(row)}
-            action="edit"
             label="수정"
+            action="edit"
             size="sm"
+            onClick={() => handleEditBanner(row)}
           />
           <ActionButton
-            onClick={() => handleDeleteBanner(value)}
-            action="delete"
             label="삭제"
+            action="delete"
             size="sm"
+            onClick={() => handleDeleteBanner(value)}
           />
         </div>
       ),
+      size: 200, // Adjust size if needed
     },
   ];
 

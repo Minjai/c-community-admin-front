@@ -8,7 +8,7 @@ import Input from "@/components/forms/Input";
 import TextEditor from "@/components/forms/TextEditor";
 import FileUpload from "@/components/forms/FileUpload";
 import Alert from "@/components/Alert";
-import { formatDate } from "@/utils/dateUtils";
+import { formatDate, formatDateForDisplay } from "@/utils/dateUtils";
 import { extractDataArray } from "../../api/util";
 
 // 카지노 게임 타입 정의
@@ -363,6 +363,18 @@ const CasinoGameManagement = () => {
   // DataTable 컬럼 정의
   const columns = [
     {
+      header: "게임 제목",
+      accessor: "title" as keyof CasinoGame,
+      cell: (value: string, row: CasinoGame) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          onClick={() => handleEditGame(row)}
+        >
+          {value}
+        </span>
+      ),
+    },
+    {
       header: "썸네일",
       accessor: "thumbnailUrl" as keyof CasinoGame,
       cell: (value: string) => (
@@ -374,10 +386,6 @@ const CasinoGameManagement = () => {
           )}
         </div>
       ),
-    },
-    {
-      header: "게임 제목",
-      accessor: "title" as keyof CasinoGame,
     },
     {
       header: "별점",
@@ -392,7 +400,7 @@ const CasinoGameManagement = () => {
     {
       header: "등록일자",
       accessor: "createdAt" as keyof CasinoGame,
-      cell: (value: string) => formatDate(value),
+      cell: (value: string) => formatDateForDisplay(value),
     },
     {
       header: "공개 여부",

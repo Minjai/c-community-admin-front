@@ -394,10 +394,13 @@ const CompanyBannerPage: React.FC = () => {
     {
       header: "제목",
       accessor: "title" as keyof Banner,
-      cell: (value: string) => (
-        <div className="max-w-xs truncate" title={value}>
+      cell: (value: string, row: Banner) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          onClick={() => handleEditBanner(row)}
+        >
           {value}
-        </div>
+        </span>
       ),
     },
     // 2. PC 이미지

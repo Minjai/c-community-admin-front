@@ -169,8 +169,8 @@ export default function SportsManagement() {
     setModalType("edit");
     setCurrentCategory(category);
     setFormData({
-      sportName: getKoreanSportName(category.sportName),
-      displayName: getKoreanSportName(category.sportName),
+      sportName: category.displayName || getKoreanSportName(category.sportName),
+      displayName: category.displayName || getKoreanSportName(category.sportName),
       icon: category.icon || "",
       isPublic: category.isPublic,
     });
@@ -209,6 +209,12 @@ export default function SportsManagement() {
       return;
     }
 
+    // Check if the custom display name is entered
+    if (!formData.sportName.trim()) {
+      setError("스포츠 종목명을 입력해주세요."); // Or perhaps a more specific name like "표시 이름"
+      return;
+    }
+
     setLoading(true);
     setError(null); // Clear modal error before saving
     setSuccess(null); // Clear success message before saving
@@ -216,27 +222,32 @@ export default function SportsManagement() {
     try {
       if (modalType === "add") {
         await createSportCategory({
-          ...formData,
+          // sportName still uses the English code from the selection
           sportName: getEnglishSportCode(selectedSport),
-          displayName: selectedSport,
+          // displayName now uses the value from the text input
+          displayName: formData.sportName.trim(),
+          isPublic: formData.isPublic,
+          icon: formData.icon, // Assuming icon is handled if needed
           displayOrder:
-            categories.length > 0 ? Math.max(...categories.map((c) => c.displayOrder)) + 1 : 1,
+            categories.length > 0 ? Math.max(...categories.map((c) => c.displayOrder || 0)) + 1 : 1,
         });
 
         setSuccess("새 스포츠 카테고리가 추가되었습니다.");
         setShowModal(false);
-        // 추가 후 목록 다시 불러오기
         fetchSportCategories();
       } else if (currentCategory) {
         await updateSportCategory(currentCategory.id, {
-          ...formData,
+          // sportName still uses the English code from the selection
           sportName: getEnglishSportCode(selectedSport),
-          displayName: selectedSport,
+          // displayName now uses the value from the text input
+          displayName: formData.sportName.trim(),
+          isPublic: formData.isPublic,
+          icon: formData.icon, // Assuming icon is handled if needed
+          // displayOrder is handled by move up/down functions, not typically in edit save
         });
 
         setSuccess("스포츠 카테고리가 업데이트되었습니다.");
         setShowModal(false);
-        // 수정 후 목록 다시 불러오기
         fetchSportCategories();
       }
     } catch (err) {
@@ -252,10 +263,18 @@ export default function SportsManagement() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement;
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "radio" ? parseInt(value) : value,
-    }));
+    // Special handling for radio buttons based on name
+    if (name === "isPublicModal") {
+      setFormData((prev) => ({
+        ...prev,
+        isPublic: parseInt(value),
+      }));
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
   };
 
   const handleSportSelect = (sport: string) => {
@@ -363,7 +382,15 @@ export default function SportsManagement() {
     {
       header: "종목명",
       accessor: "sportName" as keyof SportCategory,
-      cell: (value: string, row: SportCategory) => getKoreanSportName(value),
+      cell: (value: string, row: SportCategory) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
+          onClick={() => handleEditCategory(row)}
+          title={value}
+        >
+          {row.displayName || getKoreanSportName(value)}
+        </span>
+      ),
     },
     {
       header: "표시 이름",

@@ -17,6 +17,7 @@ import {
   formatDateForDisplay,
   formatISODateToDateTimeLocal,
   convertDateTimeLocalToISOUTC,
+  formatDate,
 } from "@/utils/dateUtils";
 
 // 스포츠 종목 추천 관리 컴포넌트
@@ -504,11 +505,25 @@ export default function SportRecommendationsManagement() {
     {
       header: "제목",
       accessor: "title" as keyof SportRecommendation,
-      cell: (value: string) => (
-        <div className="max-w-xs truncate" title={value}>
+      cell: (value: string, row: SportRecommendation) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
+          onClick={() => handleEditRecommendation(row)}
+          title={value}
+        >
           {value}
-        </div>
+        </span>
       ),
+    },
+    {
+      header: "시작일자",
+      accessor: "startTime" as keyof SportRecommendation,
+      cell: (value: string) => formatDate(value),
+    },
+    {
+      header: "종료일자",
+      accessor: "endTime" as keyof SportRecommendation,
+      cell: (value: string) => formatDate(value),
     },
     {
       header: "등록 경기",
@@ -519,14 +534,6 @@ export default function SportRecommendationsManagement() {
         const gameIds = item.sportGameIds || (item.sportGameId ? [item.sportGameId] : []);
         return `${gameIds.length}개의 경기`;
       },
-    },
-    {
-      header: "기간",
-      accessor: (item: SportRecommendation): ReactNode => (
-        <span>
-          {formatDateForDisplay(item.startTime)} ~ {formatDateForDisplay(item.endTime)}
-        </span>
-      ),
     },
     {
       header: "공개 상태",
@@ -793,7 +800,8 @@ export default function SportRecommendationsManagement() {
                             {game.homeTeam} vs {game.awayTeam}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {game.league} ({game.sport}) | {formatDateForDisplay(game.dateTime)}
+                            {game.league} ({game.sport}) |{" "}
+                            {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
                           </div>
                         </div>
                       </div>

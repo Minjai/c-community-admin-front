@@ -354,83 +354,99 @@ const CasinoCompanyPage: React.FC = () => {
     }
   };
 
-  // DataTable 컬럼 정의
+  // 데이터 테이블 컬럼 정의
   const columns = [
+    // 1. 업체 명 (Moved to first)
     {
-      header: "이미지",
-      accessor: "imageUrl" as keyof CasinoCompany,
-      cell: (value: any, company: CasinoCompany) => (
-        <div className="w-20 h-20 relative">
-          <img
-            src={company.imageUrl}
-            alt={company.companyName}
-            className="object-cover w-full h-full rounded"
-          />
-        </div>
-      ),
-    },
-    {
-      header: "업체명",
+      header: "업체 명",
       accessor: "companyName" as keyof CasinoCompany,
-    },
-    {
-      header: "업체소개",
-      accessor: "description" as keyof CasinoCompany,
-      cell: (value: any, company: CasinoCompany) => (
-        <div className="max-w-xs truncate">{company.description}</div>
-      ),
-    },
-    {
-      header: "등록일자",
-      accessor: "createdAt" as keyof CasinoCompany,
-      cell: (value: any, company: CasinoCompany) => formatDate(company.createdAt),
-    },
-    {
-      header: "공개여부",
-      accessor: "isPublic" as keyof CasinoCompany,
-      cell: (value: number, company: CasinoCompany) => (
+      cell: (value: string, row: CasinoCompany) => (
         <span
-          className={`px-2 py-1 rounded text-xs ${
-            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate" // Apply blue style and click handler
+          onClick={() => handleEditCompany(row)} // Call edit handler on click
+          title={value}
         >
-          {value === 1 ? "공개" : "비공개"}
+          {value}
         </span>
       ),
     },
+    // 2. 로고 이미지 (Moved to second)
+    {
+      header: "로고 이미지",
+      accessor: "imageUrl" as keyof CasinoCompany,
+      cell: (value: string) =>
+        value ? (
+          <img src={value} alt="로고" className="h-10 w-auto object-contain" />
+        ) : (
+          <span>이미지 없음</span>
+        ),
+      size: 120,
+    },
+    // 3. 평점
+    {
+      header: "평점",
+      accessor: "rating" as keyof CasinoCompany,
+      cell: (value: number) => value?.toFixed(1) ?? "0.0",
+      size: 80,
+    },
+    // 4. 상태 (표시 여부)
+    {
+      header: "상태",
+      accessor: "isPublic" as keyof CasinoCompany,
+      cell: (value: number | boolean) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            value === 1 || value === true
+              ? "bg-green-100 text-green-800"
+              : "bg-red-100 text-red-800"
+          }`}
+        >
+          {value === 1 || value === true ? "공개" : "비공개"}
+        </span>
+      ),
+      size: 80,
+    },
+    // 5. 등록일자
+    {
+      header: "등록일자",
+      accessor: "createdAt" as keyof CasinoCompany,
+      cell: (value: string) => formatDate(value),
+    },
+    // 6. 관리
     {
       header: "관리",
-      accessor: "id" as keyof CasinoCompany,
-      cell: (value: any, company: CasinoCompany, index: number) => (
+      accessor: "id" as keyof CasinoCompany, // Assuming 'id' is the accessor for actions
+      cell: (value: any, row: CasinoCompany, index: number) => (
         <div className="flex space-x-2">
           <ActionButton
-            onClick={() => handleMoveUp(company, index)}
-            disabled={index === 0}
-            action="up"
             label="위로"
+            action="up"
             size="sm"
+            onClick={() => handleMoveUp(row, index)}
+            disabled={isMoving || index === 0}
           />
           <ActionButton
-            onClick={() => handleMoveDown(company, index)}
-            disabled={index === companies.length - 1}
-            action="down"
             label="아래로"
+            action="down"
             size="sm"
+            onClick={() => handleMoveDown(row, index)}
+            disabled={isMoving || index === companies.length - 1}
           />
           <ActionButton
-            onClick={() => handleEditCompany(company)}
-            action="edit"
             label="수정"
+            action="edit"
             size="sm"
+            onClick={() => handleEditCompany(row)}
           />
           <ActionButton
-            onClick={() => handleDeleteCompany(company.id)}
-            action="delete"
             label="삭제"
+            action="delete"
             size="sm"
+            onClick={() => handleDeleteCompany(row.id)}
           />
         </div>
       ),
+      size: 200, // Adjust size as needed
     },
   ];
 

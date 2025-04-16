@@ -248,63 +248,58 @@ const AdminManagement: React.FC = () => {
     {
       header: "관리자 명",
       accessor: "nickname" as keyof AdminUser,
-    },
-    {
-      header: "로그인 계정",
-      accessor: "email" as keyof AdminUser,
-    },
-    {
-      header: "등급",
-      accessor: "rank" as keyof AdminUser,
-      cell: (value: Rank) => (
-        <span className={`px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800`}>
-          {value?.rankName || "등급 없음"}
-        </span>
-      ),
-    },
-    {
-      header: "가입일자",
-      accessor: "createdAt" as keyof AdminUser,
-      cell: (value: string) => formatDate(value),
-    },
-    {
-      header: "최근 수정일",
-      accessor: "updatedAt" as keyof AdminUser,
-      cell: (value: string) => formatDate(value),
-    },
-    {
-      header: "포인트",
-      accessor: "score" as keyof AdminUser,
-      cell: (value: number) => `${value.toLocaleString()} P`,
-    },
-    {
-      header: "상태",
-      accessor: "status" as keyof AdminUser,
-      cell: (value: string) => (
-        <span className={`px-2 py-1 rounded-full text-xs ${getStatusClassName(value)}`}>
+      cell: (value: string, row: AdminUser) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
+          onClick={() => handleEditAdmin(row)}
+          title={value}
+        >
           {value}
         </span>
       ),
     },
     {
+      header: "이메일",
+      accessor: "email" as keyof AdminUser,
+    },
+    {
+      header: "권한",
+      accessor: "role" as keyof AdminUser,
+      cell: (value: string) => (
+        <span className={`px-2 py-1 rounded ${getRoleClassName(value)} text-xs font-medium`}>
+          {value}
+        </span>
+      ),
+    },
+    {
+      header: "상태",
+      accessor: "status" as keyof AdminUser,
+      cell: (value: string) => (
+        <span className={`px-2 py-1 rounded ${getStatusClassName(value)} text-xs font-medium`}>
+          {value}
+        </span>
+      ),
+    },
+    {
+      header: "등록일자",
+      accessor: "createdAt" as keyof AdminUser,
+      cell: (value: string) => formatDate(value),
+    },
+    {
       header: "관리",
       accessor: "id" as keyof AdminUser,
       cell: (value: number, row: AdminUser) => (
-        <div className="flex items-center space-x-2">
-          <ActionButton
-            label="수정"
-            onClick={() => handleEditAdmin(row)}
-            color="blue"
-            action="edit"
-          />
+        <div className="flex space-x-2">
+          <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEditAdmin(row)} />
           <ActionButton
             label="삭제"
-            onClick={() => handleDeleteAdmin(value)}
-            color="red"
             action="delete"
+            size="sm"
+            onClick={() => handleDeleteAdmin(value)}
           />
         </div>
       ),
+      size: 120,
     },
   ];
 

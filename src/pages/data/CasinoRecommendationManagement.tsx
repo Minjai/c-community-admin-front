@@ -409,10 +409,15 @@ const CasinoRecommendationManagement = () => {
     {
       header: "타이틀",
       accessor: "title" as keyof CasinoRecommendation,
-      cell: (value: string) => (
-        <div className="max-w-xs truncate" title={value}>
+      // Add cell renderer for title styling and click functionality
+      cell: (value: string, row: CasinoRecommendation) => (
+        <span // Changed from div to span for styling consistency
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
+          onClick={() => handleOpenEditModal(row)} // Call edit handler on click
+          title={value}
+        >
           {value}
-        </div>
+        </span>
       ),
     },
     {
@@ -444,12 +449,12 @@ const CasinoRecommendationManagement = () => {
     {
       header: "시작일자",
       accessor: "startDate" as keyof CasinoRecommendation,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: string) => formatDateForDisplay(value), // Already using correct function
     },
     {
       header: "종료일자",
       accessor: "endDate" as keyof CasinoRecommendation,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: string) => formatDateForDisplay(value), // Already using correct function
     },
     {
       header: "공개 여부",

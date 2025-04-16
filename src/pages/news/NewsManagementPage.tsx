@@ -313,31 +313,32 @@ const NewsManagementPage = () => {
       header: "선택",
       accessor: "id" as keyof NewsItem,
       cell: (value: number) => (
-        <div className="flex items-center justify-center">
-          <input
-            type="checkbox"
-            checked={selectedNews.includes(value)}
-            onChange={() => handleToggleSelect(value)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          />
-        </div>
+        <input
+          type="checkbox"
+          checked={selectedNews.includes(value)}
+          onChange={() => handleToggleSelect(value)}
+        />
       ),
-    },
-    {
-      header: "타이틀",
-      accessor: "title" as keyof NewsItem,
+      size: 50,
     },
     {
       header: "썸네일",
       accessor: "thumbnailUrl" as keyof NewsItem,
-      cell: (value: string) => (
-        <div className="w-20 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
-          {value && value.trim() !== "" ? (
-            <img src={value} alt="썸네일" className="max-w-full max-h-full object-contain" />
-          ) : (
-            <span className="text-xs text-gray-500">이미지 없음</span>
-          )}
-        </div>
+      cell: (value: string) =>
+        value ? <img src={value} alt="썸네일" className="h-10 w-auto object-contain" /> : "-",
+      size: 100,
+    },
+    {
+      header: "타이틀",
+      accessor: "title" as keyof NewsItem,
+      cell: (value: string, row: NewsItem) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-md truncate"
+          onClick={() => handleEditNews(row)}
+          title={value}
+        >
+          {value}
+        </span>
       ),
     },
     {
@@ -346,42 +347,35 @@ const NewsManagementPage = () => {
       cell: (value: number, row: NewsItem) => (
         <button
           onClick={() => handleTogglePublic(row.id, value)}
-          className={`px-2 py-1 rounded text-xs ${
-            value === 1
-              ? "bg-green-100 text-green-800 hover:bg-green-200"
-              : "bg-red-100 text-red-800 hover:bg-red-200"
+          className={`px-2 py-1 text-xs rounded ${
+            value === 1 ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"
           }`}
         >
           {value === 1 ? "공개" : "비공개"}
         </button>
       ),
+      size: 100,
     },
     {
-      header: "Most View 여부",
-      accessor: "isSelected" as keyof NewsItem,
-      cell: (value: number) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            value === 1 ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"
-          }`}
-        >
-          {value === 1 ? "선택됨" : "선택안됨"}
-        </span>
-      ),
+      header: "등록일자",
+      accessor: "createdAt" as keyof NewsItem,
+      cell: (value: string) => formatDate(value),
     },
     {
       header: "관리",
       accessor: "id" as keyof NewsItem,
       cell: (value: number, row: NewsItem) => (
-        <div className="flex items-center space-x-2">
+        <div className="flex space-x-2">
+          <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEditNews(row)} />
           <ActionButton
-            label="수정"
-            onClick={() => handleEditNews(row)}
-            color="blue"
-            action="edit"
+            label="삭제"
+            action="delete"
+            size="sm"
+            onClick={() => handleDeleteNews(value)}
           />
         </div>
       ),
+      size: 120,
     },
   ];
 

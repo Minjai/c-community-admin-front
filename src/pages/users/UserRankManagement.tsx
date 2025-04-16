@@ -291,35 +291,28 @@ const UserRankManagement: React.FC = () => {
     {
       header: "등급명",
       accessor: "rankName" as keyof UserRank,
+      cell: (value: string, row: UserRank) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
+          onClick={() => handleEditRank(row)}
+          title={value}
+        >
+          {value}
+        </span>
+      ),
     },
     {
       header: "이미지",
       accessor: "image" as keyof UserRank,
-      cell: (value: string) => (
-        <div className="flex justify-start">
-          {value ? (
-            <img
-              src={
-                value.startsWith("http") ? value : `${import.meta.env.VITE_API_BASE_URL}/${value}`
-              }
-              alt="등급 이미지"
-              className="h-10 w-10 object-cover rounded-full"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = "/placeholder-image.png";
-              }}
-            />
-          ) : (
-            <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center text-gray-500">
-              No
-            </div>
-          )}
-        </div>
-      ),
+      cell: (value: string) =>
+        value ? <img src={value} alt="등급 이미지" className="h-10 w-auto object-contain" /> : "-",
+      size: 100,
     },
     {
-      header: "필요 포인트",
+      header: "점수",
       accessor: "score" as keyof UserRank,
-      cell: (value: number) => `${value.toLocaleString()} P`,
+      cell: (value: number) => value.toLocaleString(),
+      size: 100,
     },
     {
       header: "등록일자",
@@ -329,22 +322,32 @@ const UserRankManagement: React.FC = () => {
     {
       header: "관리",
       accessor: "id" as keyof UserRank,
-      cell: (value: number, row: UserRank) => (
-        <div className="flex items-center space-x-2">
+      cell: (value: number, row: UserRank, index: number) => (
+        <div className="flex space-x-2">
           <ActionButton
-            label="수정"
-            onClick={() => handleEditRank(row)}
-            color="blue"
-            action="edit"
+            label="위로"
+            action="up"
+            size="sm"
+            onClick={() => handleMoveUp(index)}
+            disabled={index === 0}
           />
           <ActionButton
+            label="아래로"
+            action="down"
+            size="sm"
+            onClick={() => handleMoveDown(index)}
+            disabled={index === ranks.length - 1}
+          />
+          <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEditRank(row)} />
+          <ActionButton
             label="삭제"
-            onClick={() => handleDeleteRank(value)}
-            color="red"
             action="delete"
+            size="sm"
+            onClick={() => handleDeleteRank(value)}
           />
         </div>
       ),
+      size: 200,
     },
   ];
 
