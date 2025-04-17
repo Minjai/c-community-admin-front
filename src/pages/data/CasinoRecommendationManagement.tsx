@@ -212,14 +212,9 @@ const CasinoRecommendationManagement = () => {
     setSelectedGames([]);
     setSelectedGameIds([]);
 
-    // 현재 시각을 기본 시작 시간으로 설정
-    const now = new Date();
-    setStartDate(now.toISOString().substring(0, 16));
-
-    // 기본 종료 시간: 1주일 후
-    const weekLater = new Date();
-    weekLater.setDate(weekLater.getDate() + 7);
-    setEndDate(weekLater.toISOString().substring(0, 16));
+    // 시작일/종료일 빈 값으로 초기화
+    setStartDate("");
+    setEndDate("");
 
     setIsPublic(1);
     setPublicSettings("public");

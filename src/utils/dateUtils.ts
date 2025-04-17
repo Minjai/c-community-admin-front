@@ -134,21 +134,28 @@ export function formatISODateToDateTimeLocal(isoUtcString: string | null | undef
 }
 
 /**
- * HTML datetime-local input 요소의 값 (사용자 로컬 시간대)을 그대로 반환 (저장용)
+ * HTML datetime-local input 요소의 값 (사용자 로컬 시간대)을 UTC ISO 문자열로 변환 (저장용)
  * @param localDateTimeString - 'yyyy-MM-ddTHH:mm' 형식의 로컬 날짜/시간 문자열
- * @returns 입력된 'yyyy-MM-ddTHH:mm' 형식 문자열 또는 유효하지 않으면 빈 문자열
+ * @returns UTC ISO 8601 형식 문자열 또는 유효하지 않으면 빈 문자열
  */
 export function convertDateTimeLocalToISOUTC(
   localDateTimeString: string | null | undefined
 ): string {
   if (!localDateTimeString) return "";
-  // 간단한 형식 검증 (필요시 더 강화)
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(localDateTimeString)) {
-    console.error("Invalid local datetime-local format for saving:", localDateTimeString);
+  try {
+    // 로컬 시간 문자열을 Date 객체로 파싱
+    // new Date()는 로컬 시간 문자열을 브라우저/Node.js 환경의 로컬 시간대로 해석
+    const date = new Date(localDateTimeString);
+    if (isNaN(date.getTime())) {
+      console.error("Invalid datetime-local string provided:", localDateTimeString);
+      return "";
+    }
+    // UTC 기준 ISO 문자열로 변환하여 반환
+    return date.toISOString();
+  } catch (error) {
+    console.error("Error converting local datetime-local to ISO UTC:", error);
     return "";
   }
-  // 변환 없이 그대로 반환
-  return localDateTimeString;
 }
 
 /**
