@@ -10,6 +10,12 @@ import DatePicker from "../../components/forms/DatePicker";
 import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
 import { toast } from "react-toastify";
+import {
+  formatDateForDisplay,
+  formatDateForInput,
+  convertToISOString,
+  getCurrentDateTimeLocalString,
+} from "../../utils/dateUtils";
 
 const MiniBannerPage: React.FC = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -22,23 +28,6 @@ const MiniBannerPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [pcImageFile, setPcImageFile] = useState<File | null>(null);
   const [mobileImageFile, setMobileImageFile] = useState<File | null>(null);
-
-  // 날짜 포맷 변환 함수 (UTC 기준)
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "";
-
-    // ISO 형식 문자열을 Date 객체로 변환
-    const date = new Date(dateStr);
-
-    // UTC 기준으로 날짜 및 시간 구성 요소 추출
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(date.getUTCDate()).padStart(2, "0");
-    const hours = String(date.getUTCHours()).padStart(2, "0");
-    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-
-    return `${year}.${month}.${day} ${hours}:${minutes}`; // UTC 기준이지만 "(UTC)" 제거
-  };
 
   // 배너 목록 조회
   const fetchBanners = async () => {
@@ -71,69 +60,40 @@ const MiniBannerPage: React.FC = () => {
 
   // 배너 추가 모달 열기
   const handleAddBanner = () => {
-    setModalError(null);
-    setCurrentBanner({
+    const newBanner: Banner = {
       id: 0,
       title: "",
       pUrl: "",
       mUrl: "",
+      linkUrl: "",
       startDate: "",
       endDate: "",
       isPublic: 1,
-      position: banners.length + 1, // 현재 배너 개수 + 1
+      position: banners.length > 0 ? Math.max(...banners.map((b) => b.position)) + 1 : 1,
       bannerType: "mini",
-      linkUrl: "",
-    });
-    setPcImageFile(null);
-    setMobileImageFile(null);
+    };
+    setCurrentBanner(newBanner);
     setShowModal(true);
-    setIsEditing(false);
   };
 
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
     setModalError(null);
-    // 서버에서 받은 UTC ISO 문자열을 Date 객체로 변환
-    const startDateUTC = banner.startDate ? new Date(banner.startDate) : null;
-    const endDateUTC = banner.endDate ? new Date(banner.endDate) : null;
+    console.log("수정할 배너 데이터:", banner);
 
-    // Date 객체에서 UTC 기준 년/월/일/시/분 추출하여 yyyy-MM-ddTHH:mm 형식으로 변환
-    const formattedStartDate = startDateUTC
-      ? `${startDateUTC.getUTCFullYear()}-${String(startDateUTC.getUTCMonth() + 1).padStart(
-          2,
-          "0"
-        )}-${String(startDateUTC.getUTCDate()).padStart(2, "0")}T${String(
-          startDateUTC.getUTCHours()
-        ).padStart(2, "0")}:${String(startDateUTC.getUTCMinutes()).padStart(2, "0")}`
-      : "";
+    const formattedStartDate = formatDateForInput(banner.startDate);
+    const formattedEndDate = formatDateForInput(banner.endDate);
 
-    const formattedEndDate = endDateUTC
-      ? `${endDateUTC.getUTCFullYear()}-${String(endDateUTC.getUTCMonth() + 1).padStart(
-          2,
-          "0"
-        )}-${String(endDateUTC.getUTCDate()).padStart(2, "0")}T${String(
-          endDateUTC.getUTCHours()
-        ).padStart(2, "0")}:${String(endDateUTC.getUTCMinutes()).padStart(2, "0")}`
-      : "";
-
-    console.log(
-      "원본 시작일(미니, UTC):",
-      banner.startDate,
-      "DatePicker 표시용 UTC 시간:",
-      formattedStartDate
-    );
-    console.log(
-      "원본 종료일(미니, UTC):",
-      banner.endDate,
-      "DatePicker 표시용 UTC 시간:",
-      formattedEndDate
-    );
+    console.log("DatePicker 표시용 시작일:", formattedStartDate);
+    console.log("DatePicker 표시용 종료일:", formattedEndDate);
 
     setCurrentBanner({
       ...banner,
       startDate: formattedStartDate,
       endDate: formattedEndDate,
+      isPublic: banner.isPublic === 1 ? 1 : 0,
     });
+
     setPcImageFile(null);
     setMobileImageFile(null);
     setShowModal(true);
@@ -429,12 +389,12 @@ const MiniBannerPage: React.FC = () => {
     {
       header: "시작일",
       accessor: "startDate" as keyof Banner,
-      cell: (value: string) => formatDate(value),
+      cell: (value: string) => formatDateForDisplay(value),
     },
     {
       header: "종료일",
       accessor: "endDate" as keyof Banner,
-      cell: (value: string) => formatDate(value),
+      cell: (value: string) => formatDateForDisplay(value),
     },
     {
       header: "공개 여부",

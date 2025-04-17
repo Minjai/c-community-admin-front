@@ -716,24 +716,22 @@ const CasinoRecommendationManagement = () => {
           {/* 노출 기간 */}
           <div>
             <h3 className="text-lg font-medium mb-2">노출 기간</h3>
-            <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
-              <div className="flex-1">
-                <label className="block mb-1 text-sm font-medium">시작일시</label>
-                <input
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Input
+                  label="노출 시작일시"
                   type="datetime-local"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   required
                 />
               </div>
-              <div className="flex-1">
-                <label className="block mb-1 text-sm font-medium">종료일시</label>
-                <input
+              <div>
+                <Input
+                  label="노출 종료일시"
                   type="datetime-local"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   required
                 />
               </div>

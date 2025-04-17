@@ -85,7 +85,7 @@ const CasinoGameManagement = () => {
 
         // position 기준으로 내림차순 정렬 (높은 값이 위로)
         const sortedGames = [...transformedGames].sort(
-          (a, b) => (b.position || 0) - (a.position || 0)
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
         setGames(sortedGames);
       } else {

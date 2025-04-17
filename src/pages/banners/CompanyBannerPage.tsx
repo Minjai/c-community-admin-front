@@ -12,6 +12,12 @@ import Alert from "../../components/Alert";
 import { addDays } from "date-fns";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import { toast } from "react-toastify";
+import {
+  formatDateForDisplay,
+  formatDateForInput,
+  convertToISOString,
+  getCurrentDateTimeLocalString,
+} from "../../utils/dateUtils";
 
 const CompanyBannerPage: React.FC = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -30,43 +36,10 @@ const CompanyBannerPage: React.FC = () => {
     title: "",
     bannerType: "COMPANY",
     url: "",
-    startDate: new Date().toISOString().substring(0, 10),
-    endDate: addDays(new Date(), 30).toISOString().substring(0, 10),
+    startDate: getCurrentDateTimeLocalString(),
+    endDate: formatDateForInput(addDays(new Date(), 30).toISOString()),
     isPublic: 1,
     position: 0,
-  };
-
-  // 날짜 표시 포맷 변환 함수 (UI 표시용, UTC 기준)
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "";
-
-    // ISO 형식 문자열을 Date 객체로 변환
-    const date = new Date(dateStr);
-
-    // UTC 기준으로 날짜 및 시간 구성 요소 추출
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(date.getUTCDate()).padStart(2, "0");
-    const hours = String(date.getUTCHours()).padStart(2, "0");
-    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-
-    return `${year}.${month}.${day} ${hours}:${minutes}`; // UTC 기준이지만 "(UTC)" 제거
-  };
-
-  // 날짜를 yyyy-MM-ddTHH:mm 형식으로 변환하는 함수 (폼 입력용, UTC 기준)
-  const formatDateForInput = (dateStr: string) => {
-    if (!dateStr) return "";
-
-    const date = new Date(dateStr);
-
-    // UTC 기준 년/월/일/시/분 추출
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const day = String(date.getUTCDate()).padStart(2, "0");
-    const hours = String(date.getUTCHours()).padStart(2, "0");
-    const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
   // 배너 목록 조회
@@ -106,8 +79,8 @@ const CompanyBannerPage: React.FC = () => {
       title: "",
       pUrl: "",
       mUrl: "",
-      startDate: new Date().toISOString().substring(0, 10),
-      endDate: addDays(new Date(), 30).toISOString().substring(0, 10),
+      startDate: getCurrentDateTimeLocalString(),
+      endDate: formatDateForInput(addDays(new Date(), 30).toISOString()),
       isPublic: 1,
       position: banners.length + 1, // 현재 배너 개수 + 1
       bannerType: "company",
@@ -123,14 +96,13 @@ const CompanyBannerPage: React.FC = () => {
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
     setModalError(null);
-    console.log("수정할 배너 데이터 (원본 UTC):", banner);
+    console.log("수정할 배너 데이터:", banner);
 
-    // 서버에서 받은 UTC 날짜 형식을 폼 입력 형식(yyyy-MM-ddTHH:mm)으로 변환 (UTC 기준)
     const formattedStartDate = formatDateForInput(banner.startDate);
     const formattedEndDate = formatDateForInput(banner.endDate);
 
-    console.log("DatePicker 표시용 시작일(UTC):", formattedStartDate);
-    console.log("DatePicker 표시용 종료일(UTC):", formattedEndDate);
+    console.log("DatePicker 표시용 시작일:", formattedStartDate);
+    console.log("DatePicker 표시용 종료일:", formattedEndDate);
 
     setCurrentBanner({
       ...banner,
@@ -429,13 +401,13 @@ const CompanyBannerPage: React.FC = () => {
     {
       header: "시작일자",
       accessor: "startDate" as keyof Banner,
-      cell: (value: string) => formatDate(value),
+      cell: (value: string) => formatDateForDisplay(value),
     },
     // 5. 종료일자
     {
       header: "종료일자",
       accessor: "endDate" as keyof Banner,
-      cell: (value: string) => formatDate(value),
+      cell: (value: string) => formatDateForDisplay(value),
     },
     // 6. 공개 여부
     {

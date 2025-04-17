@@ -492,7 +492,17 @@ const GuidelineManagement = ({ boardId = 3 }) => {
     {
       header: "등록일자",
       accessor: "createdAt" as keyof GuidelineWithOrder,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: string) => {
+        const date = new Date(value);
+        return date.toLocaleString("ko-KR", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hourCycle: "h23",
+        });
+      },
     },
     {
       header: "공개 여부",
