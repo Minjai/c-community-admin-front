@@ -126,7 +126,6 @@ const PostDetail = () => {
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
-  const [isPopular, setIsPopular] = useState(false);
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -168,7 +167,6 @@ const PostDetail = () => {
       formData.append("content", content);
       formData.append("boardId", "2");
       formData.append("isPublic", "1");
-      formData.append("isPopular", isPopular ? "1" : "0");
 
       // 이미지 파일 추가 (에디터에서 감지된 이미지)
       if (contentAnalysis.imgSources.length > 0) {
@@ -275,9 +273,6 @@ const PostDetail = () => {
       if (postData) {
         setPost(postData);
         setTitle(postData.title || "");
-
-        // 인기 게시물 상태 설정
-        setIsPopular(postData.isPopular === 1 || postData.isPopular === true);
 
         // 안전하게 content 설정 - 비동기 처리
         setTimeout(() => {
@@ -627,23 +622,6 @@ const PostDetail = () => {
       {/* Text Editor */}
       <div ref={editorContainerRef} className="mb-6">
         <TextEditor content={content} setContent={setContent} height="400px" />
-      </div>
-
-      {/* Popular Post Toggle - Moved Below Editor */}
-      <div className="mb-6 flex items-center">
-        {" "}
-        {/* Adjusted margin */}
-        <input
-          type="checkbox"
-          id="isPopular"
-          checked={isPopular}
-          onChange={(e) => setIsPopular(e.target.checked)}
-          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-          disabled={saving}
-        />
-        <label htmlFor="isPopular" className="ml-2 block text-sm text-gray-900">
-          인기 게시물 지정
-        </label>
       </div>
 
       {/* Comments Section (only in edit mode) */}

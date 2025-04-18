@@ -7,22 +7,22 @@ import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
-import TextEditor from "@/components/forms/TextEditor";
-import { extractDataArray } from "@/api/util";
+import { toast } from "react-toastify";
 
-// 뉴스 아이템 타입 정의
+// 뉴스 아이템 타입 정의 (API 응답 기준)
 interface NewsItem {
   id: number;
   title: string;
   link: string;
-  category: string;
-  description: string;
-  author: string;
-  thumbnailUrl: string;
+  description: string | null;
+  thumbnailUrl: string | null; // Mapped from thumbnail
+  thumbnail?: string | null; // Original field from API
   isPublic: number;
-  isSelected: number;
+  isSelected: number; // Field exists in API, keep for mapping consistency
   createdAt: string;
   updatedAt: string;
+  viewCount?: number; // Optional field
+  // Add other fields from API if needed (date, content, html_description)
 }
 
 const NewsManagementPage = () => {
@@ -33,56 +33,75 @@ const NewsManagementPage = () => {
     type: "success" | "error" | "info";
     message: string;
   } | null>(null);
-
-  // 모달 관련 상태
   const [showModal, setShowModal] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [currentNews, setCurrentNews] = useState<NewsItem | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
 
-  // 뉴스 데이터 상태
+  // 뉴스 데이터 상태 (API 필드 반영)
   const [title, setTitle] = useState<string>("");
   const [link, setLink] = useState<string>("");
-  const [category, setCategory] = useState<string>("");
-  const [description, setDescription] = useState<string>("");
-  const [author, setAuthor] = useState<string>("");
-  const [thumbnailUrl, setThumbnailUrl] = useState<string>("");
+  const [description, setDescription] = useState<string | null>("");
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(""); // Allow null
   const [isPublic, setIsPublic] = useState<number>(1);
-  const [isSelected, setIsSelected] = useState<number>(0);
-  const [selectedNews, setSelectedNews] = useState<number[]>([]);
+  // isSelected state is not needed for UI based on previous request
 
-  // 뉴스 목록 조회
+  // 뉴스 목록 전체 조회
   const fetchNews = async () => {
     setLoading(true);
     setError(null);
 
     try {
-      // API 호출 - 슬래시(/) 제거
-      const response = await axios.get("news/admin-news");
-      console.log("뉴스 관리 응답 구조:", response);
+      // API 호출 (limit 파라미터 명시적 추가)
+      const limit = 10000; // Attempt to override default server limit
+      console.log(`Fetching admin news with explicit limit: ${limit}`);
+      const response = await axios.get("admin-news", {
+        params: { limit },
+      });
+      console.log("뉴스 관리 응답:", response.data);
 
-      // extractDataArray 유틸리티 함수를 사용하여 데이터 배열 추출
-      const newsData = extractDataArray(response.data, true);
+      // 서버 응답 구조에 맞춰 데이터 추출: { success: true, data: { articles: [], total: number } }
+      if (
+        response.data?.success &&
+        response.data?.data &&
+        Array.isArray(response.data.data.articles)
+      ) {
+        const articles = response.data.data.articles;
+        console.log("추출된 뉴스 데이터 (articles):", articles);
 
-      if (newsData && newsData.length > 0) {
-        console.log("추출된 뉴스 데이터:", newsData);
-
-        // thumbnail 필드를 thumbnailUrl로 매핑
-        const mappedNewsData = newsData.map((news) => ({
-          ...news,
-          thumbnailUrl: news.thumbnail || news.thumbnailUrl,
-        }));
-
-        console.log("매핑된 뉴스 데이터:", mappedNewsData);
+        const mappedNewsData: NewsItem[] = articles
+          .filter((item: any) => {
+            const isValidId = typeof item.id === "number" && item.id > 0;
+            if (!isValidId) {
+              console.warn("Invalid or missing ID found in news item, filtering out:", item);
+            }
+            return isValidId;
+          })
+          .map((item: any) => ({
+            ...item,
+            thumbnailUrl: item.thumbnail || item.thumbnailUrl || null,
+            description: item.description || null,
+          }));
         setNews(mappedNewsData);
+        // We fetched potentially all items, no need to handle server-side pagination state here
       } else {
-        console.log("적절한 뉴스 데이터를 찾지 못했습니다.");
+        console.warn("뉴스 데이터를 찾지 못했거나 형식이 다릅니다. 응답:", response.data);
         setNews([]);
-        setError("뉴스 목록을 불러오는데 실패했습니다. 서버 응답 형식을 확인해주세요.");
+        setError(response.data?.message || "뉴스 목록 형식이 올바르지 않습니다.");
       }
     } catch (err: any) {
       console.error("뉴스 목록 조회 오류:", err);
-      setError("뉴스 목록을 불러오는데 실패했습니다. 네트워크 또는 API 경로를 확인해주세요.");
+      let detailedError = "뉴스 목록을 불러오는데 실패했습니다.";
+      if (err.response) {
+        detailedError = `서버 오류 ${err.response.status}: ${
+          err.response.data?.message || "알 수 없는 오류"
+        }`;
+      } else if (err.request) {
+        detailedError = "서버로부터 응답을 받지 못했습니다.";
+      } else {
+        detailedError = `요청 설정 중 오류 발생: ${err.message}`;
+      }
+      setError(detailedError);
       setNews([]);
     } finally {
       setLoading(false);
@@ -98,165 +117,126 @@ const NewsManagementPage = () => {
     setShowModal(false);
   };
 
-  // 뉴스 추가 모달 열기
-  const handleAddNews = () => {
-    setCurrentNews(null);
-    // 초기화
-    setTitle("");
-    setLink("");
-    setCategory("");
-    setDescription("");
-    setAuthor("");
-    setThumbnailUrl("");
-    setIsPublic(1);
-    setIsSelected(0);
-    setIsEditing(false);
-    setShowModal(true);
-  };
-
-  // 뉴스 수정 모달 열기
-  const handleEditNews = (news: NewsItem) => {
-    setCurrentNews(news);
-    setTitle(news.title || "");
-    setLink(news.link || "");
-    setCategory(news.category || "");
-    setDescription(news.description || "");
-    setAuthor(news.author || "");
-    setThumbnailUrl(news.thumbnailUrl || "");
-    setIsPublic(news.isPublic);
-    setIsSelected(news.isSelected);
+  // 뉴스 수정 모달 열기 (필드 추가)
+  const handleEditNews = (newsItem: NewsItem) => {
+    setCurrentNews(newsItem);
+    setTitle(newsItem.title || "");
+    setLink(newsItem.link || "");
+    setDescription(newsItem.description || null);
+    setThumbnailUrl(newsItem.thumbnailUrl || null);
+    setIsPublic(newsItem.isPublic);
     setIsEditing(true);
+    setAlertMessage(null); // Clear modal error
     setShowModal(true);
   };
 
-  // 뉴스 삭제
+  // 뉴스 삭제 (동일)
   const handleDeleteNews = async (id: number) => {
-    if (!window.confirm("정말로 이 뉴스를 삭제하시겠습니까?")) {
+    // Add ID validation check
+    if (typeof id !== "number" || id <= 0) {
+      toast.error("유효하지 않은 뉴스 ID입니다. 삭제할 수 없습니다.");
+      console.error(`Invalid ID provided for deletion: ${id}`);
       return;
     }
-
+    if (!window.confirm("정말로 이 뉴스를 삭제하시겠습니까?")) return;
+    // Log the ID before making the delete request
+    console.log(`Attempting to delete news with ID: ${id}, Type: ${typeof id}`);
     try {
-      // API 호출 - 슬래시(/) 제거
-      await axios.delete(`news/admin-news/${id}`);
-      setAlertMessage({ type: "success", message: "뉴스가 삭제되었습니다." });
-      fetchNews(); // 목록 새로고침
+      await axios.delete(`admin-news/${id}`);
+      toast.success("뉴스가 삭제되었습니다."); // Use toast for feedback
+      fetchNews();
     } catch (err: any) {
-      setAlertMessage({ type: "error", message: "뉴스 삭제 중 오류가 발생했습니다." });
+      const errorMessage = err.response?.data?.message || "뉴스 삭제 중 오류가 발생했습니다.";
+      toast.error(errorMessage);
+      console.error("Delete news error:", err.response?.data || err);
     }
   };
 
-  // 뉴스 저장 처리
+  // 뉴스 저장 처리 (API 요청 필드 확인)
   const handleSaveNews = async () => {
     if (!title.trim()) {
       setAlertMessage({ type: "error", message: "뉴스 제목을 입력해주세요." });
       return;
     }
-
     if (!link.trim()) {
       setAlertMessage({ type: "error", message: "뉴스 링크를 입력해주세요." });
       return;
     }
+    // Category, Author 등 다른 필수 필드가 있다면 추가 검증 필요
 
+    // 수정 시 ID 유효성 검사 (강화)
+    if (isEditing && (!currentNews || typeof currentNews.id !== "number" || currentNews.id <= 0)) {
+      setAlertMessage({
+        type: "error",
+        message: "수정할 뉴스 정보가 유효하지 않습니다. (ID 오류)",
+      });
+      console.error("Invalid currentNews state for editing:", currentNews);
+      return;
+    }
+
+    setSaving(true);
+    setAlertMessage(null);
     try {
-      setSaving(true);
-
-      // API 요청 데이터 구성
+      // 서버가 받는 요청 데이터 형식에 맞춰야 함 (thumbnail vs thumbnailUrl 등)
       const requestData = {
         title: title.trim(),
         link: link.trim(),
-        description: description.trim(),
-        thumbnail: thumbnailUrl.trim(),
+        description: description?.trim() ?? null,
+        thumbnail: thumbnailUrl?.trim() ?? null, // Send thumbnailUrl as thumbnail?
         isPublic: isPublic,
-        isSelected: isSelected,
+        // isSelected는 보내지 않음 (UI에서 관리 안 함)
       };
+      console.log("Saving news data:", requestData);
 
       if (!isEditing) {
-        // 새 뉴스 생성 - 슬래시(/) 제거
-        const response = await axios.post("news/admin-news", requestData);
-
-        if (response.status === 201 || response.status === 200) {
-          setAlertMessage({ type: "success", message: "뉴스가 성공적으로 추가되었습니다." });
-        }
+        await axios.post("admin-news", requestData);
+        toast.success("뉴스가 성공적으로 추가되었습니다.");
       } else if (currentNews?.id) {
-        // 기존 뉴스 수정 - 슬래시(/) 제거
-        const response = await axios.put(`news/admin-news/${currentNews.id}`, requestData);
-
-        if (response.status === 200) {
-          setAlertMessage({ type: "success", message: "뉴스가 성공적으로 수정되었습니다." });
-        }
-      } else {
-        throw new Error("수정할 뉴스 정보가 유효하지 않습니다.");
+        // Log the ID before making the update request
+        console.log(
+          `Attempting to update news with ID: ${currentNews.id}, Type: ${typeof currentNews.id}`
+        );
+        await axios.put(`admin-news/${currentNews.id}`, requestData);
+        toast.success("뉴스가 성공적으로 수정되었습니다.");
       }
-
-      fetchNews(); // 목록 새로고침
-      setShowModal(false); // 모달 닫기
+      setShowModal(false);
+      fetchNews();
     } catch (err: any) {
-      setAlertMessage({ type: "error", message: "뉴스 저장 중 오류가 발생했습니다." });
+      console.error("Save news error:", err);
+      const errorMessage = err.response?.data?.message || "뉴스 저장 중 오류가 발생했습니다.";
+      setAlertMessage({ type: "error", message: errorMessage });
     } finally {
       setSaving(false);
     }
   };
 
-  // 뉴스 공개 상태 토글
+  // 뉴스 공개 상태 토글 (동일)
   const handleTogglePublic = async (id: number, currentStatus: number) => {
+    // Add ID validation check
+    if (typeof id !== "number" || id <= 0) {
+      toast.error("유효하지 않은 뉴스 ID입니다. 상태를 변경할 수 없습니다.");
+      console.error(`Invalid ID provided for toggle public status: ${id}`);
+      return;
+    }
+    // Log the ID before making the toggle request
+    console.log(`Attempting to toggle public status for news ID: ${id}, Type: ${typeof id}`);
     try {
-      // API 호출 - 슬래시(/) 제거
-      await axios.put(`news/admin-news/${id}/toggle-public`, {
+      await axios.put(`admin-news/${id}/toggle-public`, {
         isPublic: currentStatus === 1 ? 0 : 1,
       });
-      fetchNews(); // 목록 새로고침
+      fetchNews();
     } catch (err: any) {
-      setAlertMessage({ type: "error", message: "뉴스 공개 상태 변경 중 오류가 발생했습니다." });
+      const errorMessage =
+        err.response?.data?.message || "뉴스 공개 상태 변경 중 오류가 발생했습니다.";
+      toast.error(errorMessage);
+      console.error("Toggle public status error:", err.response?.data || err);
     }
   };
 
-  // 체크박스 토글 핸들러
-  const handleToggleSelect = (id: number) => {
-    if (selectedNews.includes(id)) {
-      setSelectedNews(selectedNews.filter((newsId) => newsId !== id));
-    } else {
-      setSelectedNews([...selectedNews, id]);
-    }
-  };
-
-  // 전체 선택/해제 토글
-  const handleToggleAll = () => {
-    if (selectedNews.length === news.length) {
-      setSelectedNews([]);
-    } else {
-      setSelectedNews(news.map((item) => item.id));
-    }
-  };
-
-  // 선택된 뉴스 삭제
-  const handleDeleteSelected = async () => {
-    if (selectedNews.length === 0) {
-      setAlertMessage({ type: "info", message: "삭제할 뉴스를 선택해주세요." });
-      return;
-    }
-
-    if (!window.confirm(`선택한 ${selectedNews.length}개의 뉴스를 삭제하시겠습니까?`)) {
-      return;
-    }
-
-    try {
-      // 선택된 모든 뉴스 삭제 요청 - 슬래시(/) 제거
-      const deletePromises = selectedNews.map((id) => axios.delete(`news/admin-news/${id}`));
-      await Promise.all(deletePromises);
-
-      setAlertMessage({ type: "success", message: "선택한 뉴스가 모두 삭제되었습니다." });
-      setSelectedNews([]); // 선택 목록 초기화
-      fetchNews(); // 목록 새로고침
-    } catch (err: any) {
-      setAlertMessage({ type: "error", message: "뉴스 삭제 중 오류가 발생했습니다." });
-    }
-  };
-
-  // 모달 컨텐츠 렌더링
+  // 모달 컨텐츠 렌더링 (필드 추가)
   const renderModalContent = () => {
     return (
       <div className="space-y-4">
-        {/* 제목 */}
         <Input
           label="뉴스 제목"
           type="text"
@@ -267,8 +247,6 @@ const NewsManagementPage = () => {
           maxLength={255}
           disabled={saving}
         />
-
-        {/* 링크 */}
         <Input
           label="뉴스 링크"
           type="text"
@@ -279,26 +257,22 @@ const NewsManagementPage = () => {
           maxLength={255}
           disabled={saving}
         />
-
-        {/* 설명 */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">뉴스 설명</label>
           <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            value={description ?? ""} // Handle null
+            onChange={(e) => setDescription(e.target.value || null)} // Set null if empty
             placeholder="뉴스 설명을 입력하세요"
             className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             rows={4}
             disabled={saving}
           />
         </div>
-
-        {/* 썸네일 URL */}
         <Input
           label="썸네일 URL"
           type="text"
-          value={thumbnailUrl}
-          onChange={(e) => setThumbnailUrl(e.target.value)}
+          value={thumbnailUrl ?? ""} // Handle null
+          onChange={(e) => setThumbnailUrl(e.target.value || null)} // Set null if empty
           placeholder="뉴스 썸네일 URL을 입력하세요"
           maxLength={255}
           disabled={saving}
@@ -307,54 +281,40 @@ const NewsManagementPage = () => {
     );
   };
 
-  // DataTable 컬럼 정의
+  // DataTable 컬럼 정의 (필드 추가)
   const columns = [
-    {
-      header: "선택",
-      accessor: "id" as keyof NewsItem,
-      cell: (value: number) => (
-        <input
-          type="checkbox"
-          checked={selectedNews.includes(value)}
-          onChange={() => handleToggleSelect(value)}
-        />
-      ),
-      size: 50,
-    },
     {
       header: "썸네일",
       accessor: "thumbnailUrl" as keyof NewsItem,
-      cell: (value: string) =>
+      cell: (value: string | null) =>
         value ? <img src={value} alt="썸네일" className="h-10 w-auto object-contain" /> : "-",
-      size: 100,
     },
     {
       header: "타이틀",
       accessor: "title" as keyof NewsItem,
-      cell: (value: string, row: NewsItem) => (
+      cell: (value: any, row: NewsItem) => (
         <span
           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-md truncate"
           onClick={() => handleEditNews(row)}
-          title={value}
+          title={row.title}
         >
-          {value}
+          {row.title}
         </span>
       ),
     },
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof NewsItem,
-      cell: (value: number, row: NewsItem) => (
+      cell: (value: any, row: NewsItem) => (
         <button
-          onClick={() => handleTogglePublic(row.id, value)}
+          onClick={() => handleTogglePublic(row.id, row.isPublic)}
           className={`px-2 py-1 text-xs rounded ${
-            value === 1 ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"
+            row.isPublic === 1 ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"
           }`}
         >
-          {value === 1 ? "공개" : "비공개"}
+          {row.isPublic === 1 ? "공개" : "비공개"}
         </button>
       ),
-      size: 100,
     },
     {
       header: "등록일자",
@@ -364,18 +324,17 @@ const NewsManagementPage = () => {
     {
       header: "관리",
       accessor: "id" as keyof NewsItem,
-      cell: (value: number, row: NewsItem) => (
+      cell: (value: any, row: NewsItem) => (
         <div className="flex space-x-2">
           <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEditNews(row)} />
           <ActionButton
             label="삭제"
             action="delete"
             size="sm"
-            onClick={() => handleDeleteNews(value)}
+            onClick={() => handleDeleteNews(row.id)}
           />
         </div>
       ),
-      size: 120,
     },
   ];
 
@@ -383,22 +342,10 @@ const NewsManagementPage = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">뉴스 관리</h1>
-        <div className="flex items-center space-x-2">
-          <Button onClick={handleToggleAll} variant="secondary" className="mr-2">
-            {selectedNews.length === news.length && news.length > 0 ? "전체 해제" : "전체 선택"}
-          </Button>
-          <Button
-            onClick={handleDeleteSelected}
-            variant="danger"
-            disabled={selectedNews.length === 0}
-            className="mr-2"
-          >
-            선택 삭제
-          </Button>
-        </div>
       </div>
 
-      {alertMessage && (
+      {/* Alerts */}
+      {alertMessage?.type !== "error" && alertMessage?.message && (
         <Alert
           type={alertMessage.type}
           message={alertMessage.message}
@@ -406,11 +353,11 @@ const NewsManagementPage = () => {
           className="mb-4"
         />
       )}
-
       {error && (
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
+      {/* DataTable */}
       <DataTable
         columns={columns}
         data={news}
@@ -418,14 +365,9 @@ const NewsManagementPage = () => {
         emptyMessage="등록된 뉴스가 없습니다."
       />
 
-      {/* 뉴스 추가/수정 모달 */}
-      <Modal
-        isOpen={showModal}
-        onClose={handleCloseModal}
-        title={isEditing ? "뉴스 수정" : "새 뉴스 추가"}
-        size="lg"
-      >
-        {/* Modal Error Alert (Above controls) */}
+      {/* Modal */}
+      <Modal isOpen={showModal} onClose={handleCloseModal} title="뉴스 수정" size="lg">
+        {/* Modal Error Alert (only for save errors now) */}
         {alertMessage?.type === "error" && (
           <div className="mb-4">
             <Alert
@@ -435,21 +377,17 @@ const NewsManagementPage = () => {
             />
           </div>
         )}
-
-        {/* Top Control Area */}
+        {/* Top Control Area (ensure no isSelected) */}
         <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
-          {/* Buttons (Left) */}
           <div className="flex space-x-3">
             <Button onClick={handleSaveNews} variant="primary" disabled={saving}>
-              {saving ? "저장 중..." : isEditing ? "수정" : "등록"}
+              {saving ? "저장 중..." : "수정"}
             </Button>
             <Button onClick={handleCloseModal} variant="secondary" disabled={saving}>
               취소
             </Button>
           </div>
-          {/* Toggles (Right) */}
           <div className="flex items-center space-x-4">
-            {/* 공개 여부 */}
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -462,72 +400,9 @@ const NewsManagementPage = () => {
                 공개 상태
               </label>
             </div>
-            {/* 선택 여부 */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="isSelected-modal"
-                checked={isSelected === 1}
-                onChange={(e) => setIsSelected(e.target.checked ? 1 : 0)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-              />
-              <label htmlFor="isSelected-modal" className="ml-2 block text-sm text-gray-900">
-                Most View 여부
-              </label>
-            </div>
           </div>
         </div>
-
-        {/* Form content */}
-        <div className="space-y-4">
-          {/* 제목 */}
-          <Input
-            label="뉴스 제목"
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="뉴스 제목을 입력하세요"
-            required
-            maxLength={255}
-            disabled={saving}
-          />
-
-          {/* 링크 */}
-          <Input
-            label="뉴스 링크"
-            type="text"
-            value={link}
-            onChange={(e) => setLink(e.target.value)}
-            placeholder="뉴스 링크를 입력하세요"
-            required
-            maxLength={255}
-            disabled={saving}
-          />
-
-          {/* 설명 */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">뉴스 설명</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="뉴스 설명을 입력하세요"
-              className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={4}
-              disabled={saving}
-            />
-          </div>
-
-          {/* 썸네일 URL */}
-          <Input
-            label="썸네일 URL"
-            type="text"
-            value={thumbnailUrl}
-            onChange={(e) => setThumbnailUrl(e.target.value)}
-            placeholder="뉴스 썸네일 URL을 입력하세요"
-            maxLength={255}
-            disabled={saving}
-          />
-        </div>
+        {renderModalContent()}
       </Modal>
     </div>
   );
