@@ -80,8 +80,9 @@ export default function SportRecommendationsManagement() {
       const result = await getSportRecommendations({ page, limit });
       // Sort recommendations by ID descending (newest first)
       const sortedData = result.data.sort((a, b) => b.id - a.id);
-      setRecommendations(sortedData); // Use sorted data
-      setTotal(result.meta.total || 0);
+      // Revert: Keep all sorted recommendations
+      setRecommendations(sortedData);
+      setTotal(result.meta.total || 0); // Revert total count
     } catch (err) {
       console.error("Error fetching sport recommendations:", err);
       setError("스포츠 종목 추천 목록을 불러오는데 실패했습니다.");
@@ -343,17 +344,68 @@ export default function SportRecommendationsManagement() {
         endTime: convertDateTimeLocalToISOUTC(formData.endTime),
       };
 
-      let result;
+      let savedRecommendationId: number | null = null;
+      let savedSuccessfully = false; // Track success of initial save
+
+      // 1. Initial Save
       if (modalType === "add") {
-        result = await createSportRecommendation(payload);
-        setSuccess("새 스포츠 종목 추천이 등록되었습니다.");
+        const result = await createSportRecommendation(payload);
+        if (result) {
+          savedRecommendationId = result.id;
+          savedSuccessfully = true;
+          setSuccess("새 스포츠 종목 추천이 등록되었습니다.");
+        }
       } else if (currentRecommendation) {
-        result = await updateSportRecommendation(currentRecommendation.id, payload);
-        setSuccess("스포츠 종목 추천이 수정되었습니다.");
+        const result = await updateSportRecommendation(currentRecommendation.id, payload);
+        if (result) {
+          savedRecommendationId = result.id;
+          savedSuccessfully = true;
+          setSuccess("스포츠 종목 추천이 수정되었습니다.");
+        }
       }
 
-      setShowModal(false);
-      fetchRecommendations();
+      // Proceed only if initial save was successful
+      if (savedSuccessfully) {
+        setShowModal(false); // Close modal immediately
+
+        // 2. Handle making others private (if needed)
+        if (payload.isPublic === 1 && savedRecommendationId !== null) {
+          // Fetch *all* current recommendations to find others to make private
+          // Note: This ignores pagination temporarily to get the full list.
+          const allRecsResult = await getSportRecommendations({});
+          const allCurrentRecs = allRecsResult.data || [];
+
+          const updatesToMake = allCurrentRecs
+            .filter((rec) => rec.id !== savedRecommendationId && rec.isPublic === 1)
+            .map((rec) => updateSportRecommendation(rec.id, { isPublic: 0 }));
+
+          if (updatesToMake.length > 0) {
+            console.log(
+              `Waiting to set ${updatesToMake.length} other recommendations to private...`
+            );
+            const updateResults = await Promise.allSettled(updatesToMake); // Wait for all updates
+            updateResults.forEach((res, index) => {
+              if (res.status === "rejected") {
+                const failedRec = allCurrentRecs.filter(
+                  (rec) => rec.id !== savedRecommendationId && rec.isPublic === 1
+                )[index];
+                console.error(
+                  `Failed to update recommendation ${failedRec?.id} to private:`,
+                  res.reason
+                );
+                // Consider adding user feedback for failed background updates
+              }
+            });
+            console.log("Finished setting others to private.");
+          }
+        }
+
+        // 3. Final Fetch to update UI (uses component's page/limit state)
+        await fetchRecommendations();
+      } else {
+        // Handle initial save failure - error might be set by API call
+        if (!error) setError("추천 저장에 실패했습니다."); // Set generic error if none exists
+      }
     } catch (err) {
       console.error("Error saving sport recommendation:", err);
       const apiError =
@@ -579,10 +631,10 @@ export default function SportRecommendationsManagement() {
               <input
                 type="radio"
                 id="visibility-public-modal"
-                name="isPublicModal"
+                name="isPublic"
                 value="1"
                 checked={formData.isPublic === 1}
-                onChange={handleInputChange} // Assuming handleChange handles radio correctly by name
+                onChange={handleInputChange}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
               />
               <label htmlFor="visibility-public-modal" className="ml-2 text-sm text-gray-700">
@@ -593,10 +645,10 @@ export default function SportRecommendationsManagement() {
               <input
                 type="radio"
                 id="visibility-private-modal"
-                name="isPublicModal"
+                name="isPublic"
                 value="0"
                 checked={formData.isPublic === 0}
-                onChange={handleInputChange} // Assuming handleChange handles radio correctly by name
+                onChange={handleInputChange}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
               />
               <label htmlFor="visibility-private-modal" className="ml-2 text-sm text-gray-700">
@@ -633,7 +685,12 @@ export default function SportRecommendationsManagement() {
                 <div className="space-y-2">
                   {selectedGames.map((game) => (
                     <div key={game.id} className="flex justify-between items-center border-b pb-2">
-                      <div className="font-medium">{game.matchName}</div>
+                      <div>
+                        <div className="font-medium">{game.matchName}</div>
+                        <div className="text-sm text-gray-600">
+                          {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
+                        </div>
+                      </div>
                       <button
                         type="button"
                         onClick={() => handleRemoveSelectedGame(game.id)}
@@ -687,7 +744,10 @@ export default function SportRecommendationsManagement() {
                           type="checkbox"
                           name={`game-${game.id}`}
                           checked={selectedGames.some((g) => g.id === game.id)}
-                          onChange={() => handleToggleGame(game)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            handleToggleGame(game);
+                          }}
                           className="h-4 w-4 text-blue-600 mr-2 rounded"
                         />
                         <div>

@@ -67,8 +67,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
       subItems: [
         { name: "회원 등급 관리", path: "/settings/user-levels" },
         { name: "송금 배너 관리", path: "/settings/transfer-banners" },
-        { name: "사이트 메뉴 관리", path: "/settings/site-menu" },
-        { name: "사이트 약관 관리", path: "/settings/terms" },
+        // { name: "사이트 메뉴 관리", path: "/settings/site-menu" }, // Hide Site Menu Management
+        // { name: "사이트 약관 관리", path: "/settings/terms" },     // Hide Site Terms Management
         { name: "하단 푸터 관리", path: "/settings/footer" },
       ],
     },
