@@ -783,9 +783,31 @@ const TextEditor: React.FC<TextEditorProps> = ({
             }
           }
 
-          // 2. 이미지가 아닐 경우, 텍스트 확인 (지원되는 비디오 URL 자동 임베드)
+          // 2. 이미지가 아닐 경우, 텍스트 확인
           if (!processed) {
             const pastedText = clipboardData.getData("text/plain").trim();
+
+            // --- 이미지 URL 우선 처리 --- START ---
+            const isImageUrl = /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(pastedText);
+            if (isImageUrl) {
+              e.preventDefault(); // 기본 텍스트 붙여넣기 방지
+              processed = true;
+
+              const range = editor.getSelection(true);
+              if (range) {
+                // 선택 영역 삭제 후 이미지 임베드
+                editor.deleteText(range.index, range.length, "user");
+                editor.insertEmbed(range.index, "image", pastedText, "user");
+                editor.setSelection(range.index + 1, 0, "user");
+              } else {
+                // 선택 영역 없으면 맨 끝에 삽입
+                const length = editor.getLength();
+                editor.insertEmbed(length, "image", pastedText, "user");
+                editor.setSelection(length + 1, 0, "user");
+              }
+              return; // 이미지 URL 처리 완료
+            }
+            // --- 이미지 URL 우선 처리 --- END ---
 
             // 이미 <iframe...> 이나 <blockquote...> 형태인지 간단히 확인 (변환 방지)
             if (
@@ -891,7 +913,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
             }
             // --- Twitter Blockquote 처리 추가 --- END ---
 
-            // URL 변환 시도 (YouTube, Vimeo) - Instagram, TikTok, Twitter 가 아닌 경우
+            // URL 변환 시도 (YouTube, Vimeo) - 다른 처리가 안 된 경우
             const embedUrl = transformUrlToEmbed(pastedText);
 
             if (embedUrl) {
@@ -1151,6 +1173,18 @@ const TextEditor: React.FC<TextEditorProps> = ({
              border-left: none !important;
              /* Add other resets if needed */
              list-style: none !important; /* Example reset */
+           }
+           /* Ensure images inserted by Quill render as actual images */
+           .ql-editor img {
+             display: inline-block !important; /* or block, depending on desired layout */
+             max-width: 100%; /* Prevent image overflow */
+             height: auto; /* Maintain aspect ratio */
+             content: none !important; /* Prevent content override */
+           }
+           .ql-editor .ql-image {
+             /* Reset any styles potentially overriding image display */
+             display: inline-block !important;
+             content: none !important;
            }
         `}
       </style>

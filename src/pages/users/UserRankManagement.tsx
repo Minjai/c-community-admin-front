@@ -428,11 +428,13 @@ const UserRankManagement: React.FC = () => {
             />
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">등급 이미지</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                등급 이미지 <span className="text-xs text-gray-500">(사이즈 권장크기 36x36)</span>
+              </label>
               <FileUpload onChange={(file) => setImageFile(file)} accept="image/*" preview={true} />
-              {currentRank.image && !imageFile && (
+              {currentRank?.image && !imageFile && (
                 <div className="mt-2">
-                  <p className="text-sm text-gray-500">현재 이미지:</p>
+                  <span className="text-xs text-gray-500">현재 이미지:</span>
                   <img
                     src={
                       currentRank.image.startsWith("http")

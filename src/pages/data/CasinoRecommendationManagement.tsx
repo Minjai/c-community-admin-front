@@ -559,7 +559,7 @@ const CasinoRecommendationManagement = () => {
         isOpen={showModal}
         onClose={handleCloseModal}
         title={isEditing ? "게임 추천 수정" : "새 게임 추천 추가"}
-        size="xl"
+        size="2xl"
       >
         {/* Modal Error Alert (below title, above controls) */}
         {error && (
@@ -688,13 +688,18 @@ const CasinoRecommendationManagement = () => {
                     selectedGames.map((gameTitle, index) => (
                       <div
                         key={index}
-                        className="flex justify-between items-center py-1 px-2 bg-gray-50 mb-1 rounded"
+                        className="flex justify-between items-center py-1 px-2 bg-gray-50 mb-1 rounded overflow-hidden"
                       >
-                        <span className="text-sm truncate">{gameTitle}</span>
+                        <span
+                          className="text-sm truncate flex-1 mr-2 min-w-0 overflow-hidden whitespace-nowrap"
+                          title={gameTitle}
+                        >
+                          {gameTitle}
+                        </span>
                         <button
                           type="button"
                           onClick={() => removeGameFromSelection(selectedGameIds[index], gameTitle)}
-                          className="text-red-500 hover:text-red-700"
+                          className="text-red-500 hover:text-red-700 flex-shrink-0"
                         >
                           ✕
                         </button>
