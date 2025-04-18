@@ -478,40 +478,27 @@ const RemittanceBannerPage: React.FC = () => {
               이동링크 <span className="text-red-600">*</span>
             </label>
             <Input
+              label="이동링크"
               type="text"
               value={currentBanner?.link || ""}
               onChange={(e) =>
                 setCurrentBanner((prev) => (prev ? { ...prev, link: e.target.value } : null))
               }
-              placeholder="https://example.com"
-              className="w-full"
+              placeholder="https://..."
+              required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              로고 이미지 {!isEditing && <span className="text-red-600">*</span>}
-            </label>
             <div className="mb-2">
               <FileUpload
-                onChange={(file) => setLogoFile(file)}
-                accept="image/*"
-                label={isEditing ? "로고 이미지 변경" : "로고 이미지 선택"}
+                label="로고 이미지 (권장크기: 36x36)"
+                onChange={setLogoFile}
+                value={currentBanner?.imageUrl}
+                required={!isEditing}
+                accept="image/png, image/jpeg, image/gif, image/svg+xml"
               />
-              <p className="text-xs text-gray-500 mt-1">권장 크기: 400x200px, 최대 2MB</p>
             </div>
-            {isEditing && currentBanner?.imageUrl && (
-              <div className="mt-2">
-                <p className="text-sm mb-1">현재 로고:</p>
-                <div className="w-40 h-20 border border-gray-200 rounded-md overflow-hidden">
-                  <img
-                    src={currentBanner.imageUrl}
-                    alt="현재 로고"
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </Modal>
