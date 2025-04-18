@@ -78,7 +78,9 @@ export default function SportRecommendationsManagement() {
 
     try {
       const result = await getSportRecommendations({ page, limit });
-      setRecommendations(result.data);
+      // Sort recommendations by ID descending (newest first)
+      const sortedData = result.data.sort((a, b) => b.id - a.id);
+      setRecommendations(sortedData); // Use sorted data
       setTotal(result.meta.total || 0);
     } catch (err) {
       console.error("Error fetching sport recommendations:", err);
@@ -402,98 +404,6 @@ export default function SportRecommendationsManagement() {
     });
   };
 
-  // 게임 위로 이동
-  const handleMoveUp = async (index: number) => {
-    if (index <= 0) return;
-
-    const newRecommendations = [...recommendations];
-
-    // 현재 선택된 추천과 위의 추천
-    const currentRecommendation = newRecommendations[index];
-    const targetRecommendation = newRecommendations[index - 1];
-
-    // displayOrder 값 교환
-    const currentDisplayOrder = currentRecommendation.displayOrder;
-    const targetDisplayOrder = targetRecommendation.displayOrder;
-
-    // displayOrder 값 교환
-    currentRecommendation.displayOrder = targetDisplayOrder;
-    targetRecommendation.displayOrder = currentDisplayOrder;
-
-    // 배열 내 위치 교환
-    newRecommendations[index] = targetRecommendation;
-    newRecommendations[index - 1] = currentRecommendation;
-
-    try {
-      // 로컬 상태 먼저 업데이트
-      setRecommendations(newRecommendations);
-
-      // API를 통해 각 추천 개별적으로 업데이트
-      await updateSportRecommendation(currentRecommendation.id, {
-        displayOrder: currentRecommendation.displayOrder,
-      });
-
-      await updateSportRecommendation(targetRecommendation.id, {
-        displayOrder: targetRecommendation.displayOrder,
-      });
-
-      // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
-      fetchRecommendations();
-      setSuccess("추천 순서가 변경되었습니다.");
-    } catch (err) {
-      // 에러 발생 시 원래 순서로 되돌림
-      fetchRecommendations();
-      setError("추천 순서 변경 중 오류가 발생했습니다.");
-      console.error("Error updating recommendation order:", err);
-    }
-  };
-
-  // 게임 아래로 이동
-  const handleMoveDown = async (index: number) => {
-    if (index >= recommendations.length - 1) return;
-
-    const newRecommendations = [...recommendations];
-
-    // 현재 선택된 추천과 아래 추천
-    const currentRecommendation = newRecommendations[index];
-    const targetRecommendation = newRecommendations[index + 1];
-
-    // displayOrder 값 교환
-    const currentDisplayOrder = currentRecommendation.displayOrder;
-    const targetDisplayOrder = targetRecommendation.displayOrder;
-
-    // displayOrder 값 교환
-    currentRecommendation.displayOrder = targetDisplayOrder;
-    targetRecommendation.displayOrder = currentDisplayOrder;
-
-    // 배열 내 위치 교환
-    newRecommendations[index] = targetRecommendation;
-    newRecommendations[index + 1] = currentRecommendation;
-
-    try {
-      // 로컬 상태 먼저 업데이트
-      setRecommendations(newRecommendations);
-
-      // API를 통해 각 추천 개별적으로 업데이트
-      await updateSportRecommendation(currentRecommendation.id, {
-        displayOrder: currentRecommendation.displayOrder,
-      });
-
-      await updateSportRecommendation(targetRecommendation.id, {
-        displayOrder: targetRecommendation.displayOrder,
-      });
-
-      // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
-      fetchRecommendations();
-      setSuccess("추천 순서가 변경되었습니다.");
-    } catch (err) {
-      // 에러 발생 시 원래 순서로 되돌림
-      fetchRecommendations();
-      setError("추천 순서 변경 중 오류가 발생했습니다.");
-      console.error("Error updating recommendation order:", err);
-    }
-  };
-
   // 등록 경기 개수 렌더링 함수
   const renderGameCount = (gameIds: number[]) => {
     if (!gameIds || gameIds.length === 0) return "0개의 경기";
@@ -571,20 +481,6 @@ export default function SportRecommendationsManagement() {
       accessor: "id" as keyof SportRecommendation,
       cell: (value: number, row: SportRecommendation, index: number): ReactNode => (
         <div className="flex space-x-2">
-          <ActionButton
-            label="위로"
-            action="up"
-            size="sm"
-            onClick={() => handleMoveUp(index)}
-            disabled={index === 0}
-          />
-          <ActionButton
-            label="아래로"
-            action="down"
-            size="sm"
-            onClick={() => handleMoveDown(index)}
-            disabled={index === recommendations.length - 1}
-          />
           <ActionButton
             label="수정"
             action="edit"

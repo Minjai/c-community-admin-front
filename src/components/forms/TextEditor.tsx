@@ -1057,56 +1057,56 @@ const TextEditor: React.FC<TextEditorProps> = ({
       </div>
       <style>
         {`
-          .text-editor-wrapper .ql-container {
+        .text-editor-wrapper .ql-container {
             height: ${height}; /* Apply fixed height to the container */
             overflow: hidden; /* Hide editor overflow within the container */
-            margin-bottom: 0 !important;
+          margin-bottom: 0 !important;
             padding-bottom: 0 !important; /* Ensure container has no bottom padding */
-            border-bottom-left-radius: 0.375rem;
-            border-bottom-right-radius: 0.375rem;
-            background-color: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-top: none;
-          }
-          .text-editor-wrapper .ql-editor {
+          border-bottom-left-radius: 0.375rem;
+          border-bottom-right-radius: 0.375rem;
+          background-color: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-top: none;
+        }
+        .text-editor-wrapper .ql-editor {
             /* Let editor fill the container */
-            height: 100%;
-            padding-bottom: 0 !important;
-            overflow-y: auto;
-            box-sizing: border-box;
-            direction: ltr;
-            text-align: left;
-            background-color: #ffffff;
-            cursor: text;
+          height: 100%;
+          padding-bottom: 0 !important;
+          overflow-y: auto;
+          box-sizing: border-box;
+          direction: ltr;
+          text-align: left;
+          background-color: #ffffff;
+          cursor: text;
           }
            .quill-editor-container {
              border-radius: 0.375rem;
              overflow: hidden;
-           }
-           .ql-toolbar.ql-snow {
-             border-top-left-radius: 0.375rem;
-             border-top-right-radius: 0.375rem;
-             background-color: #f9fafb;
-             border: 1px solid #e5e7eb;
-             border-bottom: none;
-           }
-           .ql-container.ql-snow {
-            border-bottom-left-radius: 0.375rem;
-            border-bottom-right-radius: 0.375rem;
-            background-color: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-top: none;
-          }
-          .ql-editor.ql-blank::before {
-            content: "";
-            left: 0;
-            right: 0;
-            color: transparent;
-            pointer-events: none;
-          }
-          .ql-editor:focus {
-            outline: none;
-          }
+        }
+        .ql-toolbar.ql-snow {
+          border-top-left-radius: 0.375rem;
+          border-top-right-radius: 0.375rem;
+          background-color: #f9fafb;
+          border: 1px solid #e5e7eb;
+          border-bottom: none;
+        }
+        .ql-container.ql-snow {
+          border-bottom-left-radius: 0.375rem;
+          border-bottom-right-radius: 0.375rem;
+          background-color: #ffffff;
+          border: 1px solid #e5e7eb;
+          border-top: none;
+        }
+        .ql-editor.ql-blank::before {
+          content: "";
+          left: 0;
+          right: 0;
+          color: transparent;
+          pointer-events: none;
+        }
+        .ql-editor:focus {
+          outline: none;
+        }
           .ql-embed { /* embed 블롯 스타일 (기존 ql-video 와 유사하게) */
             display: block;
             width: 100%; /* 너비 조정 가능 */
