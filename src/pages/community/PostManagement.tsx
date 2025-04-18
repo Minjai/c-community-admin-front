@@ -2,6 +2,7 @@ import axios from "@/api/axios";
 import { useEffect, useState } from "react";
 import { Post } from "@/types/index";
 import { useNavigate } from "react-router-dom";
+import ActionButton from "@/components/ActionButton";
 
 const PostManagement = () => {
   const [loading, setLoading] = useState<boolean>(false);
@@ -183,7 +184,7 @@ const PostManagement = () => {
     <div className="p-6 bg-white rounded-xl shadow-md">
       <h2 className="text-xl font-semibold mb-4">게시물 목록</h2>
 
-      <div className="mb-4 flex justify-between">
+      <div className="mb-4 flex justify-end space-x-2">
         <button
           onClick={handleDeleteSelected}
           disabled={selectedPosts.length === 0}
@@ -249,18 +250,20 @@ const PostManagement = () => {
                     {post.viewCount || 0}/{post.comments?.length || 0}/{post.likes?.length || 0}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={(e) => handleEdit(post.id, e)}
-                      className="text-sm text-blue-500 hover:underline"
-                    >
-                      수정
-                    </button>
-                    <button
-                      onClick={(e) => handleDelete(post.id, e)}
-                      className="ml-2 text-sm text-red-500 hover:underline"
-                    >
-                      삭제
-                    </button>
+                    <div className="flex space-x-1 justify-end">
+                      <ActionButton
+                        label="수정"
+                        action="edit"
+                        size="sm"
+                        onClick={(e) => handleEdit(post.id, e)}
+                      />
+                      <ActionButton
+                        label="삭제"
+                        action="delete"
+                        size="sm"
+                        onClick={(e) => handleDelete(post.id, e)}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))

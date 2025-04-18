@@ -1,5 +1,5 @@
 // src/pages/footer/FooterManagementPage.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, ReactNode } from "react";
 import axios from "@/api/axios";
 import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
@@ -9,12 +9,25 @@ import { formatDate } from "@/utils/dateUtils";
 import FooterFormModal from "./FooterFormModal";
 import type { Footer } from "./types";
 
-// Define a simpler column type based on existing DataTable usage
-interface SimpleColumnDef {
+// Define column type based on DataTable.tsx
+interface FooterColumnDef {
   header: string;
-  accessor: keyof Footer | "select" | "actions"; // Use keyof Footer or specific strings for non-data columns
-  cell?: (value: any, row: Footer, index: number) => React.ReactNode; // Optional cell renderer
-  size?: number; // Optional size prop if DataTable supports it
+  accessor: keyof Footer | ((item: Footer) => ReactNode);
+  cell?: (value: any, row: Footer, index?: number) => React.ReactNode;
+  className?: string; // Match DataTable prop
+  // size?: number; // Removed size as it's not in DataTable props
+}
+
+// Helper function to strip HTML tags and truncate text
+function createPreview(htmlContent: string, maxLength: number = 50): string {
+  if (!htmlContent) return "";
+  // Create a temporary element to parse HTML
+  const tempElement = document.createElement("div");
+  tempElement.innerHTML = htmlContent;
+  // Get text content, removing extra whitespace
+  const text = (tempElement.textContent || tempElement.innerText || "").trim();
+  // Truncate if necessary
+  return text.length > maxLength ? text.substring(0, maxLength) + "..." : text;
 }
 
 function FooterManagementPage() {
@@ -145,12 +158,12 @@ function FooterManagementPage() {
     }
   }
 
-  // Define columns based on SimpleColumnDef and banner page examples
-  const columns: SimpleColumnDef[] = [
+  // Define columns matching DataTable.tsx props
+  const columns: FooterColumnDef[] = [
     {
       header: "선택",
-      accessor: "select",
-      cell: (_, row) => (
+      accessor: (item: Footer) => item.id, // Use a function accessor
+      cell: (_: any, row: Footer) => (
         <input
           type="checkbox"
           checked={selectedIds.has(row.id)}
@@ -158,11 +171,10 @@ function FooterManagementPage() {
           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
         />
       ),
-      size: 50, // Keep size if your DataTable uses it
     },
     {
       header: "제목",
-      accessor: "title",
+      accessor: "title", // Use keyof Footer
       cell: (value: string, row: Footer) => (
         <span
           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
@@ -172,20 +184,24 @@ function FooterManagementPage() {
           {value}
         </span>
       ),
-      size: 200,
     },
     {
       header: "내용",
-      accessor: "content",
-      cell: (value) => (
-        <div className="truncate max-w-xs">{value as string}</div> // Truncate long content
+      accessor: "content", // Use keyof Footer
+      cell: (
+        value: string // Add type for value
+      ) => (
+        <div className="truncate max-w-xs" title={createPreview(value, 500)}>
+          {createPreview(value, 50)}
+        </div>
       ),
-      size: 400,
     },
     {
       header: "공개 여부",
-      accessor: "isPublic",
-      cell: (value) => (
+      accessor: "isPublic", // Use keyof Footer
+      cell: (
+        value: number // Add type for value
+      ) => (
         <span
           className={`px-2 py-1 rounded text-xs font-medium ${
             value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
@@ -194,28 +210,29 @@ function FooterManagementPage() {
           {value === 1 ? "공개" : "비공개"}
         </span>
       ),
-      size: 100,
     },
     {
       header: "관리",
-      accessor: "actions",
-      cell: (_, row) => (
+      accessor: (item: Footer) => item.id, // Keep function accessor
+      cell: (_: any, row: Footer) => (
+        // Apply the banner button style
         <div className="flex space-x-1">
           <ActionButton
+            label="수정" // Use label prop
             action="edit"
+            size="sm" // Use sm size
             onClick={() => handleEditClick(row)}
             disabled={deleting}
-            size="sm"
           />
           <ActionButton
+            label="삭제" // Use label prop
             action="delete"
+            size="sm" // Use sm size
             onClick={() => handleDeleteClick(row.id)}
             disabled={deleting}
-            size="sm"
           />
         </div>
       ),
-      size: 100,
     },
   ];
 
@@ -224,7 +241,6 @@ function FooterManagementPage() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">하단 푸터 관리</h1>
         <div className="flex items-center space-x-2">
-          {/* Re-add Select All Checkbox */}
           <div className="flex items-center pr-4">
             <input
               type="checkbox"
@@ -237,11 +253,10 @@ function FooterManagementPage() {
               전체 선택
             </label>
           </div>
-          {/* Re-add Delete Selected Button, disable if nothing selected */}
           <Button
             variant="danger"
             onClick={handleDeleteSelectedClick}
-            disabled={deleting || selectedIds.size === 0} // Disable if deleting or no items selected
+            disabled={deleting || selectedIds.size === 0}
           >
             {deleting ? "삭제 중..." : `선택 항목 삭제 (${selectedIds.size})`}
           </Button>
@@ -275,6 +290,7 @@ function FooterManagementPage() {
         isOpen={showFormModal}
         onClose={() => setShowFormModal(false)}
         onSuccess={() => {
+          setShowFormModal(false);
           fetchFooters();
           setAlertMessage({
             type: "success",
