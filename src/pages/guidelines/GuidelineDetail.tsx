@@ -330,9 +330,12 @@ const GuidelineDetail = ({ boardId = 3 }) => {
           return;
         }
 
+        // Ensure trimmedContent reflects the final HTML after image processing
+        const finalContentForCreate = trimmedContent;
+
         const requestData = {
           title: trimmedTitle,
-          content: trimmedContent,
+          content: finalContentForCreate, // Use the final processed content
           boardId: boardId,
           image: imageFile,
           tags: tags.length > 0 ? JSON.stringify(tags) : undefined,

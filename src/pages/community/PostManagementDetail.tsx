@@ -6,6 +6,7 @@ import axios from "@/api/axios";
 import { AxiosProgressEvent } from "axios";
 import Alert from "@/components/Alert";
 import Button from "@/components/Button";
+import { formatDate } from "@/utils/dateUtils";
 
 // replaceAsync 유틸리티 함수 추가
 const replaceAsync = async (
@@ -648,64 +649,60 @@ const PostDetail = () => {
           {/* Comments list */}
           <div className="space-y-4">
             {comments.map((comment) => (
-              <div key={comment.id} className="bg-gray-50 p-4 rounded-lg shadow-sm">
+              <div key={comment.id} className="bg-gray-50 p-4 rounded-md shadow-sm">
                 {editingCommentId === comment.id ? (
-                  // Editing Comment
                   <div>
                     <textarea
                       value={editCommentContent}
                       onChange={(e) => setEditCommentContent(e.target.value)}
                       rows={3}
-                      className="w-full p-2 border border-gray-300 rounded-md mb-2"
+                      className="w-full p-2 border border-gray-300 rounded-md mb-2 focus:ring-indigo-500 focus:border-indigo-500"
                       required
                     />
                     <div className="flex justify-end space-x-2">
-                      <Button variant="secondary" size="sm" onClick={cancelEditComment}>
-                        취소
-                      </Button>
                       <Button
                         variant="primary"
                         size="sm"
                         onClick={() => handleUpdateComment(comment.id)}
                       >
-                        저장
+                        수정 완료
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={cancelEditComment}>
+                        취소
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  // Displaying Comment
                   <div>
-                    <div className="flex justify-between items-start mb-1">
-                      <span className="font-semibold text-sm text-gray-800">
-                        {comment.authorName || comment.User?.nickname || "익명"}
-                      </span>
-                      <span className="text-xs text-gray-500">
-                        {new Date(comment.createdAt).toLocaleString()}
-                      </span>
+                    <div className="flex justify-between items-center mb-2">
+                      <p className="text-sm font-semibold text-gray-800">
+                        {comment.author?.nickname || "익명"}
+                      </p>
+                      <span className="text-xs text-gray-500">{formatDate(comment.createdAt)}</span>
                     </div>
-                    <p className="text-gray-700 text-sm mb-2 whitespace-pre-wrap">
+                    <p className="text-gray-700 whitespace-pre-wrap break-words">
                       {comment.content}
                     </p>
-                    {/* Add Edit/Delete buttons if user has permission */}
-                    <div className="text-right space-x-2">
-                      <button
-                        onClick={() => startEditComment(comment)}
-                        className="text-xs text-blue-500 hover:underline"
-                      >
+                    {/* 수정 및 삭제 버튼 (임시로 숨김 또는 권한 로직 추가 필요) */}
+                    <div className="flex justify-end space-x-2 mt-2">
+                      <Button variant="outline" size="sm" onClick={() => startEditComment(comment)}>
                         수정
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => handleDeleteComment(comment.id)}
-                        className="text-xs text-red-500 hover:underline"
                       >
                         삭제
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
               </div>
             ))}
-            {comments.length === 0 && <p className="text-center text-gray-500">댓글이 없습니다.</p>}
+            {comments.length === 0 && (
+              <p className="text-center text-gray-500">등록된 댓글이 없습니다.</p>
+            )}
           </div>
         </div>
       )}
