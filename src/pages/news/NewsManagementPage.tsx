@@ -44,6 +44,7 @@ const NewsManagementPage = () => {
   const [description, setDescription] = useState<string | null>("");
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(""); // Allow null
   const [isPublic, setIsPublic] = useState<number>(1);
+  // const [modalIsSelected, setModalIsSelected] = useState<number>(0); // Remove state for modal's selected checkbox
   // isSelected state is not needed for UI based on previous request
 
   // 뉴스 목록 전체 조회
@@ -125,6 +126,7 @@ const NewsManagementPage = () => {
     setDescription(newsItem.description || null);
     setThumbnailUrl(newsItem.thumbnailUrl || null);
     setIsPublic(newsItem.isPublic);
+    // setModalIsSelected(newsItem.isSelected || 0); // Remove setting modal state
     setIsEditing(true);
     setAlertMessage(null); // Clear modal error
     setShowModal(true);
@@ -181,14 +183,16 @@ const NewsManagementPage = () => {
       const requestData = {
         title: title.trim(),
         link: link.trim(),
-        description: description?.trim() ?? null,
-        thumbnail: thumbnailUrl?.trim() ?? null, // Send thumbnailUrl as thumbnail?
+        content: description?.trim() ?? null, // Map description to content
+        thumbnailUrl: thumbnailUrl?.trim() ?? null, // Use thumbnailUrl
         isPublic: isPublic,
-        // isSelected는 보내지 않음 (UI에서 관리 안 함)
+        // isSelected: currentNews?.isSelected ?? 0, // Remove isSelected again as per request
+        // category 필드는 상태 없으므로 생략
       };
       console.log("Saving news data:", requestData);
 
       if (!isEditing) {
+        // POST endpoint might need adjustment too, assuming admin-news for now
         await axios.post("admin-news", requestData);
         toast.success("뉴스가 성공적으로 추가되었습니다.");
       } else if (currentNews?.id) {
@@ -196,7 +200,17 @@ const NewsManagementPage = () => {
         console.log(
           `Attempting to update news with ID: ${currentNews.id}, Type: ${typeof currentNews.id}`
         );
-        await axios.put(`admin-news/${currentNews.id}`, requestData);
+        const newsId = Number(currentNews.id); // Ensure ID is a number
+        if (isNaN(newsId)) {
+          console.error("Invalid News ID for PUT request:", currentNews.id);
+          setAlertMessage({ type: "error", message: "유효하지 않은 뉴스 ID입니다." });
+          setSaving(false);
+          return;
+        }
+        const requestPath = `news/admin-news/${newsId}`; // Update path to include /news
+        console.log("Constructed PUT request path:", requestPath); // Log the constructed path
+        // Update PUT endpoint to /api/news/admin-news/:id (axios instance handles /api)
+        await axios.put(requestPath, requestData); // Use the constructed path
         toast.success("뉴스가 성공적으로 수정되었습니다.");
       }
       setShowModal(false);
@@ -281,7 +295,7 @@ const NewsManagementPage = () => {
     );
   };
 
-  // DataTable 컬럼 정의 (필드 추가)
+  // DataTable 컬럼 정의 (관리 컬럼 수정)
   const columns = [
     {
       header: "썸네일",
@@ -317,6 +331,11 @@ const NewsManagementPage = () => {
       ),
     },
     {
+      header: "인기 여부",
+      accessor: "isSelected" as keyof NewsItem,
+      cell: (value: number) => (value === 1 ? "Y" : "N"),
+    },
+    {
       header: "등록일자",
       accessor: "createdAt" as keyof NewsItem,
       cell: (value: string) => formatDate(value),
@@ -325,7 +344,9 @@ const NewsManagementPage = () => {
       header: "관리",
       accessor: "id" as keyof NewsItem,
       cell: (value: any, row: NewsItem) => (
-        <div className="flex space-x-2">
+        <div className="flex space-x-1">
+          {" "}
+          {/* Use space-x-1 for consistency */}
           <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEditNews(row)} />
           <ActionButton
             label="삭제"
@@ -388,6 +409,21 @@ const NewsManagementPage = () => {
             </Button>
           </div>
           <div className="flex items-center space-x-4">
+            {/* Removed Selected Checkbox (Popularity) */}
+            {/* <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isSelected-modal"
+                checked={modalIsSelected === 1}
+                onChange={(e) => setModalIsSelected(e.target.checked ? 1 : 0)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                disabled={saving}
+              />
+              <label htmlFor="isSelected-modal" className="ml-2 block text-sm text-gray-900">
+                인기 여부
+              </label>
+            </div> */}
+            {/* Public Status Checkbox */}
             <div className="flex items-center">
               <input
                 type="checkbox"
