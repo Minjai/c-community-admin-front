@@ -58,30 +58,34 @@ const CasinoGameManagement = () => {
     setLoading(true);
 
     try {
-      const response = await axios.get("/casino");
-      console.log("카지노 게임 응답 구조:", response);
+      const response = await axios.get("/casino", {
+        params: {
+          limit: 20,
+        },
+      });
 
       // 유틸리티 함수를 사용하여 데이터 배열 추출
       const gameData = extractDataArray(response.data, true);
 
       if (gameData && gameData.length > 0) {
-        console.log("추출된 게임 데이터:", gameData);
-
         // 서버 응답 데이터를 클라이언트 형식으로 변환
-        const transformedGames = gameData.map((game: any) => ({
-          id: game.id,
-          title: game.title,
-          description: game.content || game.description || "",
-          thumbnailUrl: game.imageUrl || game.thumbnailUrl || "",
-          rating: Number(game.rating) || 0,
-          returnRate: Number(game.payoutRate || game.returnRate) || 0,
-          isDirectLinkEnabled: game.isShortcut === 1 || game.isShortcut === true,
-          directLinkUrl: game.shortcutUrl || game.directLinkUrl || "",
-          isPublic: game.isPublic === 1 || game.isPublic === true ? 1 : 0,
-          position: game.displayOrder || game.position || 0,
-          createdAt: game.createdAt || new Date().toISOString(),
-          updatedAt: game.updatedAt || game.createdAt || new Date().toISOString(),
-        }));
+        const transformedGames = gameData.map((game: any) => {
+          return {
+            id: game.id,
+            title: game.title,
+            // Prioritize 'content' for description, then 'description'
+            description: game.content || game.description || "",
+            thumbnailUrl: game.imageUrl || game.thumbnailUrl || "",
+            rating: Number(game.rating) || 0,
+            returnRate: Number(game.payoutRate || game.returnRate) || 0,
+            isDirectLinkEnabled: game.isShortcut === 1 || game.isShortcut === true,
+            directLinkUrl: game.shortcutUrl || game.directLinkUrl || "",
+            isPublic: game.isPublic === 1 || game.isPublic === true ? 1 : 0,
+            position: game.displayOrder || game.position || 0,
+            createdAt: game.createdAt || new Date().toISOString(),
+            updatedAt: game.updatedAt || game.createdAt || new Date().toISOString(),
+          };
+        });
 
         // position 기준으로 내림차순 정렬 (높은 값이 위로)
         const sortedGames = [...transformedGames].sort(
@@ -89,7 +93,6 @@ const CasinoGameManagement = () => {
         );
         setGames(sortedGames);
       } else {
-        console.log("적절한 게임 데이터 배열을 찾지 못했습니다.");
         setGames([]);
       }
     } catch (err) {
@@ -105,15 +108,40 @@ const CasinoGameManagement = () => {
     fetchGames();
   }, []);
 
+  // Effect to populate modal fields and open modal when editing a game
+  useEffect(() => {
+    // Only run when currentGame is set for editing
+    if (isEditing && currentGame) {
+      setTitle(currentGame.title || "");
+      setRating(currentGame.rating || 5.0);
+      setReturnRate(currentGame.returnRate || 95);
+      setIsDirectLinkEnabled(currentGame.isDirectLinkEnabled || false);
+      setDirectLinkUrl(currentGame.directLinkUrl || "");
+      setIsPublic(currentGame.isPublic === 1 ? 1 : 0);
+      setThumbnailFile(null);
+      setThumbnailPreview(currentGame.thumbnailUrl || null);
+
+      // Reset errors
+      setModalError(null);
+
+      // Now open the modal after states are set
+      setShowModal(true);
+    }
+  }, [currentGame, isEditing]); // Run when currentGame or isEditing changes
+
   // 모달 닫기
   const handleCloseModal = () => {
     setShowModal(false);
+    // Reset editing state when modal closes
+    setIsEditing(false);
+    setCurrentGame(null); // Also clear currentGame
   };
 
   // 게임 추가 모달 열기
   const handleAddGame = () => {
-    setCurrentGame(null);
-    // 초기화
+    setIsEditing(false); // Explicitly set isEditing to false
+    setCurrentGame(null); // Clear currentGame
+    // Reset form fields
     setTitle("");
     setDescription("");
     setRating(5.0);
@@ -123,30 +151,15 @@ const CasinoGameManagement = () => {
     setIsPublic(1);
     setThumbnailFile(null);
     setThumbnailPreview(null);
-    setIsEditing(false);
-    setShowModal(true);
+    setModalError(null);
+    setShowModal(true); // Open modal directly for adding new game
   };
 
   // 게임 수정 모달 열기
   const handleEditGame = (game: CasinoGame) => {
-    setCurrentGame(game);
-    setTitle(game.title || "");
-
-    // 설명 설정 - 기존 문제였던 비동기 타이밍 이슈 해결
-    setDescription(game.description || "");
-
-    setRating(game.rating || 5.0);
-    setReturnRate(game.returnRate || 95);
-    setIsDirectLinkEnabled(game.isDirectLinkEnabled || false);
-    setDirectLinkUrl(game.directLinkUrl || "");
-    setIsPublic(game.isPublic === 1 ? 1 : 0);
-    setThumbnailFile(null);
-
-    // 이미지 URL 처리
-    setThumbnailPreview(game.thumbnailUrl || null);
-
-    setIsEditing(true);
-    setShowModal(true);
+    setIsEditing(true); // Indicate editing mode
+    setCurrentGame(game); // Set the game data, triggering the useEffect
+    // Other state settings and setShowModal(true) moved to useEffect
   };
 
   // 게임 삭제
@@ -504,7 +517,12 @@ const CasinoGameManagement = () => {
 
         <div>
           <label className="label">게임 설명</label>
-          <TextEditor content={description} setContent={setDescription} height="200px" />
+          <TextEditor
+            key={currentGame?.id || "new"}
+            content={isEditing && currentGame ? currentGame.description || "" : description}
+            setContent={setDescription}
+            height="200px"
+          />
         </div>
 
         <div>

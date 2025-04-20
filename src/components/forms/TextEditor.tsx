@@ -400,11 +400,15 @@ const TextEditor: React.FC<TextEditorProps> = ({
   onChange,
   onFocus,
 }) => {
+  // Log the received content prop
+  // console.log("TextEditor received content prop:", content);
+
   const quillRef = useRef<ReactQuill>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef<boolean>(false);
   const prevContentRef = useRef<string>(content || "");
   const internalChangeRef = useRef<boolean>(false);
+  const quillInstanceRef = useRef<Quill | null>(null);
 
   // 에디터 초기화 useEffect
   useEffect(() => {
@@ -496,17 +500,29 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
     if (quillRef.current) {
       const editor = quillRef.current.getEditor();
+      const quillInstance = quillRef.current.getEditor(); // quill 인스턴스 가져오기
 
       // 외부에서 content가 변경되었고, 내부 변경이 아닌 경우에만 적용
       if (content !== prevContentRef.current && !internalChangeRef.current) {
         prevContentRef.current = content;
-        editor.root.innerHTML = content || "";
+
+        // Always attempt to convert the incoming HTML string to Delta format
+        try {
+          // Always attempt to convert the incoming HTML string to Delta format
+          const delta = quillInstance.clipboard.convert(content);
+          // Set the editor contents using the Delta object, 'silent' prevents triggering 'text-change'
+          quillInstance.setContents(delta, "silent");
+        } catch (error) {
+          console.error("Error setting Quill content in TextEditor:", error);
+          // Optional: Set fallback text or handle the error appropriately
+          // quillInstance.setText('Error loading content.');
+        }
       }
 
       // 내부 변경 플래그 초기화
       internalChangeRef.current = false;
     }
-  }, [content]);
+  }, [content]); // Rerun only when content prop changes
 
   // 에디터 변경 핸들러
   const handleChange = useCallback(
