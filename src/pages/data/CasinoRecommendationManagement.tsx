@@ -160,7 +160,7 @@ const CasinoRecommendationManagement = () => {
   // 가능한 게임 목록 가져오기
   const fetchAvailableGames = async () => {
     try {
-      const response = await axios.get("/casino");
+      const response = await axios.get("/casino/all");
       const gameData = extractDataArray(response.data, true);
       if (gameData && gameData.length > 0) {
         // 필드 매핑 및 처리
