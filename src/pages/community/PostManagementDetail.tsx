@@ -136,6 +136,8 @@ const PostDetail = () => {
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<number | null>(null);
   const [editCommentContent, setEditCommentContent] = useState("");
+  const [isPopular, setIsPopular] = useState<number>(0); // isPublic -> isPopular, 기본값 0
+  const [isPublic, setIsPublic] = useState<number>(1); // 공개 상태 추가, 기본값 1
   const isNewPost = id === "new";
   const isEditMode = !isNewPost;
 
@@ -151,11 +153,6 @@ const PostDetail = () => {
         return;
       }
 
-      if (content.length <= 20) {
-        setError("내용은 최소 20자 이상 입력해주세요.");
-        return;
-      }
-
       // 에디터 내용 분석
       const contentAnalysis = analyzeContent(content);
 
@@ -166,8 +163,9 @@ const PostDetail = () => {
       const formData = new FormData();
       formData.append("title", trimmedTitle);
       formData.append("content", content);
-      formData.append("boardId", "2");
-      formData.append("isPublic", "1");
+      formData.append("boardId", post?.boardId?.toString() || "2");
+      formData.append("isPopular", isPopular.toString());
+      formData.append("isPublic", isPublic.toString());
 
       // 이미지 파일 추가 (에디터에서 감지된 이미지)
       if (contentAnalysis.imgSources.length > 0) {
@@ -233,6 +231,8 @@ const PostDetail = () => {
   const getPostDetail = async () => {
     if (isNewPost) {
       setLoading(false);
+      setIsPopular(0);
+      setIsPublic(1);
       return;
     }
 
@@ -272,13 +272,24 @@ const PostDetail = () => {
       }
 
       if (postData) {
+        console.log("추출된 postData:", postData);
         setPost(postData);
         setTitle(postData.title || "");
-
-        // 안전하게 content 설정 - 비동기 처리
         setTimeout(() => {
           setContent(postData.content || "");
         }, 0);
+        const popularStatusFromServer = postData.isPopular;
+        console.log("서버에서 받은 isPopular 값:", popularStatusFromServer);
+        const newIsPopularState = popularStatusFromServer === 1 ? 1 : 0;
+        console.log("새로 설정될 isPopular 상태 값:", newIsPopularState);
+        setIsPopular(newIsPopularState);
+
+        const publicStatusFromServer = postData.isPublic;
+        console.log("[DEBUG] 서버에서 받은 isPublic 값:", publicStatusFromServer); // DEBUG 로그
+        const newIsPublicState =
+          publicStatusFromServer === 1 || publicStatusFromServer === true ? 1 : 0;
+        console.log("[DEBUG] 새로 설정될 isPublic 상태 값:", newIsPublicState); // DEBUG 로그
+        setIsPublic(newIsPublicState);
       } else {
         setError("게시물을 찾을 수 없습니다.");
         console.error("게시물 조회 실패: 데이터 없음");
@@ -586,22 +597,60 @@ const PostDetail = () => {
       )}
 
       {/* Top Control Area */}
-      <div className="flex justify-start items-center mb-4 pb-4 border-b border-gray-200 space-x-2">
-        {/* Buttons on the left, Edit/Register first, then Cancel */}
-        <Button
-          variant="primary"
-          onClick={() => handleSubmit()} // Trigger submit handler directly
-          disabled={saving}
-        >
-          {saving ? `저장 중... (${uploadProgress.toFixed(0)}%)` : isEditMode ? "수정" : "등록"}
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => navigate(-1)} // Go back
-          disabled={saving}
-        >
-          취소
-        </Button>
+      <div className="flex justify-between items-center mb-4 pb-4 border-b border-gray-200 space-x-2">
+        {/* Buttons on the left */}
+        <div className="flex space-x-2">
+          <Button
+            variant="primary"
+            onClick={() => handleSubmit()} // Trigger submit handler directly
+            disabled={saving}
+          >
+            {saving ? `저장 중... (${uploadProgress.toFixed(0)}%)` : isEditMode ? "수정" : "등록"}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => navigate(-1)} // Go back
+            disabled={saving}
+          >
+            취소
+          </Button>
+        </div>
+
+        {/* 체크박스 그룹 (오른쪽 끝) */}
+        <div className="flex items-center space-x-4">
+          {" "}
+          {/* 두 체크박스를 묶는 부모 div */}
+          {/* 인기 게시물 등록 체크박스 */}
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="isPopular"
+              checked={isPopular === 1}
+              onChange={(e) => setIsPopular(e.target.checked ? 1 : 0)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              disabled={saving || isNewPost}
+            />
+            <label htmlFor="isPopular" className="ml-2 block text-sm text-gray-900">
+              인기 게시물 등록
+            </label>
+          </div>
+          {/* 공개 상태 체크박스 */}
+          <div className="flex items-center">
+            {" "}
+            {/* ml-4 제거 */}
+            <input
+              type="checkbox"
+              id="isPublic"
+              checked={isPublic === 1}
+              onChange={(e) => setIsPublic(e.target.checked ? 1 : 0)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              disabled={saving}
+            />
+            <label htmlFor="isPublic" className="ml-2 block text-sm text-gray-900">
+              공개 상태
+            </label>
+          </div>
+        </div>
       </div>
 
       {/* Title Input */}

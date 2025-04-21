@@ -44,8 +44,8 @@ const NewsManagementPage = () => {
   const [description, setDescription] = useState<string | null>("");
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(""); // Allow null
   const [isPublic, setIsPublic] = useState<number>(1);
-  // const [modalIsSelected, setModalIsSelected] = useState<number>(0); // Remove state for modal's selected checkbox
-  // isSelected state is not needed for UI based on previous request
+  const [modalIsSelected, setModalIsSelected] = useState<number>(0); // 인기 여부 상태 추가
+  // isSelected state is not needed for UI based on previous request - 이 주석은 제거해도 될 듯
 
   // 뉴스 목록 전체 조회
   const fetchNews = async () => {
@@ -126,7 +126,7 @@ const NewsManagementPage = () => {
     setDescription(newsItem.description || null);
     setThumbnailUrl(newsItem.thumbnailUrl || null);
     setIsPublic(newsItem.isPublic);
-    // setModalIsSelected(newsItem.isSelected || 0); // Remove setting modal state
+    setModalIsSelected(newsItem.isSelected || 0); // modalIsSelected 상태 설정 추가
     setIsEditing(true);
     setAlertMessage(null); // Clear modal error
     setShowModal(true);
@@ -186,7 +186,7 @@ const NewsManagementPage = () => {
         content: description?.trim() ?? null, // Map description to content
         thumbnailUrl: thumbnailUrl?.trim() ?? null, // Use thumbnailUrl
         isPublic: isPublic,
-        // isSelected: currentNews?.isSelected ?? 0, // Remove isSelected again as per request
+        isSelected: modalIsSelected, // isSelected 값 추가
         // category 필드는 상태 없으므로 생략
       };
       console.log("Saving news data:", requestData);
@@ -409,20 +409,6 @@ const NewsManagementPage = () => {
             </Button>
           </div>
           <div className="flex items-center space-x-4">
-            {/* Removed Selected Checkbox (Popularity) */}
-            {/* <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="isSelected-modal"
-                checked={modalIsSelected === 1}
-                onChange={(e) => setModalIsSelected(e.target.checked ? 1 : 0)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                disabled={saving}
-              />
-              <label htmlFor="isSelected-modal" className="ml-2 block text-sm text-gray-900">
-                인기 여부
-              </label>
-            </div> */}
             {/* Public Status Checkbox */}
             <div className="flex items-center">
               <input
@@ -434,6 +420,20 @@ const NewsManagementPage = () => {
               />
               <label htmlFor="isPublic-modal" className="ml-2 block text-sm text-gray-900">
                 공개 상태
+              </label>
+            </div>
+            {/* isSelected (인기 여부) Checkbox 추가 */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isSelected-modal"
+                checked={modalIsSelected === 1}
+                onChange={(e) => setModalIsSelected(e.target.checked ? 1 : 0)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                disabled={saving}
+              />
+              <label htmlFor="isSelected-modal" className="ml-2 block text-sm text-gray-900">
+                인기 여부
               </label>
             </div>
           </div>
