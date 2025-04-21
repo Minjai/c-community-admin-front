@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 // 관리자 계정 타입 정의
 interface Rank {
@@ -61,11 +62,16 @@ const AdminManagement: React.FC = () => {
   } | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
+  const [saving, setSaving] = useState<boolean>(false);
+
+  // 선택된 관리자 ID 상태 추가
+  const [selectedAdminIds, setSelectedAdminIds] = useState<number[]>([]);
 
   // 관리자 목록 조회
   const fetchAdmins = async (page: number = 1) => {
     setLoading(true);
     setError(null);
+    const currentSelected = [...selectedAdminIds]; // 선택 상태 유지
 
     try {
       const response = await axios.get<AdminResponse>(`/admin/admins?page=${page}`);
@@ -74,26 +80,34 @@ const AdminManagement: React.FC = () => {
         setAdmins(response.data.users);
         setCurrentPage(response.data.page);
         setTotalPages(response.data.totalPages);
+        // 선택 상태 복원
+        setSelectedAdminIds(
+          currentSelected.filter((id) => response.data.users.some((admin) => admin.id === id))
+        );
       } else {
         setAdmins([]);
+        setSelectedAdminIds([]); // 에러 시 선택 초기화
         setError("관리자 목록을 불러오는데 실패했습니다.");
       }
     } catch (err) {
       console.error("Error fetching admins:", err);
-      setError("관리자 목록을 불러오는데 실패했습니다.");
       setAdmins([]);
+      setSelectedAdminIds([]); // 에러 시 선택 초기화
+      setError("관리자 목록을 불러오는데 실패했습니다.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAdmins();
-  }, []);
+    fetchAdmins(currentPage);
+  }, [currentPage]);
 
   // 페이지 변경 핸들러
   const handlePageChange = (page: number) => {
-    fetchAdmins(page);
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      setCurrentPage(page);
+    }
   };
 
   // 관리자 추가 모달 열기
@@ -117,6 +131,8 @@ const AdminManagement: React.FC = () => {
     });
     setShowModal(true);
     setIsEditing(false);
+    setAlertMessage(null); // 모달 오류 초기화
+    setSelectedAdminIds([]); // 추가 시 선택 해제
   };
 
   // 관리자 상세 정보 조회
@@ -140,11 +156,16 @@ const AdminManagement: React.FC = () => {
     fetchAdminDetail(admin.id);
     setShowModal(true);
     setIsEditing(true);
+    setAlertMessage(null); // 모달 오류 초기화
+    setSelectedAdminIds([]); // 수정 시 선택 해제
   };
 
   // 관리자 계정 저장 (추가 또는 수정)
   const handleSaveAdmin = async () => {
     if (!currentAdmin) return;
+
+    setSaving(true); // 저장 로딩 상태 시작
+    setAlertMessage(null);
 
     try {
       // 필수 필드 검증 (새 관리자 추가 시에만)
@@ -177,6 +198,7 @@ const AdminManagement: React.FC = () => {
 
       // 모달 닫고 목록 갱신
       setShowModal(false);
+      setSelectedAdminIds([]); // 저장 후 선택 해제
       fetchAdmins(currentPage);
     } catch (error: any) {
       console.error("Error saving admin:", error);
@@ -186,6 +208,8 @@ const AdminManagement: React.FC = () => {
           error.response?.data?.message || error.message
         }`,
       });
+    } finally {
+      setSaving(false); // 저장 로딩 상태 종료
     }
   };
 
@@ -195,9 +219,12 @@ const AdminManagement: React.FC = () => {
       return;
     }
 
+    setLoading(true); // 삭제 로딩 상태 시작
+    setAlertMessage(null);
     try {
       await axios.delete(`/admin/account/${id}`);
       setAlertMessage({ type: "success", message: "관리자가 삭제되었습니다." });
+      setSelectedAdminIds((prev) => prev.filter((adminId) => adminId !== id)); // 선택 해제
       fetchAdmins(currentPage);
     } catch (error: any) {
       console.error("Error deleting admin:", error);
@@ -207,6 +234,8 @@ const AdminManagement: React.FC = () => {
           error.response?.data?.message || error.message
         }`,
       });
+    } finally {
+      setLoading(false); // 삭제 로딩 상태 종료
     }
   };
 
@@ -243,8 +272,109 @@ const AdminManagement: React.FC = () => {
     }
   };
 
+  // 개별 선택 핸들러 추가
+  const handleSelectAdmin = (id: number) => {
+    setSelectedAdminIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((adminId) => adminId !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  // 전체 선택 핸들러 추가
+  const handleSelectAllAdmins = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedAdminIds(admins.map((admin) => admin.id));
+    } else {
+      setSelectedAdminIds([]);
+    }
+  };
+
+  // 일괄 삭제 핸들러 추가
+  const handleBulkDelete = async () => {
+    if (selectedAdminIds.length === 0) {
+      setAlertMessage({ type: "info", message: "삭제할 관리자를 선택해주세요." });
+      return;
+    }
+    if (!window.confirm(`선택된 ${selectedAdminIds.length}명의 관리자를 정말 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    setLoading(true);
+    setAlertMessage(null);
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    for (const id of selectedAdminIds) {
+      try {
+        await axios.delete(`/admin/account/${id}`);
+        successCount++;
+      } catch (err: any) {
+        errorCount++;
+        const message = err.response?.data?.message || `관리자(ID: ${id}) 삭제 중 오류`;
+        errors.push(message);
+        console.error(`Error deleting admin ${id}:`, err.response?.data || err);
+      }
+    }
+
+    setSelectedAdminIds([]); // 완료 후 선택 해제
+    setLoading(false);
+
+    if (errorCount === 0) {
+      setAlertMessage({
+        type: "success",
+        message: `${successCount}명의 관리자가 성공적으로 삭제되었습니다.`,
+      });
+    } else if (successCount === 0) {
+      setAlertMessage({
+        type: "error",
+        message: `선택된 관리자를 삭제하는 중 오류가 발생했습니다. (${errors.join(", ")})`,
+      });
+    } else {
+      setAlertMessage({
+        type: "info",
+        message: `${successCount}명 삭제 성공, ${errorCount}명 삭제 실패.`,
+      });
+    }
+
+    fetchAdmins(currentPage);
+  };
+
   // DataTable 컬럼 정의
   const columns = [
+    // 체크박스 컬럼 추가
+    {
+      header: (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          onChange={handleSelectAllAdmins}
+          checked={admins.length > 0 && selectedAdminIds.length === admins.length}
+          ref={(input) => {
+            if (input) {
+              input.indeterminate =
+                selectedAdminIds.length > 0 && selectedAdminIds.length < admins.length;
+            }
+          }}
+          disabled={loading || admins.length === 0 || saving}
+        />
+      ),
+      accessor: "id" as keyof AdminUser,
+      cell: (id: number) => (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          checked={selectedAdminIds.includes(id)}
+          onChange={() => handleSelectAdmin(id)}
+          disabled={loading || saving}
+        />
+      ),
+      className: "w-px px-4",
+      size: 50,
+    },
     {
       header: "관리자 명",
       accessor: "nickname" as keyof AdminUser,
@@ -288,14 +418,19 @@ const AdminManagement: React.FC = () => {
     {
       header: "관리",
       accessor: "id" as keyof AdminUser,
-      cell: (value: number, row: AdminUser) => (
+      cell: (id: number, row: AdminUser) => (
         <div className="flex space-x-2">
-          <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEditAdmin(row)} />
+          <ActionButton
+            label="수정"
+            action="edit"
+            onClick={() => handleEditAdmin(row)}
+            disabled={loading || saving}
+          />
           <ActionButton
             label="삭제"
             action="delete"
-            size="sm"
-            onClick={() => handleDeleteAdmin(value)}
+            onClick={() => handleDeleteAdmin(id)}
+            disabled={loading || saving}
           />
         </div>
       ),
@@ -307,9 +442,18 @@ const AdminManagement: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">관리자 계정 관리</h1>
-        <Button onClick={handleAddAdmin} variant="primary">
-          새 관리자 추가
-        </Button>
+        <div className="flex space-x-2">
+          <Button
+            variant="danger"
+            onClick={handleBulkDelete}
+            disabled={selectedAdminIds.length === 0 || loading || saving}
+          >
+            {`선택 삭제 (${selectedAdminIds.length})`}
+          </Button>
+          <Button onClick={handleAddAdmin} variant="primary" disabled={loading || saving}>
+            새 관리자 추가
+          </Button>
+        </div>
       </div>
 
       {alertMessage && (
@@ -325,10 +469,12 @@ const AdminManagement: React.FC = () => {
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
+      <LoadingOverlay isLoading={loading || saving} />
+
       <DataTable
         columns={columns}
         data={admins}
-        loading={loading}
+        loading={false}
         emptyMessage="등록된 관리자가 없습니다."
         pagination={{
           currentPage,
@@ -383,6 +529,7 @@ const AdminManagement: React.FC = () => {
               value={currentAdmin.nickname}
               onChange={(e) => handleInputChange("nickname", e.target.value)}
               required
+              disabled={saving}
             />
 
             <Input
@@ -392,6 +539,7 @@ const AdminManagement: React.FC = () => {
               value={currentAdmin.email}
               onChange={(e) => handleInputChange("email", e.target.value)}
               required
+              disabled={saving || isEditing}
             />
 
             <Input
@@ -401,6 +549,7 @@ const AdminManagement: React.FC = () => {
               value={currentAdmin.password || ""}
               onChange={(e) => handleInputChange("password", e.target.value)}
               required={!isEditing}
+              disabled={saving}
             />
 
             {isEditing && (

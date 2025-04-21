@@ -16,6 +16,7 @@ import {
   convertToISOString,
   getCurrentDateTimeLocalString,
 } from "../../utils/dateUtils";
+import LoadingOverlay from "../../components/LoadingOverlay";
 
 const BottomBannerPage: React.FC = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -34,6 +35,9 @@ const BottomBannerPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
   const [totalItems, setTotalItems] = useState<number>(0);
+
+  // 선택된 배너 ID 상태 추가
+  const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
 
   // 배너 목록 조회 (페이지네이션 적용)
   const fetchBanners = async (page: number = 1, limit: number = 10) => {
@@ -371,8 +375,93 @@ const BottomBannerPage: React.FC = () => {
     setMobileImageFile(null);
   };
 
+  // 선택된 배너 일괄 삭제
+  const handleBulkDelete = async () => {
+    if (selectedBannerIds.length === 0) {
+      toast.info("삭제할 배너를 선택해주세요.");
+      return;
+    }
+    if (!window.confirm(`선택된 ${selectedBannerIds.length}개의 배너를 정말 삭제하시겠습니까?`))
+      return;
+
+    try {
+      setLoading(true);
+      const deletePromises = selectedBannerIds.map(
+        (id) => BannerApiService.deleteBottomBanner(id) // Use deleteBottomBanner
+      );
+      await Promise.allSettled(deletePromises);
+
+      toast.success(`${selectedBannerIds.length}개의 배너가 삭제되었습니다.`);
+      fetchBanners(currentPage, pageSize);
+      setSelectedBannerIds([]);
+    } catch (error: any) {
+      console.error("배너 일괄 삭제 중 오류 발생:", error);
+      toast.error("배너 삭제 중 일부 오류가 발생했습니다. 목록을 확인해주세요.");
+      // 에러 발생 시에도 목록 새로고침 및 선택 초기화
+      fetchBanners(currentPage, pageSize);
+      setSelectedBannerIds([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 개별 배너 선택/해제
+  const handleSelectBanner = (id: number) => {
+    setSelectedBannerIds((prevSelected) => {
+      if (prevSelected.includes(id)) {
+        return prevSelected.filter((bannerId) => bannerId !== id);
+      } else {
+        return [...prevSelected, id];
+      }
+    });
+  };
+
+  // 현재 페이지의 모든 배너 선택/해제
+  const handleSelectAllBanners = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const currentPageBannerIds = banners.map((banner) => banner.id);
+      setSelectedBannerIds(currentPageBannerIds);
+    } else {
+      setSelectedBannerIds([]);
+    }
+  };
+
   // 테이블 컬럼 정의
   const columns = [
+    {
+      header: (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          onChange={handleSelectAllBanners}
+          checked={
+            banners.length > 0 &&
+            selectedBannerIds.length === banners.length &&
+            banners.every((banner) => selectedBannerIds.includes(banner.id))
+          }
+          ref={(input) => {
+            if (input) {
+              const someSelected =
+                selectedBannerIds.length > 0 &&
+                selectedBannerIds.length < banners.length &&
+                banners.some((banner) => selectedBannerIds.includes(banner.id));
+              input.indeterminate = someSelected;
+            }
+          }}
+          disabled={loading || banners.length === 0}
+        />
+      ),
+      accessor: "id" as keyof Banner,
+      cell: (id: number) => (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          checked={selectedBannerIds.includes(id)}
+          onChange={() => handleSelectBanner(id)}
+        />
+      ),
+      className: "w-px px-4",
+    },
     {
       header: "제목",
       accessor: "title" as keyof Banner,
@@ -492,21 +581,36 @@ const BottomBannerPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">하단 배너 관리</h1>
-        <Button onClick={handleAddBanner} variant="primary">
-          배너 추가
-        </Button>
+        <div className="flex space-x-2">
+          {/* 선택 삭제 버튼 추가 */}
+          <Button
+            onClick={handleBulkDelete}
+            variant="danger"
+            disabled={selectedBannerIds.length === 0 || loading}
+          >
+            {`선택 삭제 (${selectedBannerIds.length})`}
+          </Button>
+          <Button onClick={handleAddBanner} disabled={loading}>
+            배너 추가
+          </Button>
+        </div>
       </div>
 
       {error && (
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
-      <DataTable
-        columns={columns}
-        data={banners}
-        loading={loading}
-        emptyMessage="등록된 배너가 없습니다."
-      />
+      {/* LoadingOverlay 추가 */}
+      <LoadingOverlay isLoading={loading || isSaving} />
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={banners}
+          loading={loading}
+          emptyMessage="등록된 배너가 없습니다."
+        />
+      </div>
 
       {/* 배너 추가/수정 모달 */}
       {currentBanner && (

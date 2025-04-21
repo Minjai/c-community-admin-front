@@ -205,9 +205,9 @@ const PostManagementPage: React.FC = () => {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">게시물 관리</h1>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6 px-4 py-3 bg-white border-b border-gray-200">
+        <h1 className="text-xl font-semibold text-gray-800">게시물 관리</h1>
         <div className="flex items-center space-x-2">
           <Select
             value={selectedBoard ? selectedBoard.toString() : "all"}

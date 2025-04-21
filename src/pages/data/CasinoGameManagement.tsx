@@ -10,6 +10,7 @@ import FileUpload from "@/components/forms/FileUpload";
 import Alert from "@/components/Alert";
 import { formatDate, formatDateForDisplay } from "@/utils/dateUtils";
 import { extractDataArray } from "../../api/util";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 // 카지노 게임 타입 정의
 interface CasinoGame {
@@ -57,6 +58,9 @@ const CasinoGameManagement = () => {
   const [isPublic, setIsPublic] = useState<number>(1);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+
+  // 선택된 게임 ID 상태 추가
+  const [selectedGameIds, setSelectedGameIds] = useState<number[]>([]);
 
   // 게임 목록 조회 (페이지네이션 적용)
   const fetchGames = async (page: number = currentPage, limit: number = pageSize) => {
@@ -201,12 +205,71 @@ const CasinoGameManagement = () => {
     }
 
     try {
+      setLoading(true); // 로딩 시작
       await axios.delete(`/casino/${id}`);
       setAlertMessage({ type: "success", message: "게임이 삭제되었습니다." });
       fetchGames(); // 목록 새로고침
+      setSelectedGameIds((prev) => prev.filter((gameId) => gameId !== id)); // 삭제된 ID를 선택 목록에서 제거
     } catch (err) {
       console.error("Error deleting game:", err);
       setAlertMessage({ type: "error", message: "게임 삭제 중 오류가 발생했습니다." });
+    } finally {
+      setLoading(false); // 로딩 종료
+    }
+  };
+
+  // 선택된 게임 일괄 삭제
+  const handleBulkDelete = async () => {
+    if (selectedGameIds.length === 0) {
+      setAlertMessage({ type: "info", message: "삭제할 게임을 선택해주세요." });
+      return;
+    }
+    if (!window.confirm(`선택된 ${selectedGameIds.length}개의 게임을 정말 삭제하시겠습니까?`))
+      return;
+
+    try {
+      setLoading(true); // 로딩 시작
+      const deletePromises = selectedGameIds.map((id) => axios.delete(`/casino/${id}`));
+      await Promise.allSettled(deletePromises);
+
+      setAlertMessage({
+        type: "success",
+        message: `${selectedGameIds.length}개의 게임이 삭제되었습니다.`,
+      });
+      fetchGames(); // 목록 새로고침
+      setSelectedGameIds([]); // 선택 초기화
+    } catch (error: any) {
+      console.error("게임 일괄 삭제 중 오류 발생:", error);
+      setAlertMessage({
+        type: "error",
+        message: "게임 삭제 중 일부 오류가 발생했습니다. 목록을 확인해주세요.",
+      });
+      // 오류 발생 시에도 목록 새로고침 및 선택 초기화
+      fetchGames();
+      setSelectedGameIds([]);
+    } finally {
+      setLoading(false); // 로딩 종료
+    }
+  };
+
+  // 개별 게임 선택/해제
+  const handleSelectGame = (id: number) => {
+    setSelectedGameIds((prevSelected) => {
+      if (prevSelected.includes(id)) {
+        return prevSelected.filter((gameId) => gameId !== id);
+      } else {
+        return [...prevSelected, id];
+      }
+    });
+  };
+
+  // 현재 페이지의 모든 게임 선택/해제
+  const handleSelectAllGames = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const currentPageGameIds = games.map((game) => game.id);
+      setSelectedGameIds(currentPageGameIds);
+    } else {
+      setSelectedGameIds([]);
     }
   };
 
@@ -407,6 +470,42 @@ const CasinoGameManagement = () => {
 
   // DataTable 컬럼 정의
   const columns = [
+    // 체크박스 컬럼 추가
+    {
+      header: (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          onChange={handleSelectAllGames}
+          checked={
+            games.length > 0 &&
+            selectedGameIds.length === games.length &&
+            games.every((game) => selectedGameIds.includes(game.id))
+          }
+          ref={(input) => {
+            if (input) {
+              // 일부만 선택되었을 때 indeterminate 상태로 설정
+              const someSelected =
+                selectedGameIds.length > 0 &&
+                selectedGameIds.length < games.length &&
+                games.some((game) => selectedGameIds.includes(game.id));
+              input.indeterminate = someSelected;
+            }
+          }}
+          disabled={loading || games.length === 0} // 로딩 중이거나 데이터가 없을 때 비활성화
+        />
+      ),
+      accessor: "id" as keyof CasinoGame,
+      cell: (id: number) => (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          checked={selectedGameIds.includes(id)}
+          onChange={() => handleSelectGame(id)}
+        />
+      ),
+      className: "w-px px-4", // 컬럼 너비 및 패딩 조정
+    },
     {
       header: "게임 제목",
       accessor: "title" as keyof CasinoGame,
@@ -463,7 +562,7 @@ const CasinoGameManagement = () => {
     {
       header: "관리",
       accessor: "id" as keyof CasinoGame,
-      cell: (value: number, row: CasinoGame) => (
+      cell: (value: number, row: CasinoGame, index: number) => (
         <div className="flex items-center space-x-2">
           <ActionButton
             label="수정"
@@ -637,9 +736,18 @@ const CasinoGameManagement = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">카지노 게임 관리</h1>
-        <Button onClick={handleAddGame} variant="primary">
-          게임 추가
-        </Button>
+        <div className="flex space-x-2">
+          <Button
+            onClick={handleBulkDelete}
+            variant="danger"
+            disabled={selectedGameIds.length === 0 || loading || saving}
+          >
+            {`선택 삭제 (${selectedGameIds.length})`}
+          </Button>
+          <Button onClick={handleAddGame} variant="primary" disabled={loading || saving}>
+            게임 추가
+          </Button>
+        </div>
       </div>
 
       {alertMessage && (
@@ -651,6 +759,8 @@ const CasinoGameManagement = () => {
         />
       )}
 
+      <LoadingOverlay isLoading={loading || saving} />
+
       <DataTable
         columns={columns}
         data={games}
@@ -658,7 +768,6 @@ const CasinoGameManagement = () => {
         emptyMessage="등록된 게임이 없습니다."
       />
 
-      {/* 페이지네이션 UI 추가 */}
       {games && games.length > 0 && totalPages > 1 && (
         <div className="flex justify-center my-6">
           <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">

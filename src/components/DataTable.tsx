@@ -1,8 +1,8 @@
-import React, { ReactNode } from 'react';
+import React, { ReactNode } from "react";
 
 export interface TableProps<T> {
   columns: {
-    header: string;
+    header: string | ReactNode;
     accessor: keyof T | ((item: T) => ReactNode);
     className?: string;
     cell?: (value: any, row: T, index: number) => ReactNode;
@@ -22,19 +22,17 @@ const DataTable = <T extends Record<string, any>>({
   columns,
   data,
   loading = false,
-  emptyMessage = '데이터가 없습니다.',
+  emptyMessage = "데이터가 없습니다.",
   pagination,
 }: TableProps<T>) => {
   // 페이지네이션 계산
-  const totalPages = pagination
-    ? Math.ceil(pagination.totalItems / pagination.pageSize)
-    : 1;
+  const totalPages = pagination ? Math.ceil(pagination.totalItems / pagination.pageSize) : 1;
 
   // 페이지 번호 배열 생성
   const getPageNumbers = () => {
     const pages = [];
     const maxVisiblePages = 5;
-    
+
     if (totalPages <= maxVisiblePages) {
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i);
@@ -43,33 +41,33 @@ const DataTable = <T extends Record<string, any>>({
       const currentPage = pagination?.currentPage || 1;
       let startPage = Math.max(currentPage - Math.floor(maxVisiblePages / 2), 1);
       let endPage = startPage + maxVisiblePages - 1;
-      
+
       if (endPage > totalPages) {
         endPage = totalPages;
         startPage = Math.max(endPage - maxVisiblePages + 1, 1);
       }
-      
+
       if (startPage > 1) {
         pages.push(1);
-        if (startPage > 2) pages.push('...');
+        if (startPage > 2) pages.push("...");
       }
-      
+
       for (let i = startPage; i <= endPage; i++) {
         pages.push(i);
       }
-      
+
       if (endPage < totalPages) {
-        if (endPage < totalPages - 1) pages.push('...');
+        if (endPage < totalPages - 1) pages.push("...");
         pages.push(totalPages);
       }
     }
-    
+
     return pages;
   };
 
   // 셀 값 가져오기
   const getCellValue = (row: T, accessor: keyof T | ((item: T) => ReactNode)) => {
-    if (typeof accessor === 'function') {
+    if (typeof accessor === "function") {
       return accessor(row);
     }
     return row[accessor];
@@ -84,7 +82,9 @@ const DataTable = <T extends Record<string, any>>({
               <th
                 key={index}
                 scope="col"
-                className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${column.className || ''}`}
+                className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                  column.className || ""
+                }`}
               >
                 {column.header}
               </th>
@@ -113,7 +113,9 @@ const DataTable = <T extends Record<string, any>>({
                 {columns.map((column, colIndex) => (
                   <td
                     key={colIndex}
-                    className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${column.className || ''}`}
+                    className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${
+                      column.className || ""
+                    }`}
                   >
                     {column.cell
                       ? column.cell(getCellValue(row, column.accessor), row, rowIndex)
@@ -134,8 +136,8 @@ const DataTable = <T extends Record<string, any>>({
               disabled={pagination.currentPage === 1}
               className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
                 pagination.currentPage === 1
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-white text-gray-700 hover:bg-gray-50"
               }`}
             >
               이전
@@ -145,8 +147,8 @@ const DataTable = <T extends Record<string, any>>({
               disabled={pagination.currentPage === totalPages}
               className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
                 pagination.currentPage === totalPages
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-white text-gray-700 hover:bg-gray-50'
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-white text-gray-700 hover:bg-gray-50"
               }`}
             >
               다음
@@ -155,26 +157,29 @@ const DataTable = <T extends Record<string, any>>({
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-700">
-                전체 <span className="font-medium">{pagination.totalItems}</span> 개 중{' '}
+                전체 <span className="font-medium">{pagination.totalItems}</span> 개 중{" "}
                 <span className="font-medium">
                   {(pagination.currentPage - 1) * pagination.pageSize + 1}
-                </span>{' '}
-                -{' '}
+                </span>{" "}
+                -{" "}
                 <span className="font-medium">
                   {Math.min(pagination.currentPage * pagination.pageSize, pagination.totalItems)}
-                </span>{' '}
+                </span>{" "}
                 표시
               </p>
             </div>
             <div>
-              <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              <nav
+                className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                aria-label="Pagination"
+              >
                 <button
                   onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
                   disabled={pagination.currentPage === 1}
                   className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
                     pagination.currentPage === 1
-                      ? 'text-gray-300 cursor-not-allowed'
-                      : 'text-gray-500 hover:bg-gray-50'
+                      ? "text-gray-300 cursor-not-allowed"
+                      : "text-gray-500 hover:bg-gray-50"
                   }`}
                 >
                   <span className="sr-only">이전</span>
@@ -194,7 +199,7 @@ const DataTable = <T extends Record<string, any>>({
                 </button>
                 {getPageNumbers().map((page, index) => (
                   <React.Fragment key={index}>
-                    {page === '...' ? (
+                    {page === "..." ? (
                       <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
                         ...
                       </span>
@@ -203,8 +208,8 @@ const DataTable = <T extends Record<string, any>>({
                         onClick={() => pagination.onPageChange(page as number)}
                         className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
                           page === pagination.currentPage
-                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                            ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
+                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
                         }`}
                       >
                         {page}
@@ -217,8 +222,8 @@ const DataTable = <T extends Record<string, any>>({
                   disabled={pagination.currentPage === totalPages}
                   className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
                     pagination.currentPage === totalPages
-                      ? 'text-gray-300 cursor-not-allowed'
-                      : 'text-gray-500 hover:bg-gray-50'
+                      ? "text-gray-300 cursor-not-allowed"
+                      : "text-gray-500 hover:bg-gray-50"
                   }`}
                 >
                   <span className="sr-only">다음</span>

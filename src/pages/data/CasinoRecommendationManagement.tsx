@@ -13,6 +13,7 @@ import {
   convertDateTimeLocalToISOUTC,
 } from "@/utils/dateUtils";
 import { extractDataArray } from "../../api/util";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 // 카지노 게임 추천 타입 정의
 interface CasinoRecommendation {
@@ -78,6 +79,9 @@ const CasinoRecommendationManagement = () => {
 
   // 게임 선택 상태 관리
   const selectedListRef = useRef<HTMLDivElement>(null);
+
+  // 선택된 추천 ID 상태 추가
+  const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<number[]>([]);
 
   // 공개 설정 상태 관리
   useEffect(() => {
@@ -248,71 +252,128 @@ const CasinoRecommendationManagement = () => {
 
   // 게임 추천 삭제
   const handleDeleteRecommendation = async (id: number) => {
-    if (!window.confirm("정말로 이 게임 추천을 삭제하시겠습니까?")) {
+    if (window.confirm("정말로 이 추천 목록을 삭제하시겠습니까?")) {
+      try {
+        setLoading(true);
+        await axios.delete(`/casino-recommends/${id}`);
+        setAlertMessage({ type: "success", message: "추천 목록이 삭제되었습니다." });
+        fetchRecommendations(); // 목록 새로고침
+        setSelectedRecommendationIds((prev) => prev.filter((recId) => recId !== id)); // 선택 해제
+      } catch (err) {
+        setError("추천 목록 삭제 중 오류가 발생했습니다.");
+        console.error("Delete error:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  // 선택된 추천 일괄 삭제
+  const handleBulkDelete = async () => {
+    if (selectedRecommendationIds.length === 0) {
+      setAlertMessage({ type: "info", message: "삭제할 추천 목록을 선택해주세요." });
       return;
     }
+    if (
+      !window.confirm(
+        `선택된 ${selectedRecommendationIds.length}개의 추천 목록을 정말 삭제하시겠습니까?`
+      )
+    )
+      return;
 
     try {
-      // 올바른 API 경로로 수정
-      await axios.delete(`/casino-recommends/${id}`);
-      setAlertMessage({ type: "success", message: "게임 추천이 삭제되었습니다." });
+      setLoading(true);
+      const deletePromises = selectedRecommendationIds.map((id) =>
+        axios.delete(`/casino-recommends/${id}`)
+      );
+      await Promise.allSettled(deletePromises);
+
+      setAlertMessage({
+        type: "success",
+        message: `${selectedRecommendationIds.length}개의 추천 목록이 삭제되었습니다.`,
+      });
       fetchRecommendations(); // 목록 새로고침
-    } catch (err: any) {
-      console.error("Error deleting recommendation:", err);
-      setAlertMessage({ type: "error", message: "게임 추천 삭제 중 오류가 발생했습니다." });
+      setSelectedRecommendationIds([]); // 선택 초기화
+    } catch (error: any) {
+      console.error("추천 목록 일괄 삭제 중 오류 발생:", error);
+      setError("추천 목록 삭제 중 일부 오류가 발생했습니다. 목록을 확인해주세요.");
+      // 오류 발생 시에도 목록 새로고침 및 선택 초기화 (선택적)
+      fetchRecommendations();
+      setSelectedRecommendationIds([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 게임 추천 순서 위로 이동 (기존 로직 재활용 및 수정)
+  // 개별 추천 선택/해제
+  const handleSelectRecommendation = (id: number) => {
+    setSelectedRecommendationIds((prevSelected) => {
+      if (prevSelected.includes(id)) {
+        return prevSelected.filter((recId) => recId !== id);
+      } else {
+        return [...prevSelected, id];
+      }
+    });
+  };
+
+  // 현재 페이지의 모든 추천 선택/해제
+  const handleSelectAllRecommendations = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const currentPageRecommendationIds = recommendations.map((rec) => rec.id);
+      setSelectedRecommendationIds(currentPageRecommendationIds);
+    } else {
+      setSelectedRecommendationIds([]);
+    }
+  };
+
+  // 순서 변경 (위로)
   const handleMoveUp = async (index: number) => {
     if (index <= 0) return;
+    const currentItem = recommendations[index];
+    const targetItem = recommendations[index - 1];
+    const currentPosition = currentItem.position || 0;
+    const targetPosition = targetItem.position || 0;
 
     try {
-      const recommendationToMove = recommendations[index];
-      const recommendationAbove = recommendations[index - 1];
-
-      // position 값 교환 (API는 displayOrder 필드를 기대할 수 있음 - 확인 필요)
-      const newDisplayOrder = recommendationAbove.position; // 기존 position 값 사용
-      const oldDisplayOrder = recommendationToMove.position;
-
-      // 서버 API 엔드포인트 및 필드명 확인 필요
-      await axios.put(`/casino-recommends/${recommendationToMove.id}`, {
-        displayOrder: newDisplayOrder,
+      setLoading(true);
+      // Use the batch update endpoint
+      await axios.patch(`/casino-recommends/display-order`, {
+        updates: [
+          { id: currentItem.id, displayOrder: targetPosition },
+          { id: targetItem.id, displayOrder: currentPosition },
+        ],
       });
-      await axios.put(`/casino-recommends/${recommendationAbove.id}`, {
-        displayOrder: oldDisplayOrder,
-      });
-
-      setAlertMessage({ type: "success", message: "게임 추천 순서가 변경되었습니다." });
-      fetchRecommendations();
-    } catch (err: any) {
-      setAlertMessage({ type: "error", message: "게임 추천 순서 변경 중 오류가 발생했습니다." });
+      fetchRecommendations(); // Refresh list
+    } catch (err) {
+      setError("순서 변경 중 오류가 발생했습니다.");
+      fetchRecommendations(); // Refresh list even on error to revert optimistic update
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 게임 추천 순서 아래로 이동 (기존 로직 재활용 및 수정)
+  // 순서 변경 (아래로)
   const handleMoveDown = async (index: number) => {
     if (index >= recommendations.length - 1) return;
+    const currentItem = recommendations[index];
+    const targetItem = recommendations[index + 1];
+    const currentPosition = currentItem.position || 0;
+    const targetPosition = targetItem.position || 0;
 
     try {
-      const recommendationToMove = recommendations[index];
-      const recommendationBelow = recommendations[index + 1];
-
-      const newDisplayOrder = recommendationBelow.position;
-      const oldDisplayOrder = recommendationToMove.position;
-
-      // 서버 API 엔드포인트 및 필드명 확인 필요
-      await axios.put(`/casino-recommends/${recommendationToMove.id}`, {
-        displayOrder: newDisplayOrder,
+      setLoading(true);
+      await axios.patch(`/casino-recommends/display-order`, {
+        updates: [
+          { id: currentItem.id, displayOrder: targetPosition },
+          { id: targetItem.id, displayOrder: currentPosition },
+        ],
       });
-      await axios.put(`/casino-recommends/${recommendationBelow.id}`, {
-        displayOrder: oldDisplayOrder,
-      });
-
-      setAlertMessage({ type: "success", message: "게임 추천 순서가 변경되었습니다." });
-      fetchRecommendations();
-    } catch (err: any) {
-      setAlertMessage({ type: "error", message: "게임 추천 순서 변경 중 오류가 발생했습니다." });
+      fetchRecommendations(); // Refresh list
+    } catch (err) {
+      setError("순서 변경 중 오류가 발생했습니다.");
+      fetchRecommendations(); // Refresh list even on error
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -321,7 +382,7 @@ const CasinoRecommendationManagement = () => {
     setShowModal(false);
   };
 
-  // 게임 체크박스 토글 핸들러
+  // 게임 선택/해제 토글
   const handleGameToggle = (gameId: number, gameTitle: string) => {
     // 이미 선택된 게임인지 확인
     const isSelected = selectedGameIds.includes(gameId);
@@ -337,13 +398,13 @@ const CasinoRecommendationManagement = () => {
     }
   };
 
-  // 선택된 게임에서 제거
+  // 선택 목록에서 게임 제거
   const removeGameFromSelection = (gameId: number, gameTitle: string) => {
     setSelectedGameIds((prev) => prev.filter((id) => id !== gameId));
     setSelectedGames((prev) => prev.filter((title) => title !== gameTitle));
   };
 
-  // 폼 제출 처리
+  // 추천 저장 (추가/수정)
   const handleSaveRecommendation = async () => {
     setError(null);
     if (!title.trim()) {
@@ -402,138 +463,159 @@ const CasinoRecommendationManagement = () => {
     }
   };
 
-  // DataTable 컬럼 정의 - '관리' 컬럼 수정
-  const columns = [
-    {
-      header: "타이틀",
-      accessor: "title" as keyof CasinoRecommendation,
-      // Add cell renderer for title styling and click functionality
-      cell: (value: string, row: CasinoRecommendation) => (
-        <span // Changed from div to span for styling consistency
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
-          onClick={() => handleOpenEditModal(row)} // Call edit handler on click
-          title={value}
-        >
-          {value}
-        </span>
-      ),
-    },
-    {
-      header: "메인 노출",
-      accessor: "isMainDisplay" as keyof CasinoRecommendation,
-      cell: (value: boolean | number) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            value === true || value === 1
-              ? "bg-blue-100 text-blue-800"
-              : "bg-gray-100 text-gray-800"
-          }`}
-        >
-          {value === true || value === 1 ? "노출" : "미노출"}
-        </span>
-      ),
-    },
-    {
-      header: "등록 게임",
-      accessor: "games" as keyof CasinoRecommendation,
-      cell: (value: string[]) => (
-        <div className="max-w-xs truncate">
-          {value?.length > 0
-            ? `${value.length}개 (${value.slice(0, 2).join(", ")}${value.length > 2 ? "..." : ""})`
-            : "등록된 게임 없음"}
-        </div>
-      ),
-    },
-    {
-      header: "시작일자",
-      accessor: "startDate" as keyof CasinoRecommendation,
-      cell: (value: string) => formatDateForDisplay(value), // Already using correct function
-    },
-    {
-      header: "종료일자",
-      accessor: "endDate" as keyof CasinoRecommendation,
-      cell: (value: string) => formatDateForDisplay(value), // Already using correct function
-    },
-    {
-      header: "공개 여부",
-      accessor: "isPublic" as keyof CasinoRecommendation,
-      cell: (value: boolean | number, row: CasinoRecommendation) => {
-        // 공개 여부가 false인 경우 단순히 "비공개"로 표시
-        if (!(value === true || value === 1)) {
-          return (
-            <span className="px-2 py-1 rounded-full text-xs bg-red-100 text-red-800">비공개</span>
-          );
-        }
-
-        // 현재 시간과 시작일/종료일 비교
-        const now = new Date();
-        const startDate = row.startDate ? new Date(row.startDate) : null;
-        const endDate = row.endDate ? new Date(row.endDate) : null;
-
-        // 공개 상태 결정
-        let status = "공개";
-        let colorClass = "bg-green-100 text-green-800";
-
-        if (startDate && now < startDate) {
-          status = "공개 전";
-          colorClass = "bg-gray-100 text-gray-800";
-        } else if (endDate && now > endDate) {
-          status = "공개 종료";
-          colorClass = "bg-gray-100 text-gray-800";
-        }
-
-        return <span className={`px-2 py-1 rounded-full text-xs ${colorClass}`}>{status}</span>;
+  // 테이블 컬럼 정의
+  const columns = useMemo(
+    () => [
+      // 체크박스 컬럼 추가
+      {
+        header: (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            onChange={handleSelectAllRecommendations}
+            checked={
+              recommendations.length > 0 &&
+              selectedRecommendationIds.length === recommendations.length &&
+              recommendations.every((rec) => selectedRecommendationIds.includes(rec.id))
+            }
+            ref={(input) => {
+              if (input) {
+                const someSelected =
+                  selectedRecommendationIds.length > 0 &&
+                  selectedRecommendationIds.length < recommendations.length &&
+                  recommendations.some((rec) => selectedRecommendationIds.includes(rec.id));
+                input.indeterminate = someSelected;
+              }
+            }}
+            disabled={loading || recommendations.length === 0}
+          />
+        ),
+        accessor: "id" as keyof CasinoRecommendation,
+        cell: (id: number) => (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            checked={selectedRecommendationIds.includes(id)}
+            onChange={() => handleSelectRecommendation(id)}
+          />
+        ),
+        className: "w-px px-4",
       },
-    },
-    {
-      header: "관리",
-      accessor: "id" as keyof CasinoRecommendation,
-      cell: (value: number, row: CasinoRecommendation, index: number) => (
-        <div className="flex items-center space-x-1">
-          {/* 위로 버튼 */}
-          <ActionButton
-            label="위로"
-            onClick={() => handleMoveUp(index)}
-            action="up"
-            size="sm"
-            disabled={index === 0}
-          />
-          {/* 아래로 버튼 */}
-          <ActionButton
-            label="아래로"
-            onClick={() => handleMoveDown(index)}
-            action="down"
-            size="sm"
-            disabled={index === recommendations.length - 1}
-          />
-          {/* 수정 버튼 */}
-          <ActionButton
-            label="수정"
+      {
+        header: "제목",
+        accessor: "title" as keyof CasinoRecommendation,
+        cell: (value: string, row: CasinoRecommendation) => (
+          <span
+            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
             onClick={() => handleOpenEditModal(row)}
-            action="edit"
-            size="sm"
-          />
-          {/* 삭제 버튼 */}
-          <ActionButton
-            label="삭제"
-            onClick={() => handleDeleteRecommendation(value)}
-            action="delete"
-            size="sm"
-          />
-        </div>
-      ),
-    },
-  ];
+          >
+            {value}
+          </span>
+        ),
+      },
+      {
+        header: "메인 노출",
+        accessor: "isMainDisplay" as keyof CasinoRecommendation,
+        cell: (value: boolean) => (
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${
+              value ? "bg-blue-100 text-blue-800" : "bg-gray-100 text-gray-800"
+            }`}
+          >
+            {value ? "노출" : "미노출"}
+          </span>
+        ),
+        className: "text-center",
+      },
+      {
+        header: "게임 목록",
+        accessor: "games" as keyof CasinoRecommendation,
+        cell: (games: string[]) => games?.join(", ") || "-", // Use optional chaining
+        className: "max-w-xs truncate", // Prevent long list overflow
+      },
+      {
+        header: "시작일",
+        accessor: "startDate" as keyof CasinoRecommendation,
+        cell: (value: string) => formatDateForDisplay(value),
+      },
+      {
+        header: "종료일",
+        accessor: "endDate" as keyof CasinoRecommendation,
+        cell: (value: string) => formatDateForDisplay(value),
+      },
+      {
+        header: "공개 상태",
+        accessor: "isPublic" as keyof CasinoRecommendation,
+        cell: (value: number) => (
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${
+              value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            }`}
+          >
+            {value === 1 ? "공개" : "비공개"}
+          </span>
+        ),
+        className: "text-center",
+      },
+      {
+        header: "관리",
+        accessor: "id" as keyof CasinoRecommendation,
+        cell: (id: number, row: CasinoRecommendation, index: number) => (
+          <div className="flex space-x-1 justify-center">
+            <ActionButton
+              label="위로"
+              action="up"
+              size="sm"
+              onClick={() => handleMoveUp(index)}
+              disabled={index === 0}
+            />
+            <ActionButton
+              label="아래로"
+              action="down"
+              size="sm"
+              onClick={() => handleMoveDown(index)}
+              disabled={index === recommendations.length - 1}
+            />
+            <ActionButton
+              label="수정"
+              action="edit"
+              size="sm"
+              onClick={() => handleOpenEditModal(row)}
+            />
+            <ActionButton
+              label="삭제"
+              action="delete"
+              size="sm"
+              onClick={() => handleDeleteRecommendation(id)}
+            />
+          </div>
+        ),
+        className: "text-center",
+      },
+    ],
+    [loading, recommendations, selectedRecommendationIds] // Add dependencies
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">카지노 게임 추천 관리</h1>
-        <Button onClick={handleAddRecommendation} variant="primary">
-          게임 추천 추가
-        </Button>
+        <div className="flex space-x-2">
+          {/* 선택 삭제 버튼 추가 */}
+          <Button
+            onClick={handleBulkDelete}
+            variant="danger"
+            disabled={selectedRecommendationIds.length === 0 || loading || saving}
+          >
+            {`선택 삭제 (${selectedRecommendationIds.length})`}
+          </Button>
+          <Button onClick={handleAddRecommendation} disabled={loading || saving}>
+            추천 추가
+          </Button>
+        </div>
       </div>
 
+      {/* Alert Message */}
       {alertMessage && (
         <Alert
           type={alertMessage.type}
@@ -543,202 +625,213 @@ const CasinoRecommendationManagement = () => {
         />
       )}
 
-      {error && (
-        <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
-      )}
+      {/* Loading Overlay */}
+      <LoadingOverlay isLoading={loading || saving} />
 
-      <DataTable
-        columns={columns}
-        data={recommendations}
-        loading={loading}
-        emptyMessage="등록된 게임 추천이 없습니다."
-      />
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={recommendations}
+          loading={loading}
+          emptyMessage="등록된 추천 목록이 없습니다."
+          // Add pagination props if needed
+        />
+      </div>
 
-      {/* Add/Edit Modal */}
-      <Modal
-        isOpen={showModal}
-        onClose={handleCloseModal}
-        title={isEditing ? "게임 추천 수정" : "새 게임 추천 추가"}
-        size="2xl"
-      >
-        {/* Modal Error Alert (below title, above controls) */}
-        {error && (
-          <div className="my-4">
-            <Alert type="error" message={error} onClose={() => setError(null)} />
-          </div>
-        )}
-        {/* Top Control Area: Buttons and Public Toggle - Moved to top */}
-        <div className="flex justify-between items-center mb-6 border-b pb-4">
-          {/* Buttons (Left) - Modified order: Save/Edit first */}
-          <div className="flex space-x-2">
-            <Button
-              type="button"
-              variant="primary"
-              onClick={handleSaveRecommendation}
-              disabled={saving}
-            >
-              {saving ? "저장 중..." : isEditing ? "수정" : "등록"}
-            </Button>
-            <Button type="button" variant="secondary" onClick={handleCloseModal} disabled={saving}>
-              취소
-            </Button>
-          </div>
-          {/* Public/Private Toggle (Right) */}
-          <div className="flex items-center space-x-4">
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                value="public"
-                checked={publicSettings === "public"}
-                onChange={() => setPublicSettings("public")}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+      {/* 모달 */}
+      {showModal && (
+        <Modal
+          isOpen={showModal}
+          onClose={handleCloseModal}
+          title={isEditing ? "추천 수정" : "새 추천 추가"}
+          size="2xl"
+        >
+          {/* Modal Error Alert (below title, above controls) */}
+          {error && (
+            <div className="my-4">
+              <Alert type="error" message={error} onClose={() => setError(null)} />
+            </div>
+          )}
+          {/* Top Control Area: Buttons and Public Toggle - Moved to top */}
+          <div className="flex justify-between items-center mb-6 border-b pb-4">
+            {/* Buttons (Left) - Modified order: Save/Edit first */}
+            <div className="flex space-x-2">
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleSaveRecommendation}
                 disabled={saving}
-              />
-              <span className="ml-2 text-sm text-gray-900">공개</span>
-            </label>
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                value="private"
-                checked={publicSettings === "private"}
-                onChange={() => setPublicSettings("private")}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+              >
+                {saving ? "저장 중..." : isEditing ? "수정" : "등록"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleCloseModal}
                 disabled={saving}
+              >
+                취소
+              </Button>
+            </div>
+            {/* Public/Private Toggle (Right) */}
+            <div className="flex items-center space-x-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  value="public"
+                  checked={publicSettings === "public"}
+                  onChange={() => setPublicSettings("public")}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  disabled={saving}
+                />
+                <span className="ml-2 text-sm text-gray-900">공개</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  value="private"
+                  checked={publicSettings === "private"}
+                  onChange={() => setPublicSettings("private")}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  disabled={saving}
+                />
+                <span className="ml-2 text-sm text-gray-900">비공개</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Modal Content Area */}
+          <div className="space-y-6">
+            {/* 카테고리 타이틀 */}
+            <div>
+              <Input
+                label="카테고리 타이틀"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+                placeholder="타이틀을 입력하세요"
               />
-              <span className="ml-2 text-sm text-gray-900">비공개</span>
-            </label>
-          </div>
-        </div>
+            </div>
 
-        {/* Modal Content Area */}
-        <div className="space-y-6">
-          {/* 카테고리 타이틀 */}
-          <div>
-            <Input
-              label="카테고리 타이틀"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-              placeholder="타이틀을 입력하세요"
-            />
-          </div>
+            {/* 메인 노출 여부 */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="isMainDisplay"
+                checked={isMainDisplay}
+                onChange={(e) => setIsMainDisplay(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="isMainDisplay" className="ml-2 block text-sm text-gray-900">
+                메인 노출
+              </label>
+            </div>
 
-          {/* 메인 노출 여부 */}
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="isMainDisplay"
-              checked={isMainDisplay}
-              onChange={(e) => setIsMainDisplay(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="isMainDisplay" className="ml-2 block text-sm text-gray-900">
-              메인 노출
-            </label>
-          </div>
+            {/* 추천 게임 편성 */}
+            <div>
+              <h3 className="text-lg font-medium mb-2">추천 게임 편성</h3>
+              <div className="flex flex-col md:flex-row md:space-x-4">
+                {/* 왼쪽: 게임 선택 */}
+                <div className="flex-1 mb-4 md:mb-0 border border-gray-300 rounded-md p-4">
+                  <div className="mb-2">
+                    <Input
+                      placeholder="게임 검색"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </div>
+                  <div className="h-64 overflow-y-auto border border-gray-200 rounded-md p-2">
+                    {filteredGames.length > 0 ? (
+                      filteredGames.map((game) => (
+                        <div key={game.id} className="flex items-center py-1">
+                          <input
+                            type="checkbox"
+                            id={`game-${game.id}`}
+                            checked={selectedGameIds.includes(game.id)}
+                            onChange={() => handleGameToggle(game.id, game.title)}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <label
+                            htmlFor={`game-${game.id}`}
+                            className="ml-2 block text-sm text-gray-900 truncate"
+                          >
+                            {game.title}
+                          </label>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center text-gray-500 py-4">
+                        {searchQuery ? "검색 결과가 없습니다." : "등록된 게임이 없습니다."}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
-          {/* 추천 게임 편성 */}
-          <div>
-            <h3 className="text-lg font-medium mb-2">추천 게임 편성</h3>
-            <div className="flex flex-col md:flex-row md:space-x-4">
-              {/* 왼쪽: 게임 선택 */}
-              <div className="flex-1 mb-4 md:mb-0 border border-gray-300 rounded-md p-4">
-                <div className="mb-2">
+                {/* 오른쪽: 선택된 게임 목록 */}
+                <div className="flex-1 border border-gray-300 rounded-md p-4">
+                  <h4 className="font-medium mb-2">선택된 게임 목록</h4>
+                  <div
+                    ref={selectedListRef}
+                    className="h-64 overflow-y-auto border border-gray-200 rounded-md p-2"
+                  >
+                    {selectedGames.length > 0 ? (
+                      selectedGames.map((gameTitle, index) => (
+                        <div
+                          key={index}
+                          className="flex justify-between items-center py-1 px-2 bg-gray-50 mb-1 rounded overflow-hidden"
+                        >
+                          <span
+                            className="text-sm truncate flex-1 mr-2 min-w-0 overflow-hidden whitespace-nowrap"
+                            title={gameTitle}
+                          >
+                            {gameTitle}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeGameFromSelection(selectedGameIds[index], gameTitle)
+                            }
+                            className="text-red-500 hover:text-red-700 flex-shrink-0"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center text-gray-500 py-4">선택된 게임이 없습니다.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 노출 기간 */}
+            <div>
+              <h3 className="text-lg font-medium mb-2">노출 기간</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                   <Input
-                    placeholder="게임 검색"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    label="노출 시작일시"
+                    type="datetime-local"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    required
                   />
                 </div>
-                <div className="h-64 overflow-y-auto border border-gray-200 rounded-md p-2">
-                  {filteredGames.length > 0 ? (
-                    filteredGames.map((game) => (
-                      <div key={game.id} className="flex items-center py-1">
-                        <input
-                          type="checkbox"
-                          id={`game-${game.id}`}
-                          checked={selectedGameIds.includes(game.id)}
-                          onChange={() => handleGameToggle(game.id, game.title)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <label
-                          htmlFor={`game-${game.id}`}
-                          className="ml-2 block text-sm text-gray-900 truncate"
-                        >
-                          {game.title}
-                        </label>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-gray-500 py-4">
-                      {searchQuery ? "검색 결과가 없습니다." : "등록된 게임이 없습니다."}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 오른쪽: 선택된 게임 목록 */}
-              <div className="flex-1 border border-gray-300 rounded-md p-4">
-                <h4 className="font-medium mb-2">선택된 게임 목록</h4>
-                <div
-                  ref={selectedListRef}
-                  className="h-64 overflow-y-auto border border-gray-200 rounded-md p-2"
-                >
-                  {selectedGames.length > 0 ? (
-                    selectedGames.map((gameTitle, index) => (
-                      <div
-                        key={index}
-                        className="flex justify-between items-center py-1 px-2 bg-gray-50 mb-1 rounded overflow-hidden"
-                      >
-                        <span
-                          className="text-sm truncate flex-1 mr-2 min-w-0 overflow-hidden whitespace-nowrap"
-                          title={gameTitle}
-                        >
-                          {gameTitle}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => removeGameFromSelection(selectedGameIds[index], gameTitle)}
-                          className="text-red-500 hover:text-red-700 flex-shrink-0"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center text-gray-500 py-4">선택된 게임이 없습니다.</div>
-                  )}
+                <div>
+                  <Input
+                    label="노출 종료일시"
+                    type="datetime-local"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    required
+                  />
                 </div>
               </div>
             </div>
           </div>
-
-          {/* 노출 기간 */}
-          <div>
-            <h3 className="text-lg font-medium mb-2">노출 기간</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Input
-                  label="노출 시작일시"
-                  type="datetime-local"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  required
-                />
-              </div>
-              <div>
-                <Input
-                  label="노출 종료일시"
-                  type="datetime-local"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  required
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </Modal>
+        </Modal>
+      )}
     </div>
   );
 };

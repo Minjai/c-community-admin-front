@@ -214,6 +214,26 @@ const CasinoCompanyApiService = {
     }
   },
 
+  // 카지노 업체 일괄 삭제 (쿼리 파라미터 사용, 기본 경로)
+  /* // 이 함수는 더 이상 사용되지 않으므로 주석 처리 또는 삭제합니다.
+  bulkDeleteCasinoCompanies: async (ids: number[]): Promise<void> => {
+    if (ids.length === 0) return; // 삭제할 ID가 없으면 요청 보내지 않음
+    try {
+      // ID 배열을 쉼표로 구분된 문자열로 변환
+      const idsString = ids.join(',');
+      const response = await axios.delete("/companies", { // 경로를 "/companies/bulk"에서 "/companies"로 수정
+        params: { ids: idsString }, // 쿼리 파라미터로 ID 목록 전달 (e.g., ?ids=1,2,3)
+      });
+      if (response.data && !response.data.success) {
+        throw new Error(response.data.message || "카지노 업체 일괄 삭제에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("카지노 업체 일괄 삭제 오류:", error);
+      throw error;
+    }
+  },
+  */
+
   // 업체별 리뷰 조회
   getCompanyReviews: async (companyId: number): Promise<CompanyReview[]> => {
     try {

@@ -13,6 +13,7 @@ import Button from "@/components/Button";
 import ActionButton from "@/components/ActionButton";
 import DataTable from "@/components/DataTable";
 import { formatDate } from "@/utils/dateUtils";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 // 스포츠 이름 매핑 객체 추가
 const sportNameMapping: Record<string, string> = {
@@ -77,6 +78,9 @@ export default function SportsManagement() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // 선택된 카테고리 ID 상태 추가
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+
   // 모달 상태
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<"add" | "edit">("add");
@@ -129,29 +133,32 @@ export default function SportsManagement() {
   const fetchSportCategories = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const currentSelected = [...selectedCategoryIds]; // Keep track of selected IDs
 
     try {
       const data = await getAllSportCategoriesAdmin();
-      // 서버에서 받은 데이터의 영문 코드를 한글 이름으로 변환하여 표시
       const processedData = data.map((category) => ({
         ...category,
         displayName: category.displayName || getKoreanSportName(category.sportName),
       }));
-
-      // displayOrder 기준으로 내림차순 정렬 (높은 값이 위에 표시)
       const sortedData = processedData.sort(
         (a, b) => (b.displayOrder || 0) - (a.displayOrder || 0)
       );
       setCategories(sortedData);
+      // Restore selection state after fetch
+      setSelectedCategoryIds(
+        currentSelected.filter((id) => sortedData.some((cat) => cat.id === id))
+      );
     } catch (err: any) {
       console.error("Error fetching sport categories:", err);
       setError("스포츠 카테고리를 불러오는 중 오류가 발생했습니다.");
-      // 토스트 대신 성공 메시지 상태 업데이트
       setSuccess(null);
+      setCategories([]); // Clear data on error
+      setSelectedCategoryIds([]); // Clear selection on error
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedCategoryIds]); // Add selectedCategoryIds as dependency
 
   const handleAddCategory = () => {
     setModalType("add");
@@ -186,14 +193,12 @@ export default function SportsManagement() {
     setSuccess(null); // Clear previous success message
 
     try {
-      // API Call
       await deleteSportCategory(id);
-
-      // If the above line doesn't throw an error, assume success
       setSuccess("스포츠 카테고리가 삭제되었습니다.");
+      // Remove deleted ID from selection state
+      setSelectedCategoryIds((prev) => prev.filter((catId) => catId !== id));
       fetchSportCategories(); // Reload list after successful deletion
     } catch (err) {
-      // Set a more generic error or try to extract from the error object
       const apiError =
         (err as any)?.response?.data?.message || "스포츠 카테고리 삭제 중 오류가 발생했습니다.";
       setError(apiError);
@@ -377,10 +382,101 @@ export default function SportsManagement() {
     }
   };
 
+  // 일괄 삭제 핸들러 추가
+  const handleBulkDelete = async () => {
+    if (selectedCategoryIds.length === 0) {
+      setError("삭제할 종목을 선택해주세요."); // Use setError for user feedback
+      return;
+    }
+    if (!confirm(`선택된 ${selectedCategoryIds.length}개의 종목을 정말 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const deletePromises = selectedCategoryIds.map((id) => deleteSportCategory(id));
+      const results = await Promise.allSettled(deletePromises);
+
+      const failedDeletes = results.filter((result) => result.status === "rejected");
+
+      if (failedDeletes.length > 0) {
+        console.error("일부 종목 삭제 실패:", failedDeletes);
+        setError(`일부 종목 삭제에 실패했습니다. (${failedDeletes.length}개)`);
+        setSuccess(null);
+      } else {
+        setSuccess(`${selectedCategoryIds.length}개의 종목이 삭제되었습니다.`);
+        setError(null);
+      }
+      setSelectedCategoryIds([]); // Clear selection regardless of partial failure
+      fetchSportCategories(); // Reload list
+    } catch (err) {
+      console.error("Error during bulk delete:", err);
+      setError("일괄 삭제 중 오류가 발생했습니다.");
+      setSuccess(null);
+      // Attempt to refresh and clear selection even on general error
+      setSelectedCategoryIds([]);
+      fetchSportCategories();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 개별 선택 핸들러 추가
+  const handleSelectCategory = (id: number) => {
+    setSelectedCategoryIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((catId) => catId !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  // 전체 선택 핸들러 추가
+  const handleSelectAllCategories = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedCategoryIds(categories.map((cat) => cat.id));
+    } else {
+      setSelectedCategoryIds([]);
+    }
+  };
+
   // 데이터 테이블 컬럼 정의
   const columns = [
+    // 체크박스 컬럼 추가
     {
-      header: "종목명",
+      header: (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          onChange={handleSelectAllCategories}
+          checked={categories.length > 0 && selectedCategoryIds.length === categories.length}
+          ref={(input) => {
+            if (input) {
+              input.indeterminate =
+                selectedCategoryIds.length > 0 && selectedCategoryIds.length < categories.length;
+            }
+          }}
+          disabled={loading || categories.length === 0}
+        />
+      ),
+      accessor: "id" as keyof SportCategory,
+      cell: (id: number) => (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          checked={selectedCategoryIds.includes(id)}
+          onChange={() => handleSelectCategory(id)}
+          disabled={loading}
+        />
+      ),
+      className: "w-px px-4",
+    },
+    {
+      header: "종목명", // Original sport name (mapped to Korean)
       accessor: "sportName" as keyof SportCategory,
       cell: (value: string, row: SportCategory) => {
         const koreanSportName = getKoreanSportName(value);
@@ -396,58 +492,63 @@ export default function SportsManagement() {
       },
     },
     {
-      header: "표시 이름",
+      header: "표시 이름", // User-defined display name
       accessor: "displayName" as keyof SportCategory,
-      cell: (value: string, row: SportCategory) => value,
+      // Display the value directly, fallback handled in fetch
+      cell: (value: string, row: SportCategory) => value || getKoreanSportName(row.sportName),
     },
     {
-      header: "등록일자",
-      accessor: "createdAt" as keyof SportCategory,
-      cell: (value: string) => formatDate(value),
-    },
-    {
-      header: "공개여부",
+      header: "공개 여부", // Consistent header name
       accessor: "isPublic" as keyof SportCategory,
       cell: (value: number) => (
         <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+          className={`px-2 py-1 rounded text-xs ${
+            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
           }`}
         >
-          {value ? "공개" : "비공개"}
+          {value === 1 ? "공개" : "비공개"}
         </span>
       ),
     },
     {
+      header: "등록일자", // Consistent header name
+      accessor: "createdAt" as keyof SportCategory,
+      cell: (value: string) => formatDate(value),
+    },
+    {
       header: "관리",
       accessor: "id" as keyof SportCategory,
-      cell: (value: number, row: SportCategory, index: number) => (
-        <div className="flex space-x-2">
+      cell: (id: number, row: SportCategory, index: number) => (
+        <div className="flex items-center space-x-1">
           <ActionButton
-            label="위로"
+            label="위"
             action="up"
             size="sm"
             onClick={() => handleMoveUp(index)}
-            disabled={index === 0}
+            disabled={index === 0 || loading}
           />
           <ActionButton
-            label="아래로"
+            label="아래"
             action="down"
             size="sm"
             onClick={() => handleMoveDown(index)}
-            disabled={index === categories.length - 1}
+            disabled={index === categories.length - 1 || loading}
           />
           <ActionButton
             label="수정"
             action="edit"
             size="sm"
+            color="blue"
             onClick={() => handleEditCategory(row)}
+            disabled={loading}
           />
           <ActionButton
             label="삭제"
             action="delete"
             size="sm"
-            onClick={() => handleDeleteCategory(row.id)}
+            color="red"
+            onClick={() => handleDeleteCategory(id)}
+            disabled={loading}
           />
         </div>
       ),
@@ -455,145 +556,156 @@ export default function SportsManagement() {
   ];
 
   return (
-    <div className="mb-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">스포츠 종목 관리</h1>
-        <p className="text-sm text-gray-600">
-          스포츠 종목을 관리하고 공개 여부를 설정할 수 있습니다.
-        </p>
+    // Use padding for overall spacing
+    <div className="p-4">
+      <h1 className="text-xl font-semibold mb-4">스포츠 종목 관리</h1>
+
+      <div className="flex justify-between items-center mb-4">
+        {/* Title placeholder to push buttons right */}
+        <div></div>
+        <div className="flex space-x-2">
+          {" "}
+          {/* Button group on the right */}
+          {/* 선택 삭제 버튼 추가 */}
+          <Button
+            variant="danger"
+            onClick={handleBulkDelete}
+            disabled={selectedCategoryIds.length === 0 || loading}
+          >
+            {`선택 삭제 (${selectedCategoryIds.length})`}
+          </Button>
+          <Button variant="primary" onClick={handleAddCategory} disabled={loading}>
+            종목 추가
+          </Button>
+        </div>
       </div>
 
-      {(error || success) && (
-        <div className="mb-4">
-          <Alert
-            type={error ? "error" : "success"}
-            message={error || success || ""}
-            onClose={() => {
-              setError(null);
-              setSuccess(null);
-            }}
-          />
-        </div>
+      {/* Alerts */}
+      {error && (
+        <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
+      )}
+      {success && (
+        <Alert type="success" message={success} onClose={() => setSuccess(null)} className="mb-4" />
       )}
 
-      <div className="flex justify-end mb-4">
-        <Button onClick={handleAddCategory}>
-          <div className="flex items-center gap-2">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span>새 종목 추가</span>
-          </div>
-        </Button>
-      </div>
+      {/* Loading Overlay */}
+      <LoadingOverlay isLoading={loading} />
 
+      {/* DataTable */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <DataTable
           columns={columns}
           data={categories}
-          loading={loading}
+          loading={false} // Disable DataTable's internal loading, using Overlay instead
           emptyMessage="등록된 스포츠 종목이 없습니다."
         />
       </div>
 
+      {/* Modal for Add/Edit */}
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        title={modalType === "add" ? "종목 추가" : "종목 수정"}
+        title={modalType === "add" ? "새 스포츠 종목 추가" : "스포츠 종목 수정"}
       >
-        {/* Modal Error Alert (Above controls) */}
-        {error && (
-          <div className="mb-4">
-            <Alert type="error" message={error} onClose={() => setError(null)} />
-          </div>
-        )}
-
-        {/* Top Control Area */}
-        <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-4">
-          {/* Buttons (Left) */}
-          <div className="flex space-x-2">
-            <Button variant="primary" onClick={handleSaveCategory}>
-              {modalType === "add" ? "등록" : "저장"}
-            </Button>
-            <Button variant="secondary" onClick={() => setShowModal(false)}>
-              취소
-            </Button>
-          </div>
-          {/* Public Toggle (Right) */}
-          <div className="flex space-x-5">
-            <div className="flex items-center">
-              <input
-                type="radio"
-                id="visibility-public-modal"
-                name="isPublicModal"
-                value="1"
-                checked={formData.isPublic === 1}
-                onChange={handleChange} // Assuming handleChange handles radio correctly by name
-                className="form-radio h-4 w-4 text-blue-600"
-              />
-              <label htmlFor="visibility-public-modal" className="ml-2 text-sm">
-                공개
-              </label>
-            </div>
-            <div className="flex items-center">
-              <input
-                type="radio"
-                id="visibility-private-modal"
-                name="isPublicModal"
-                value="0"
-                checked={formData.isPublic === 0}
-                onChange={handleChange} // Assuming handleChange handles radio correctly by name
-                className="form-radio h-4 w-4 text-blue-600"
-              />
-              <label htmlFor="visibility-private-modal" className="ml-2 text-sm">
-                비공개
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {/* Form content */}
+        {/* Modal Content */}
         <div className="space-y-4">
+          {/* Modal Error Alert */}
+          {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
+
+          {/* Form fields ... */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">스포츠 종목명</label>
+            <label htmlFor="sportSelect" className="label">
+              종목 경기 선택
+            </label>
+            <select
+              id="sportSelect"
+              value={selectedSport}
+              onChange={(e) => handleSportSelect(e.target.value)}
+              className="input"
+              disabled={loading}
+            >
+              <option value="" disabled>
+                -- 종목 선택 --
+              </option>
+              {sportOptions.map((sport) => (
+                <option key={sport} value={sport}>
+                  {sport}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="sportName" className="label">
+              스포츠 종목명 (표시 이름)
+            </label>
             <input
               type="text"
+              id="sportName"
               name="sportName"
               value={formData.sportName}
               onChange={handleChange}
-              className="w-full p-2 border border-gray-300 rounded-md"
-              placeholder="종목명 입력"
+              className="input"
+              placeholder="예: 축구, 농구"
+              required
+              disabled={loading}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">종목 경기 편성</label>
-            <div className="grid grid-cols-4 gap-3">
-              {sportOptions.map((sport) => (
-                <div key={sport} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`sport-${sport}`}
-                    checked={selectedSport === sport}
-                    onChange={() => handleSportSelect(sport)}
-                    className="form-checkbox h-4 w-4 text-blue-600 mr-2"
-                  />
-                  <label htmlFor={`sport-${sport}`} className="text-sm">
-                    {sport}
-                  </label>
-                </div>
-              ))}
-              <div className="col-span-4 text-xs text-gray-500 mt-1">※ flashscore 기준 종목</div>
+            <label htmlFor="iconUrl" className="label">
+              아이콘 URL (선택 사항)
+            </label>
+            <input
+              type="text"
+              id="iconUrl"
+              name="icon"
+              value={formData.icon}
+              onChange={handleChange}
+              className="input"
+              placeholder="http://example.com/icon.png"
+              disabled={loading}
+            />
+          </div>
+
+          <div>
+            <label className="label">공개 여부</label>
+            <div className="flex space-x-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="isPublic" // Corrected name to match state/handler
+                  value={1}
+                  checked={formData.isPublic === 1}
+                  onChange={handleChange}
+                  className="form-radio"
+                  disabled={loading}
+                />
+                <span className="ml-2">공개</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="isPublic" // Corrected name to match state/handler
+                  value={0}
+                  checked={formData.isPublic === 0}
+                  onChange={handleChange}
+                  className="form-radio"
+                  disabled={loading}
+                />
+                <span className="ml-2">비공개</span>
+              </label>
             </div>
+          </div>
+
+          {/* Modal Actions */}
+          <div className="flex justify-end space-x-2 mt-6">
+            <Button variant="secondary" onClick={() => setShowModal(false)} disabled={loading}>
+              취소
+            </Button>
+            <Button variant="primary" onClick={handleSaveCategory} disabled={loading}>
+              {loading ? "저장 중..." : modalType === "add" ? "추가" : "저장"}
+            </Button>
           </div>
         </div>
       </Modal>

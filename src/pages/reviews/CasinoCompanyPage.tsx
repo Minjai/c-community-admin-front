@@ -36,10 +36,13 @@ const CasinoCompanyPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isMoving, setIsMoving] = useState<boolean>(false);
 
+  // 선택된 업체 ID 상태 추가
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<number[]>([]);
+
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10); // 기본 페이지 크기 또는 API 기본값
+  const [pageSize, setPageSize] = useState<number>(10);
   const [totalItems, setTotalItems] = useState<number>(0);
 
   // 초기 상태 설정
@@ -55,9 +58,10 @@ const CasinoCompanyPage: React.FC = () => {
   };
 
   // 카지노 업체 목록 조회 (페이지네이션 적용)
-  const fetchCompanies = async (page: number = 1, limit: number = 10) => {
+  const fetchCompanies = async (page: number = currentPage, limit: number = pageSize) => {
     setLoading(true);
     setError(null);
+    const currentSelected = [...selectedCompanyIds]; // Keep selection
 
     try {
       // CasinoCompanyApiService 서비스를 사용하여 API 호출 (page, limit 전달)
@@ -102,9 +106,15 @@ const CasinoCompanyPage: React.FC = () => {
           setCurrentPage(currentPageFromApi);
           setPageSize(pageSizeFromApi);
           setTotalPages(totalPagesFromApi);
+
+          // Restore selection
+          setSelectedCompanyIds(
+            currentSelected.filter((id) => transformedCompanies.some((comp) => comp.id === id))
+          );
         } else {
           console.log("items 데이터가 배열 형식이 아닙니다.");
           setCompanies([]);
+          setSelectedCompanyIds([]); // Clear selection
           setError("카지노 업체 목록 형식이 올바르지 않습니다.");
           // 페이지네이션 상태 초기화
           setTotalItems(0);
@@ -115,6 +125,7 @@ const CasinoCompanyPage: React.FC = () => {
       } else {
         console.log("적절한 업체 데이터를 찾지 못했습니다.");
         setCompanies([]);
+        setSelectedCompanyIds([]); // Clear selection
         setError(response?.message || "카지노 업체 목록을 불러오는데 실패했습니다.");
         // 페이지네이션 상태 초기화
         setTotalItems(0);
@@ -126,6 +137,7 @@ const CasinoCompanyPage: React.FC = () => {
       console.error("Error fetching casino companies:", err);
       setError("카지노 업체 목록을 불러오는데 실패했습니다.");
       setCompanies([]);
+      setSelectedCompanyIds([]); // Clear selection
       // 페이지네이션 상태 초기화
       setTotalItems(0);
       setCurrentPage(1);
@@ -208,6 +220,7 @@ const CasinoCompanyPage: React.FC = () => {
     setShowModal(true);
     setIsEditing(false);
     setPreviewUrl(null);
+    setSelectedCompanyIds([]); // Clear selection when adding
   };
 
   // 업체 수정 모달 열기
@@ -222,6 +235,7 @@ const CasinoCompanyPage: React.FC = () => {
     setCurrentCompany(processedCompany);
     setIsEditing(true);
     setShowModal(true);
+    setSelectedCompanyIds([]); // Clear selection when editing
 
     // 이미지 URL이 있으면 미리보기 설정
     if (company.imageUrl) {
@@ -322,19 +336,107 @@ const CasinoCompanyPage: React.FC = () => {
     }
   };
 
-  // 업체 삭제 처리
+  // 업체 삭제 (개별)
   const handleDeleteCompany = async (id: number) => {
-    if (!window.confirm("정말 이 업체를 삭제하시겠습니까?")) {
-      return;
-    }
+    if (!window.confirm("정말로 이 업체를 삭제하시겠습니까?")) return;
+    setLoading(true); // Use main loading state
+    setError(null);
+    setAlertMessage(null);
 
     try {
       await CasinoCompanyApiService.deleteCasinoCompany(id);
       setAlertMessage({ type: "success", message: "업체가 삭제되었습니다." });
-      fetchCompanies();
-    } catch (error) {
-      console.error("Error deleting casino company:", error);
-      setAlertMessage({ type: "error", message: "업체 삭제 중 오류가 발생했습니다." });
+      // Remove from selection if it was selected
+      setSelectedCompanyIds((prev) => prev.filter((compId) => compId !== id));
+      // Fetch current page again after delete
+      fetchCompanies(currentPage, pageSize);
+    } catch (err: any) {
+      console.error("Error deleting casino company:", err);
+      const message = err.response?.data?.message || "업체 삭제 중 오류가 발생했습니다.";
+      setError(message); // Set error for Alert component
+      setAlertMessage({ type: "error", message });
+      // Attempt to refresh anyway, might resolve inconsistent state
+      fetchCompanies(currentPage, pageSize);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 일괄 삭제 핸들러 (개별 삭제 반복 호출)
+  const handleBulkDelete = async () => {
+    if (selectedCompanyIds.length === 0) {
+      setAlertMessage({ type: "error", message: "삭제할 업체를 선택해주세요." });
+      return;
+    }
+    if (!window.confirm(`선택된 ${selectedCompanyIds.length}개의 업체를 정말 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setAlertMessage(null);
+    let successCount = 0;
+    let errorCount = 0;
+    const errors: string[] = [];
+
+    // 선택된 각 ID에 대해 개별 삭제 함수 호출
+    for (const id of selectedCompanyIds) {
+      try {
+        // 개별 삭제 API 호출 (서비스 함수 직접 호출)
+        await CasinoCompanyApiService.deleteCasinoCompany(id);
+        successCount++;
+      } catch (err: any) {
+        errorCount++;
+        const message = err.message || `업체(ID: ${id}) 삭제 중 오류 발생`;
+        errors.push(message);
+        console.error(`Error deleting company ${id}:`, err);
+      }
+    }
+
+    setSelectedCompanyIds([]); // 완료 후 선택 해제
+    setLoading(false);
+
+    // 결과 메시지 설정
+    if (errorCount === 0) {
+      setAlertMessage({
+        type: "success",
+        message: `${successCount}개의 업체가 성공적으로 삭제되었습니다.`,
+      });
+    } else if (successCount === 0) {
+      setAlertMessage({
+        type: "error",
+        message: `선택된 업체를 삭제하는 중 오류가 발생했습니다. (${errors.join(", ")})`,
+      });
+      setError(`선택된 업체를 삭제하는 중 오류가 발생했습니다.`); // 페이지 상단 에러 표시용
+    } else {
+      setAlertMessage({
+        type: "error", // 부분 성공도 에러로 표시 (혹은 warning)
+        message: `${successCount}개 삭제 성공, ${errorCount}개 삭제 실패. (${errors.join(", ")})`,
+      });
+      setError(`${errorCount}개 업체 삭제 실패.`); // 페이지 상단 에러 표시용
+    }
+
+    // 목록 새로고침 (삭제 성공/실패 여부와 관계없이 최신 상태 반영)
+    fetchCompanies(currentPage, pageSize);
+  };
+
+  // 개별 선택 핸들러 추가
+  const handleSelectCompany = (id: number) => {
+    setSelectedCompanyIds((prev) => {
+      if (prev.includes(id)) {
+        return prev.filter((compId) => compId !== id);
+      } else {
+        return [...prev, id];
+      }
+    });
+  };
+
+  // 전체 선택 핸들러 추가
+  const handleSelectAllCompanies = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      setSelectedCompanyIds(companies.map((comp) => comp.id));
+    } else {
+      setSelectedCompanyIds([]);
     }
   };
 
@@ -404,15 +506,42 @@ const CasinoCompanyPage: React.FC = () => {
 
   // 데이터 테이블 컬럼 정의
   const columns = [
-    // 1. 업체 명 (Moved to first)
+    // 체크박스 컬럼 추가
     {
-      header: "업체 명",
+      header: (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          onChange={handleSelectAllCompanies}
+          checked={companies.length > 0 && selectedCompanyIds.length === companies.length}
+          ref={(input) => {
+            if (input) {
+              input.indeterminate =
+                selectedCompanyIds.length > 0 && selectedCompanyIds.length < companies.length;
+            }
+          }}
+          disabled={loading || companies.length === 0}
+        />
+      ),
+      accessor: "id" as keyof CasinoCompany,
+      cell: (id: number) => (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          checked={selectedCompanyIds.includes(id)}
+          onChange={() => handleSelectCompany(id)}
+          disabled={loading || isMoving || isSaving}
+        />
+      ),
+      className: "w-px px-4",
+    },
+    {
+      header: "업체명",
       accessor: "companyName" as keyof CasinoCompany,
       cell: (value: string, row: CasinoCompany) => (
         <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate" // Apply blue style and click handler
-          onClick={() => handleEditCompany(row)} // Call edit handler on click
-          title={value}
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          onClick={() => handleEditCompany(row)}
         >
           {value}
         </span>
@@ -529,9 +658,22 @@ const CasinoCompanyPage: React.FC = () => {
     <div className="w-full px-8 py-8">
       <div className="mb-6 flex justify-between items-center">
         <h1 className="text-2xl font-bold">카지노 업체 관리</h1>
-        <Button onClick={handleAddCompany} variant="primary">
-          업체 추가
-        </Button>
+        <div className="flex space-x-2">
+          <Button
+            variant="danger"
+            onClick={handleBulkDelete}
+            disabled={selectedCompanyIds.length === 0 || loading || isSaving || isMoving}
+          >
+            {`선택 삭제 (${selectedCompanyIds.length})`}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleAddCompany}
+            disabled={loading || isSaving || isMoving}
+          >
+            업체 추가
+          </Button>
+        </div>
       </div>
 
       {alertMessage && (
@@ -541,6 +683,10 @@ const CasinoCompanyPage: React.FC = () => {
           onClose={() => setAlertMessage(null)}
           className="mb-4"
         />
+      )}
+
+      {error && !alertMessage && (
+        <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
       {loading ? (

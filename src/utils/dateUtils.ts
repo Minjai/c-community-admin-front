@@ -31,13 +31,13 @@ export function formatDateForDisplay(dateString: string | null | undefined): str
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) {
-      console.error("Invalid date string provided:", dateString);
-      return "유효하지 않은 날짜";
+      // console.error("Invalid date string provided:", dateString); // 콘솔 오류 제거
+      return dateString; // 원본 문자열 반환
     }
     return format(date, "yyyy.MM.dd HH:mm", { locale: ko });
   } catch (error) {
     console.error("Error formatting date for display:", error);
-    return "날짜 형식 오류";
+    return "날짜 형식 오류"; // 예상치 못한 다른 오류 발생 시
   }
 }
 

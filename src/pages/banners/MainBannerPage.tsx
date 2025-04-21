@@ -39,6 +39,9 @@ const MainBannerPage: React.FC = () => {
   const [pcImageFile, setPcImageFile] = useState<File | null>(null);
   const [mobileImageFile, setMobileImageFile] = useState<File | null>(null);
 
+  // 선택된 배너 ID 상태 추가
+  const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
+
   // 날짜 입력 처리 함수
   const handleDateChange = (name: string, dateString: string) => {
     if (!dateString) return;
@@ -290,15 +293,68 @@ const MainBannerPage: React.FC = () => {
 
   // 배너 삭제
   const handleDeleteBanner = async (id: number) => {
-    if (!window.confirm("정말 이 배너를 삭제하시겠습니까?")) return;
-
+    if (!window.confirm("정말로 이 배너를 삭제하시겠습니까?")) return;
     try {
       await BannerApiService.deleteMainBanner(id);
       toast.success("배너가 삭제되었습니다.");
-      fetchBanners();
-    } catch (err) {
-      console.error("Error deleting banner:", err);
-      toast.error("배너 삭제 중 오류가 발생했습니다.");
+      fetchBanners(currentPage, pageSize); // 목록 새로고침
+      setSelectedBannerIds((prev) => prev.filter((bannerId) => bannerId !== id)); // 삭제된 ID 제거
+    } catch (error: any) {
+      console.error("배너 삭제 오류:", error);
+      toast.error(error.response?.data?.message || "배너 삭제 중 오류 발생");
+    }
+  };
+
+  // 선택된 배너 일괄 삭제
+  const handleBulkDelete = async () => {
+    if (selectedBannerIds.length === 0) {
+      toast.info("삭제할 배너를 선택해주세요.");
+      return;
+    }
+    if (!window.confirm(`선택된 ${selectedBannerIds.length}개의 배너를 정말 삭제하시겠습니까?`))
+      return;
+
+    try {
+      setLoading(true); // 로딩 시작
+      // 여러 삭제 요청을 동시에 보냄
+      const deletePromises = selectedBannerIds.map((id) => BannerApiService.deleteMainBanner(id));
+      // 모든 요청이 완료될 때까지 기다림 (성공/실패 여부 확인은 선택적)
+      await Promise.allSettled(deletePromises);
+
+      toast.success(`${selectedBannerIds.length}개의 배너가 삭제되었습니다.`);
+      fetchBanners(currentPage, pageSize); // 목록 새로고침
+      setSelectedBannerIds([]); // 선택 상태 초기화
+    } catch (error: any) {
+      // 개별 삭제 오류는 BannerApiService에서 처리될 수 있으므로, 여기서는 일반적인 오류 메시지 표시
+      console.error("배너 일괄 삭제 중 오류 발생:", error);
+      toast.error("배너 삭제 중 일부 오류가 발생했습니다. 목록을 확인해주세요.");
+      // 오류 발생 시에도 목록 새로고침 및 선택 초기화 시도
+      fetchBanners(currentPage, pageSize);
+      setSelectedBannerIds([]);
+    } finally {
+      setLoading(false); // 로딩 종료
+    }
+  };
+
+  // 개별 배너 선택/해제
+  const handleSelectBanner = (id: number) => {
+    setSelectedBannerIds((prevSelected) => {
+      if (prevSelected.includes(id)) {
+        return prevSelected.filter((bannerId) => bannerId !== id);
+      } else {
+        return [...prevSelected, id];
+      }
+    });
+  };
+
+  // 현재 페이지의 모든 배너 선택/해제
+  const handleSelectAllBanners = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      // 현재 페이지 배너들의 ID만 선택
+      const currentPageBannerIds = banners.map((banner) => banner.id);
+      setSelectedBannerIds(currentPageBannerIds);
+    } else {
+      setSelectedBannerIds([]);
     }
   };
 
@@ -429,8 +485,45 @@ const MainBannerPage: React.FC = () => {
     setMobileImageFile(null);
   };
 
-  // 테이블 컬럼 정의
+  // 데이터 테이블 컬럼 정의 (체크박스 컬럼 추가)
   const columns = [
+    {
+      header: (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          onChange={handleSelectAllBanners}
+          // 현재 페이지의 모든 배너가 선택되었는지 확인
+          checked={
+            banners.length > 0 &&
+            selectedBannerIds.length === banners.length &&
+            banners.every((banner) => selectedBannerIds.includes(banner.id))
+          }
+          // 일부만 선택되었을 경우 indeterminate 상태
+          ref={(input) => {
+            if (input) {
+              const someSelected =
+                selectedBannerIds.length > 0 &&
+                selectedBannerIds.length < banners.length &&
+                banners.some((banner) => selectedBannerIds.includes(banner.id));
+              input.indeterminate = someSelected;
+            }
+          }}
+          disabled={loading || banners.length === 0} // 로딩 중이거나 데이터 없으면 비활성화
+        />
+      ),
+      accessor: "id" as keyof Banner,
+      cell: (id: number) => (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          checked={selectedBannerIds.includes(id)}
+          onChange={() => handleSelectBanner(id)}
+        />
+      ),
+      // className 조절하여 너비 최소화
+      className: "w-px px-4", // w-px 또는 w-1 로 최소 너비 지정, px-4는 좌우 패딩
+    },
     {
       header: "제목",
       accessor: "title" as keyof Banner,
@@ -550,9 +643,20 @@ const MainBannerPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">메인 배너 관리</h1>
-        <Button onClick={handleAddBanner} variant="primary">
-          배너 추가
-        </Button>
+        <div className="flex space-x-2">
+          {/* 선택 삭제 버튼 */}
+          <Button
+            onClick={handleBulkDelete}
+            variant="danger"
+            disabled={selectedBannerIds.length === 0 || loading}
+          >
+            {`선택 삭제 (${selectedBannerIds.length})`}
+          </Button>
+          {/* 배너 추가 버튼 */}
+          <Button onClick={handleAddBanner} disabled={loading}>
+            배너 추가
+          </Button>
+        </div>
       </div>
 
       {error && (

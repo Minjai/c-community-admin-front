@@ -12,8 +12,9 @@ import FileUpload from "@/components/forms/FileUpload";
 import Alert from "@/components/Alert";
 import { formatDate, formatDateForDisplay } from "@/utils/dateUtils";
 import { toast } from "react-toastify";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
-// Guideline 타입에 position과 displayOrder, tags 추가
+// Guideline 타입에 position과 displayOrder, tags 추가 (복원)
 interface GuidelineWithOrder extends Guideline {
   position?: number;
   displayOrder?: number;
@@ -26,37 +27,34 @@ interface GuidelineManagementProps {
 
 const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) => {
   const [loading, setLoading] = useState<boolean>(true);
-  const [guidelines, setGuidelines] = useState<GuidelineWithOrder[]>([]); // GuidelineWithOrder 사용
+  const [guidelines, setGuidelines] = useState<GuidelineWithOrder[]>([]); // GuidelineWithOrder 사용 (복원)
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
   const [currentGuideline, setCurrentGuideline] = useState<Partial<GuidelineWithOrder> | null>(
     null
-  ); // GuidelineWithOrder 사용
+  ); // GuidelineWithOrder 사용 (복원)
   const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [modalError, setModalError] = useState<string | null>(null); // Modal specific error
-  const [isSaving, setIsSaving] = useState<boolean>(false); // Add isSaving state
+  const [modalError, setModalError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
-  const [currentTagInput, setCurrentTagInput] = useState<string>(""); // State for current tag input
+  const [currentTagInput, setCurrentTagInput] = useState<string>(""); // State for current tag input (복원)
 
-  // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10); // 기본 페이지 크기
+  const [pageSize, setPageSize] = useState<number>(10);
   const [totalItems, setTotalItems] = useState<number>(0);
 
-  // TextEditor의 content를 업데이트하는 함수를 useCallback으로 감싸기
+  const [selectedGuidelineIds, setSelectedGuidelineIds] = useState<number[]>([]);
+
   const handleEditorContentChange = useCallback(
     (content: string) => {
       if (currentGuideline) {
-        // 이전 내용과 동일한 경우 업데이트 불필요
         if (currentGuideline.content === content) {
           return;
         }
-
-        // Log removed
         setCurrentGuideline((prev) => {
           if (!prev) return null;
           return { ...prev, content };
@@ -66,7 +64,6 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     [currentGuideline]
   );
 
-  // boardId 기반 경로 및 타이틀 결정
   const getPageInfo = () => {
     switch (boardId) {
       case 3:
@@ -82,36 +79,37 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
 
   const { path, title } = getPageInfo();
 
-  // 데이터 조회 함수 (페이지네이션 적용)
   const fetchGuidelines = async (page: number = 1, limit: number = 10) => {
     setLoading(true);
     setError(null);
 
     try {
-      // GuidelineApiService.getGuidelines에 page와 pageSize 전달
       const response = await GuidelineApiService.getGuidelines(boardId, page, limit);
 
-      // API 응답 구조에 맞게 데이터와 페이지네이션 정보 추출
       if (response && response.success && Array.isArray(response.data)) {
-        // position 기준으로 정렬 (서버에서 처리되지 않은 경우) <-- 이 주석과 아래 정렬 로직 제거
-        // const sortedGuidelines = [...response.data].sort(
-        //   (a, b) => (a.position || 0) - (b.position || 0)
-        // );
-        // setGuidelines(sortedGuidelines); <-- sortedGuidelines 대신 response.data 사용
+        // Process tags: Convert comma-separated string to array (복원)
+        const processedGuidelines = response.data.map((guideline: any) => ({
+          ...guideline,
+          tags:
+            typeof guideline.tags === "string"
+              ? guideline.tags
+                  .split(",")
+                  .map((tag: string) => tag.trim())
+                  .filter((tag: string) => tag !== "")
+              : guideline.tags || [], // Handle null/undefined or already array
+        }));
 
-        setGuidelines(response.data); // 서버에서 정렬된 데이터를 그대로 사용
+        setGuidelines(processedGuidelines); // Use processed data (복원)
 
-        // 페이지네이션 정보 업데이트
         if (response.pagination) {
           setTotalPages(response.pagination.totalPages);
           setCurrentPage(response.pagination.currentPage);
           setPageSize(response.pagination.pageSize);
           setTotalItems(response.pagination.totalItems);
         } else {
-          // 페이지네이션 정보가 없는 경우 (호환성 유지)
           setTotalPages(1);
           setCurrentPage(1);
-          setTotalItems(response.data.length); // sortedGuidelines 대신 response.data 사용
+          setTotalItems(processedGuidelines.length); // Use processed data length (복원)
         }
       } else {
         setGuidelines([]);
@@ -134,16 +132,14 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
 
   useEffect(() => {
     fetchGuidelines(currentPage, pageSize);
-  }, [boardId]); // boardId 변경 시에도 재조회
+  }, [boardId, currentPage, pageSize]); // useEffect 의존성 배열 복원
 
-  // 페이지 변경 핸들러
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
       fetchGuidelines(page, pageSize);
     }
   };
 
-  // 이미지 파일 처리 함수
   const handleFile = (file: File | null) => {
     setImageFile(file);
     if (file) {
@@ -158,7 +154,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     if (e.target.files && e.target.files[0]) {
       handleFile(e.target.files[0]);
     } else {
-      handleFile(null); // 파일 선택 취소 시
+      handleFile(null);
     }
   };
 
@@ -166,17 +162,16 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     fileInputRef.current?.click();
   };
 
-  // 모달 열기 (추가)
   const handleAddGuideline = () => {
-    setModalError(null); // Reset modal error
+    setModalError(null);
     setCurrentGuideline({
       title: "",
       content: "",
       boardId: boardId,
       isPublic: 1,
-      position: totalItems + 1,
+      position: totalItems + 1, // 복원
       imageUrl: "",
-      tags: [], // Initialize as empty array
+      tags: [], // 복원
     });
     setImageFile(null);
     setShowModal(true);
@@ -184,14 +179,13 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     setPreviewUrl(null);
   };
 
-  // 모달 열기 (수정) - tags 처리 단순화
   const handleEditGuideline = (guideline: GuidelineWithOrder) => {
+    // GuidelineWithOrder 복원
     setModalError(null);
     const convertedGuideline = {
       ...guideline,
       isPublic: guideline.isPublic === true || guideline.isPublic === 1 ? 1 : 0,
-      // Now tags should be correctly typed as string[] | undefined
-      tags: guideline.tags || [], // Default to empty array if undefined
+      tags: guideline.tags || [], // 복원
     };
     setCurrentGuideline(convertedGuideline);
     setImageFile(null);
@@ -200,7 +194,6 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     setPreviewUrl(guideline.imageUrl || null);
   };
 
-  // 가이드라인 저장 (추가 또는 수정)
   const handleSaveGuideline = async () => {
     if (!currentGuideline) return;
 
@@ -210,10 +203,9 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
         return;
       }
 
-      setIsSaving(true); // Set saving state
-      setModalError(null); // Clear previous modal error
+      setIsSaving(true);
+      setModalError(null);
 
-      // isPublic 값을 확실히 number로 변환
       const isPublicValue =
         currentGuideline.isPublic === true || currentGuideline.isPublic === 1 ? 1 : 0;
 
@@ -222,9 +214,9 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
         content: currentGuideline.content,
         boardId: boardId,
         isPublic: isPublicValue,
-        position: currentGuideline.position,
+        position: currentGuideline.position, // 복원
         image: imageFile || undefined,
-        tags: currentGuideline.tags?.join(",") || "",
+        tags: currentGuideline.tags?.join(",") || "", // 복원
       };
 
       if (isEditing && currentGuideline.id) {
@@ -238,210 +230,260 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
       setShowModal(false);
       fetchGuidelines(currentPage, pageSize);
     } catch (error) {
-      // Error logging removed
       const errorMsg =
         (error as any)?.response?.data?.message || "가이드라인 저장 중 오류가 발생했습니다.";
       setModalError(errorMsg);
     } finally {
-      setIsSaving(false); // Ensure saving state is reset
+      setIsSaving(false);
     }
   };
 
-  // 가이드라인 삭제
   const handleDeleteGuideline = async (id: number) => {
-    if (!window.confirm("정말 이 가이드라인을 삭제하시겠습니까?")) return;
+    if (window.confirm("정말 이 가이드라인을 삭제하시겠습니까?")) {
+      try {
+        await GuidelineApiService.deleteGuideline(id);
+        toast.success("가이드라인이 삭제되었습니다.");
+        fetchGuidelines(currentPage, pageSize);
+        setSelectedGuidelineIds((prev) => prev.filter((guidelineId) => guidelineId !== id));
+      } catch (error) {
+        toast.error("가이드라인 삭제 중 오류가 발생했습니다.");
+      }
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedGuidelineIds.length === 0) {
+      toast.info("삭제할 가이드라인을 선택해주세요.");
+      return;
+    }
+    if (
+      !window.confirm(
+        `선택된 ${selectedGuidelineIds.length}개의 가이드라인을 정말 삭제하시겠습니까?`
+      )
+    )
+      return;
 
     try {
-      await GuidelineApiService.deleteGuideline(id);
-      toast.success("가이드라인이 삭제되었습니다.");
+      setLoading(true);
+      const deletePromises = selectedGuidelineIds.map((id) =>
+        GuidelineApiService.deleteGuideline(id)
+      );
+      await Promise.allSettled(deletePromises);
+
+      toast.success(`${selectedGuidelineIds.length}개의 가이드라인이 삭제되었습니다.`);
       fetchGuidelines(currentPage, pageSize);
-    } catch (err) {
-      // Error logging removed
-      toast.error("가이드라인 삭제 중 오류가 발생했습니다.");
+      setSelectedGuidelineIds([]);
+    } catch (error: any) {
+      console.error("가이드라인 일괄 삭제 중 오류 발생:", error);
+      toast.error("가이드라인 삭제 중 일부 오류가 발생했습니다. 목록을 확인해주세요.");
+      fetchGuidelines(currentPage, pageSize);
+      setSelectedGuidelineIds([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 순서 변경 (위로)
+  const handleSelectGuideline = (id: number) => {
+    setSelectedGuidelineIds((prevSelected) => {
+      if (prevSelected.includes(id)) {
+        return prevSelected.filter((guidelineId) => guidelineId !== id);
+      } else {
+        return [...prevSelected, id];
+      }
+    });
+  };
+
+  const handleSelectAllGuidelines = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.checked) {
+      const currentPageGuidelineIds = guidelines.map((g) => g.id);
+      setSelectedGuidelineIds(currentPageGuidelineIds);
+    } else {
+      setSelectedGuidelineIds([]);
+    }
+  };
+
+  // 순서 변경 핸들러 복원
   const handleMoveUp = async (index: number) => {
     if (index <= 0) return;
-
     const currentGuideline = guidelines[index];
     const targetGuideline = guidelines[index - 1];
-
-    // position 또는 displayOrder 값 교환
     const currentPosition = currentGuideline.position || currentGuideline.displayOrder || 0;
     const targetPosition = targetGuideline.position || targetGuideline.displayOrder || 0;
-
     try {
-      // API 호출 (개별 업데이트 방식 사용)
       await GuidelineApiService.updateGuidelinePosition(currentGuideline.id, targetPosition);
       await GuidelineApiService.updateGuidelinePosition(targetGuideline.id, currentPosition);
-
       fetchGuidelines(currentPage, pageSize);
     } catch (err) {
-      // Error logging removed
       toast.error("순서 변경 중 오류가 발생했습니다.");
       fetchGuidelines(currentPage, pageSize);
     }
   };
 
-  // 순서 변경 (아래로)
   const handleMoveDown = async (index: number) => {
     if (index >= guidelines.length - 1) return;
-
     const currentGuideline = guidelines[index];
     const targetGuideline = guidelines[index + 1];
-
     const currentPosition = currentGuideline.position || currentGuideline.displayOrder || 0;
     const targetPosition = targetGuideline.position || targetGuideline.displayOrder || 0;
-
     try {
       await GuidelineApiService.updateGuidelinePosition(currentGuideline.id, targetPosition);
       await GuidelineApiService.updateGuidelinePosition(targetGuideline.id, currentPosition);
-
       fetchGuidelines(currentPage, pageSize);
     } catch (err) {
-      // Error logging removed
       toast.error("순서 변경 중 오류가 발생했습니다.");
       fetchGuidelines(currentPage, pageSize);
     }
   };
 
-  // 모달 닫기 핸들러 추가
   const handleCloseModal = () => {
     setModalError(null);
     setShowModal(false);
-    setImageFile(null); // Reset image file on close
+    setImageFile(null);
     setPreviewUrl(null);
+    setCurrentTagInput(""); // 태그 입력 상태 초기화 추가 (복원)
   };
 
-  // --- New Hashtag Handlers ---
+  // 태그 핸들러 복원
   const handleTagInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCurrentTagInput(e.target.value);
   };
 
   const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if ([",", " ", "Enter"].includes(e.key)) {
-      e.preventDefault(); // Prevent default form submission on Enter
+      e.preventDefault();
       const newTag = currentTagInput.trim();
-
       if (newTag && currentGuideline?.tags && !currentGuideline.tags.includes(newTag)) {
         setCurrentGuideline((prev) =>
-          prev
-            ? {
-                ...prev,
-                tags: [...(prev.tags || []), newTag],
-              }
-            : null
+          prev ? { ...prev, tags: [...(prev.tags || []), newTag] } : null
         );
       }
-      setCurrentTagInput(""); // Clear input field
+      setCurrentTagInput("");
     }
   };
 
   const removeTag = (tagToRemove: string) => {
     setCurrentGuideline((prev) =>
-      prev
-        ? {
-            ...prev,
-            tags: (prev.tags || []).filter((tag) => tag !== tagToRemove),
-          }
-        : null
+      prev ? { ...prev, tags: (prev.tags || []).filter((tag) => tag !== tagToRemove) } : null
     );
   };
-  // --- End of New Hashtag Handlers ---
 
-  // DataTable 컬럼 정의
   const columns = [
+    {
+      header: (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          onChange={handleSelectAllGuidelines}
+          checked={
+            guidelines.length > 0 &&
+            selectedGuidelineIds.length === guidelines.length &&
+            guidelines.every((g) => selectedGuidelineIds.includes(g.id))
+          }
+          ref={(input) => {
+            if (input) {
+              const someSelected =
+                selectedGuidelineIds.length > 0 &&
+                selectedGuidelineIds.length < guidelines.length &&
+                guidelines.some((g) => selectedGuidelineIds.includes(g.id));
+              input.indeterminate = someSelected;
+            }
+          }}
+          disabled={loading || guidelines.length === 0}
+        />
+      ),
+      accessor: "id" as keyof GuidelineWithOrder,
+      cell: (id: number) => (
+        <input
+          type="checkbox"
+          className="form-checkbox h-4 w-4 text-blue-600"
+          checked={selectedGuidelineIds.includes(id)}
+          onChange={() => handleSelectGuideline(id)}
+        />
+      ),
+      className: "w-px px-4",
+    },
     {
       header: "제목",
       accessor: "title" as keyof GuidelineWithOrder,
       cell: (value: string, row: GuidelineWithOrder) => (
         <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block w-[300px] truncate text-left"
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
           onClick={() => handleEditGuideline(row)}
-          title={value}
         >
           {value}
         </span>
       ),
     },
     {
-      header: "썸네일",
+      header: "이미지",
       accessor: "imageUrl" as keyof GuidelineWithOrder,
-      cell: (value: string) => (
-        <div className="w-20 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
-          {value ? (
-            <img src={value} alt="썸네일" className="max-w-full max-h-full object-contain" />
-          ) : (
-            <span className="text-xs text-gray-500">이미지 없음</span>
-          )}
-        </div>
-      ),
-    },
-    {
-      header: "등록일자",
-      accessor: "createdAt" as keyof GuidelineWithOrder,
-      cell: (value: string) => {
-        const date = new Date(value);
-        return date.toLocaleString("ko-KR", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          hourCycle: "h23",
-        });
+      cell: (value: string | undefined) => {
+        return (
+          <div className="h-12 flex items-center justify-center">
+            {value ? (
+              <img src={value} alt="썸네일" className="max-h-full max-w-full object-contain" />
+            ) : null}
+          </div>
+        );
       },
+      className: "text-center px-2",
     },
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof GuidelineWithOrder,
-      cell: (value: boolean | number) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            value === true || value === 1
-              ? "bg-green-100 text-green-800"
-              : "bg-red-100 text-red-800"
-          }`}
-        >
-          {value === true || value === 1 ? "공개" : "비공개"}
-        </span>
-      ),
+      cell: (value: number | boolean | undefined) => {
+        const isPublic = value === 1 || value === true;
+        return (
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${
+              isPublic ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            }`}
+          >
+            {isPublic ? "공개" : "비공개"}
+          </span>
+        );
+      },
+      className: "text-center",
+    },
+    {
+      header: "등록일",
+      accessor: "createdAt" as keyof GuidelineWithOrder,
+      cell: (value: string | undefined) => formatDateForDisplay(value),
     },
     {
       header: "관리",
       accessor: "id" as keyof GuidelineWithOrder,
-      cell: (value: number, row: GuidelineWithOrder, index: number) => (
-        <div className="flex space-x-2">
+      cell: (id: number, row: GuidelineWithOrder, index: number) => (
+        <div className="flex items-center space-x-1 justify-center">
           <ActionButton
+            label="위로"
+            action="up"
+            size="sm"
             onClick={() => handleMoveUp(index)}
             disabled={index === 0}
-            action="up"
-            label="위로"
-            size="sm"
           />
           <ActionButton
+            label="아래로"
+            action="down"
+            size="sm"
             onClick={() => handleMoveDown(index)}
             disabled={index === guidelines.length - 1}
-            action="down"
-            label="아래로"
-            size="sm"
           />
           <ActionButton
-            onClick={() => handleEditGuideline(row)}
-            action="edit"
             label="수정"
+            action="edit"
             size="sm"
+            onClick={() => handleEditGuideline(row)}
           />
           <ActionButton
-            onClick={() => handleDeleteGuideline(value)}
-            action="delete"
             label="삭제"
+            action="delete"
             size="sm"
+            onClick={() => handleDeleteGuideline(id)}
           />
         </div>
       ),
+      className: "text-center",
     },
   ];
 
@@ -449,23 +491,35 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">{title}</h1>
-        <Button onClick={handleAddGuideline} variant="primary">
-          가이드라인 추가
-        </Button>
+        <div className="flex space-x-2">
+          <Button
+            onClick={handleBulkDelete}
+            variant="danger"
+            disabled={selectedGuidelineIds.length === 0 || loading || isSaving}
+          >
+            {`선택 삭제 (${selectedGuidelineIds.length})`}
+          </Button>
+          <Button onClick={handleAddGuideline} disabled={loading || isSaving}>
+            가이드라인 추가
+          </Button>
+        </div>
       </div>
 
       {error && (
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
-      <DataTable
-        columns={columns}
-        data={guidelines}
-        loading={loading}
-        emptyMessage="등록된 가이드라인이 없습니다."
-      />
+      <LoadingOverlay isLoading={loading || isSaving} />
 
-      {/* 페이지네이션 UI (배너 페이지와 동일하게) */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={guidelines}
+          loading={loading}
+          emptyMessage="등록된 가이드라인이 없습니다."
+        />
+      </div>
+
       {guidelines && guidelines.length > 0 && totalPages > 1 && (
         <div className="flex justify-center my-6">
           <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
@@ -508,7 +562,6 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
         </div>
       )}
 
-      {/* 가이드라인 추가/수정 모달 */}
       {currentGuideline && (
         <Modal
           isOpen={showModal}
@@ -516,119 +569,106 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
           title={isEditing ? "가이드라인 수정" : "새 가이드라인 추가"}
           size="xl"
         >
-          {/* Modal Error Display (Above top controls) */}
           {modalError && (
             <div className="mb-4">
               <Alert type="error" message={modalError} onClose={() => setModalError(null)} />
             </div>
           )}
 
-          {/* New container for top controls - Reordered */}
           <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-4">
-            {/* Left side: Action Buttons */}
-            <div className="flex space-x-3">
-              <Button variant="primary" onClick={handleSaveGuideline} disabled={isSaving}>
+            <div className="flex space-x-2">
+              <Button onClick={handleSaveGuideline} disabled={isSaving}>
                 {isSaving ? "저장 중..." : isEditing ? "저장" : "추가"}
               </Button>
-              <Button variant="secondary" onClick={handleCloseModal} disabled={isSaving}>
+              <Button variant="outline" onClick={handleCloseModal} disabled={isSaving}>
                 취소
               </Button>
             </div>
-
-            {/* Right side: Public toggle */}
             <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
-                id="isPublicModal"
-                checked={currentGuideline.isPublic === true || currentGuideline.isPublic === 1}
+                id="isPublic"
+                checked={currentGuideline.isPublic === 1}
                 onChange={(e) =>
                   setCurrentGuideline({
                     ...currentGuideline,
                     isPublic: e.target.checked ? 1 : 0,
                   })
                 }
-                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                disabled={isSaving}
               />
-              <label htmlFor="isPublicModal" className="ml-2 block text-sm text-gray-900">
+              <label htmlFor="isPublic" className="text-sm font-medium text-gray-700">
                 공개 여부
               </label>
             </div>
           </div>
 
-          <div className="space-y-4">
-            {/* Form fields below */}
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
             <Input
               label="제목"
+              name="title"
               value={currentGuideline.title || ""}
-              onChange={(e) =>
-                setCurrentGuideline({
-                  ...currentGuideline,
-                  title: e.target.value,
-                })
-              }
+              onChange={(e) => setCurrentGuideline({ ...currentGuideline, title: e.target.value })}
               required
+              disabled={isSaving}
             />
 
-            <FileUpload
-              label="썸네일 이미지"
-              id="guidelineImageModal"
-              onChange={handleFile}
-              value={previewUrl || currentGuideline.imageUrl}
-            />
-            {isEditing && !previewUrl && currentGuideline.imageUrl && (
-              <p className="mt-1 text-xs text-gray-500">
-                이미지를 변경하지 않으면 기존 이미지가 유지됩니다.
-              </p>
-            )}
+            <div className="flex items-end space-x-4">
+              <div className="flex-grow">
+                <FileUpload
+                  label="썸네일 이미지 (선택 사항)"
+                  name="imageUrl"
+                  id="imageUrl"
+                  onChange={handleFile}
+                  value={currentGuideline.imageUrl || ""}
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
 
-            {/* --- New Hashtag Input UI --- */}
             <div>
-              <label htmlFor="tags-input" className="block text-sm font-medium text-gray-700 mb-1">
-                해시태그 (콤마, 스페이스, 엔터로 구분)
+              <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-1">
+                태그 (쉼표 또는 엔터로 구분)
               </label>
-              <div className="flex flex-wrap items-center gap-2 border border-gray-300 rounded-md p-2">
-                {(currentGuideline.tags || []).map((tag) => (
+              <div className="flex flex-wrap gap-2 mb-2">
+                {currentGuideline.tags?.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center bg-gray-200 text-gray-800 text-xs font-medium px-2.5 py-0.5 rounded-full"
+                    className="flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-sm font-medium"
                   >
                     {tag}
                     <button
                       type="button"
-                      className="ml-1.5 inline-flex text-gray-500 hover:text-gray-700 focus:outline-none"
                       onClick={() => removeTag(tag)}
-                      aria-label={`Remove ${tag}`}
+                      className="ml-1.5 text-blue-600 hover:text-blue-800 focus:outline-none"
+                      disabled={isSaving}
                     >
-                      <svg
-                        className="h-2.5 w-2.5"
-                        stroke="currentColor"
-                        fill="none"
-                        viewBox="0 0 8 8"
-                      >
-                        <path strokeLinecap="round" strokeWidth="1.5" d="M1 1l6 6m0-6L1 7" />
-                      </svg>
+                      &times;
                     </button>
                   </span>
                 ))}
-                <input
-                  id="tags-input"
-                  type="text"
-                  value={currentTagInput}
-                  onChange={handleTagInputChange}
-                  onKeyDown={handleTagInputKeyDown}
-                  placeholder={(currentGuideline.tags?.length || 0) > 0 ? "" : "태그 입력..."}
-                  className="flex-grow p-1 outline-none text-sm"
-                />
               </div>
+              <Input
+                id="tags"
+                name="tags"
+                value={currentTagInput}
+                onChange={handleTagInputChange}
+                onKeyDown={handleTagInputKeyDown}
+                placeholder="태그 입력 후 Enter 또는 ,"
+                disabled={isSaving}
+              />
             </div>
-            {/* --- End of New Hashtag Input UI --- */}
 
-            <TextEditor
-              content={currentGuideline.content || ""}
-              setContent={handleEditorContentChange}
-              height="300px"
-              readOnly={isSaving}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
+              <TextEditor
+                content={currentGuideline.content || ""}
+                setContent={handleEditorContentChange}
+                readOnly={isSaving}
+                height="300px"
+              />
+            </div>
           </div>
         </Modal>
       )}
