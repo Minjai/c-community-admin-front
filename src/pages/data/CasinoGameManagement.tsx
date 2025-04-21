@@ -518,7 +518,6 @@ const CasinoGameManagement = () => {
         <div>
           <label className="label">게임 설명</label>
           <TextEditor
-            key={currentGame?.id || "new"}
             content={isEditing && currentGame ? currentGame.description || "" : description}
             setContent={setDescription}
             height="200px"

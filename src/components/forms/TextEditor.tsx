@@ -105,17 +105,19 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
 const BlockEmbed = Quill.import("blots/block/embed");
 
 class EmbedBlot extends BlockEmbed {
-  static blotName = "embed"; // 블롯 이름 변경 (video -> embed)
-  static tagName = "iframe";
-  static className = "ql-embed"; // 클래스 이름 변경
+  static blotName = "embed";
+  static tagName = "iframe"; // Reverted to iframe
+  static className = "ql-embed"; // Reverted to ql-embed
 
   static create(url: string) {
+    // Reverted to accept only url string
     const node = super.create(url);
-    // 보안 및 기능 관련 속성 설정
-    node.setAttribute("src", this.sanitizeUrl(url));
+    // Basic attributes - allow Quill/browser to handle the rest if pasted
+    node.setAttribute("src", this.sanitizeUrl(url)); // Use sanitizeUrl again
     node.setAttribute("frameborder", "0");
     node.setAttribute("allowfullscreen", "true");
-    // node.setAttribute("sandbox", "allow-scripts allow-same-origin allow-popups"); // 필요시 sandbox 추가
+    // Add common allow policy
+    node.setAttribute("allow", "autoplay; fullscreen; picture-in-picture; clipboard-write");
     return node;
   }
 
@@ -123,25 +125,17 @@ class EmbedBlot extends BlockEmbed {
     return node.getAttribute("src") || undefined;
   }
 
-  // 기본적인 URL 유효성 검사 및 https 강제 (선택적)
+  // Re-introduce sanitizeUrl
   static sanitizeUrl(url: string): string {
     if (!url || typeof url !== "string") return "";
-    // 단순 URL 패턴 확인 (보안 강화 필요 시 추가 라이브러리 사용 고려)
     if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      // mailto:, tel: 등 다른 프로토콜은 그대로 둠
       if (!url.startsWith("mailto:") && !url.startsWith("tel:") && !url.startsWith("data:")) {
-        // 기본적으로 https 로 가정 (필요시 조정)
         if (url.includes(".")) {
-          // 최소한 도메인 형태는 갖추도록
           return `https://${url}`;
         }
-        return ""; // 유효하지 않은 URL로 간주
+        return "";
       }
     }
-    // HTTPS 강제 (선택 사항)
-    // if (url.startsWith('http://')) {
-    //   return url.replace('http://', 'https://');
-    // }
     return url;
   }
 }
@@ -194,36 +188,25 @@ function transformUrlToEmbed(url: string): string | null {
   // YouTube
   match = url.match(YOUTUBE_REGEX);
   if (match && match[1]) {
-    // 이미 embed 형태인 경우 그대로 반환
-    if (url.includes("/embed/")) return url.split("?")[0]; // 파라미터 제거
+    if (url.includes("/embed/")) return url.split("?")[0];
     return `https://www.youtube.com/embed/${match[1]}`;
   }
 
   // Vimeo
   match = url.match(VIMEO_REGEX);
   if (match && match[1]) {
-    // 이미 player 형태인 경우 그대로 반환
     if (url.includes("player.vimeo.com/video/")) return url.split("?")[0];
     return `https://player.vimeo.com/video/${match[1]}`;
   }
 
-  // Instagram - Instagram은 iframe 임베드를 공식적으로 쉽게 지원하지 않음.
-  // oEmbed 엔드포인트를 사용하거나, 붙여넣기 시 blockquote 형태로 변환하는 것을 고려.
-  // 여기서는 임베드 시도하지 않고 null 반환 (또는 링크로 처리)
-  // match = url.match(INSTAGRAM_REGEX);
-  // if (match && match[1]) {
-  //   // 단순 iframe 방식은 대부분 차단됨
-  //   // return `https://www.instagram.com/p/${match[1]}/embed`; // 작동 안 할 가능성 높음
-  //   return null; // 또는 링크 텍스트 반환?
-  // }
+  // TikTok - Re-enable iframe transformation attempt
+  match = url.match(TIKTOK_REGEX);
+  if (match && match[1]) {
+    const videoId = match[1];
+    return `https://www.tiktok.com/embed/v2/${videoId}`; // Re-enabled
+  }
 
-  // TikTok - TikTok도 iframe 임베드 제한적. oEmbed 사용 권장.
-  // 여기서는 null 반환.
-  // match = url.match(TIKTOK_REGEX);
-  // if (match && match[1]) {
-  //   // return `https://www.tiktok.com/embed/v2/${match[1]}`; // 공식적이지 않을 수 있음
-  //   return null;
-  // }
+  // Instagram/Twitter links are handled separately via blockquote paste
 
   // 지원하지 않는 URL
   return null;
@@ -781,183 +764,274 @@ const TextEditor: React.FC<TextEditorProps> = ({
       const editor = quillRef.current?.getEditor();
       if (!editor) return;
 
-      const handlePaste = (e: Event) => {
+      const handlePaste = (e: ClipboardEvent) => {
         try {
-          const pasteEvent = e as ClipboardEvent;
-          const clipboardData = pasteEvent.clipboardData;
+          const clipboardData = e.clipboardData;
           if (!clipboardData) return;
 
-          let processed = false; // 처리 여부 플래그
+          let processed = false;
+          const editor = quillRef.current?.getEditor();
+          if (!editor) return;
+          const range = editor.getSelection(true);
 
           // 1. 이미지 파일 확인 (기존 로직 유지)
           for (let i = 0; i < clipboardData.items.length; i++) {
             const item = clipboardData.items[i];
             if (item.type.match(/^image\//)) {
-              // ... existing image paste logic ...
-              // processed = true; 가 내부에 있음
+              e.preventDefault();
+              const file = item.getAsFile();
+              if (file && isImageTypeSupported(file)) {
+                insertBase64Image(file);
+                processed = true;
+              }
               break;
             }
           }
 
-          // 2. 이미지가 아닐 경우, 텍스트 확인
+          // 2. Text processing if not an image file
           if (!processed) {
             const pastedText = clipboardData.getData("text/plain").trim();
 
-            // --- 이미지 URL 우선 처리 --- START ---
-            const isImageUrl = /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(pastedText);
-            if (isImageUrl) {
-              e.preventDefault(); // 기본 텍스트 붙여넣기 방지
-              processed = true;
+            // --- START: Check if pasted text is iframe (Case-insensitive) ---
+            if (pastedText.toLowerCase().startsWith("<iframe")) {
+              console.log("[Paste Handler] Pasted text starts with <iframe>:", pastedText);
+              // --- START: Extract src and use insertEmbed ---
+              const srcMatch = pastedText.match(/src="([^"]*)"/i); // Extract src value
+              if (srcMatch && srcMatch[1]) {
+                const extractedSrc = srcMatch[1];
+                console.log("[Paste Handler] Extracted src from iframe:", extractedSrc);
+                e.preventDefault();
+                processed = true;
+                if (range) {
+                  console.log(
+                    "[Paste Handler] Attempting insertEmbed for extracted iframe src:",
+                    extractedSrc,
+                    "at range:",
+                    range
+                  );
+                  editor.deleteText(range.index, range.length, "user");
+                  editor.insertEmbed(range.index, "embed", extractedSrc, "user"); // Use insertEmbed with extracted src
+                  console.log(
+                    "[Paste Handler] Editor content after iframe src insertEmbed (range):",
+                    editor.root.innerHTML
+                  );
+                  editor.setSelection(range.index + 1, 0, "user");
+                } else {
+                  const length = editor.getLength();
+                  console.log(
+                    "[Paste Handler] Attempting insertEmbed for extracted iframe src:",
+                    extractedSrc,
+                    "at end (length):",
+                    length
+                  );
+                  editor.insertEmbed(length, "embed", extractedSrc, "user"); // Use insertEmbed with extracted src
+                  console.log(
+                    "[Paste Handler] Editor content after iframe src insertEmbed (end):",
+                    editor.root.innerHTML
+                  );
+                  editor.setSelection(length + 1, 0, "user");
+                }
+              } else {
+                console.warn(
+                  "[Paste Handler] Could not extract src from pasted iframe:",
+                  pastedText
+                );
+                // Let the default paste happen or handle as plain text if needed
+              }
+              // --- END: Extract src and use insertEmbed ---
+              return; // Return after handling (or attempting to handle) iframe paste
+            }
+            // --- END: Check if pasted text is iframe ---
 
-              const range = editor.getSelection(true);
+            // --- Image URL Check (Use insertEmbed) ---
+            const isImageUrl = /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(pastedText);
+            if (isImageUrl && isValidURL(pastedText)) {
+              e.preventDefault();
+              processed = true;
               if (range) {
-                // 선택 영역 삭제 후 이미지 임베드
                 editor.deleteText(range.index, range.length, "user");
                 editor.insertEmbed(range.index, "image", pastedText, "user");
                 editor.setSelection(range.index + 1, 0, "user");
               } else {
-                // 선택 영역 없으면 맨 끝에 삽입
                 const length = editor.getLength();
                 editor.insertEmbed(length, "image", pastedText, "user");
                 editor.setSelection(length + 1, 0, "user");
               }
-              return; // 이미지 URL 처리 완료
-            }
-            // --- 이미지 URL 우선 처리 --- END ---
-
-            // 이미 <iframe...> 이나 <blockquote...> 형태인지 간단히 확인 (변환 방지)
-            if (
-              pastedText.startsWith("<") &&
-              (pastedText.includes("iframe") || pastedText.includes("blockquote"))
-            ) {
-              // 이미 임베드 코드로 판단되면 기본 붙여넣기 동작에 맡김
               return;
             }
 
-            // --- Instagram Blockquote 처리 추가 --- START ---
-            const instagramMatch = pastedText.match(INSTAGRAM_REGEX);
-            if (instagramMatch && instagramMatch[1]) {
-              e.preventDefault(); // 기본 텍스트 붙여넣기 방지
-              processed = true;
+            let embedHTML = ""; // Variable for generated HTML
+            let isBlockquote = false; // Flag for blockquote embeds (Twitter)
+            let targetClass = "";
+            let processFunc = () => {};
 
-              // Instagram 임베드용 blockquote HTML 생성
-              // 참고: 스크립트 로딩은 별도 필요할 수 있음 (Quill 외부에서)
-              const blockquoteHTML = `
-                <blockquote class="instagram-media" data-instgrm-captioned data-instgrm-permalink="${pastedText}" data-instgrm-version="14" style=" background:#FFF; border:0; border-radius:3px; box-shadow:0 0 1px 0 rgba(0,0,0,0.5),0 1px 10px 0 rgba(0,0,0,0.15); margin: 1px; max-width:540px; min-width:326px; padding:0; width:99.375%; width:-webkit-calc(100% - 2px); width:calc(100% - 2px);">
-                  <div style="padding:16px;"> <a href="${pastedText}" style=" background:#FFFFFF; line-height:0; padding:0 0; text-align:center; text-decoration:none; width:100%;" target="_blank"> <div style=" display: flex; flex-direction: row; align-items: center;"> <div style="background-color: #F4F4F4; border-radius: 50%; flex-grow: 0; height: 40px; margin-right: 14px; width: 40px;"></div> <div style="display: flex; flex-direction: column; flex-grow: 1; justify-content: center;"> <div style=" background-color: #F4F4F4; border-radius: 4px; flex-grow: 0; height: 14px; margin-bottom: 6px; width: 100px;"></div> <div style=" background-color: #F4F4F4; border-radius: 4px; flex-grow: 0; height: 14px; width: 60px;"></div></div></div><div style="padding: 19% 0;"></div> <div style="display:flex; flex-direction:row; margin-bottom:14px; align-items:center;"><div> <div style="background-color: #F4F4F4; border-radius: 50%; height: 12.5px; width: 12.5px; transform:translateX(0px) translateY(7px);"></div> <div style="background-color: #F4F4F4; height: 12.5px; transform:rotate(-45deg) translateX(3px) translateY(1px); width: 12.5px; flex-grow:0; margin-right:14px; margin-left:2px;"></div> <div style="background-color: #F4F4F4; border-radius: 50%; height: 12.5px; width: 12.5px; transform:translateX(9px) translateY(-18px);"></div></div><div style="margin-left:8px;"> <div style=" background-color: #F4F4F4; border-radius: 50%; flex-grow:0; height:20px; width:20px;"></div> <div style=" width: 0; height: 0; border-top:2px solid transparent; border-left:6px solid #f4f4f4; border-bottom:2px solid transparent; transform:translateX(16px) translateY(-4px) rotate(30deg)"></div></div><div style="margin-left:auto;"> <div style=" width: 0px; border-top:8px solid #F4F4F4; border-right:8px solid transparent; transform:translateY(16px);"></div> <div style=" background-color: #F4F4F4; flex-grow:0; height:12px; width:16px; transform:translateY(-4px);"></div> <div style=" width: 0; height: 0; border-top:8px solid #F4F4F4; border-left:8px solid transparent; transform:translateY(-4px) translateX(8px);"></div></div></div> <div style="display:flex; flex-direction:column; flex-grow:1; justify-content:center; margin-bottom:24px;"> <div style=" background-color: #F4F4F4; border-radius: 4px; flex-grow:0; height:14px; margin-bottom:6px; width:224px;"></div> <div style=" background-color: #F4F4F4; border-radius: 4px; flex-grow:0; height:14px; width:144px;"></div></div></a>
-                </blockquote>
-              `;
-
-              const range = editor.getSelection(true);
-              if (range) {
-                // 선택 영역 삭제 후 blockquote 삽입
-                editor.deleteText(range.index, range.length, "user");
-                editor.clipboard.dangerouslyPasteHTML(range.index, blockquoteHTML, "user");
-                editor.setSelection(range.index + 1, 0, "user"); // 블록 요소 뒤로 커서 이동
-              } else {
-                // 선택 영역 없으면 맨 끝에 삽입
-                const length = editor.getLength();
-                editor.clipboard.dangerouslyPasteHTML(length, blockquoteHTML, "user");
-                editor.setSelection(length + 1, 0, "user");
-              }
-              return; // Instagram 처리 완료, 이후 로직 실행 안 함
-            }
-            // --- Instagram Blockquote 처리 추가 --- END ---
-
-            // --- TikTok Blockquote 처리 추가 --- START ---
+            // --- START: Check for TikTok Link --- (Use insertEmbed with iframe source)
             const tiktokMatch = pastedText.match(TIKTOK_REGEX);
             if (tiktokMatch && tiktokMatch[1]) {
-              e.preventDefault(); // 기본 텍스트 붙여넣기 방지
-              processed = true;
-
+              console.log("[Paste Handler] TikTok link matched (insertEmbed iframe):", pastedText);
               const videoId = tiktokMatch[1];
-
-              // TikTok 임베드용 blockquote HTML 생성
-              // 참고: 스크립트 로딩은 별도 필요 (https://www.tiktok.com/embed.js)
-              const blockquoteHTML = `
-                <blockquote class="tiktok-embed" cite="${pastedText}" data-video-id="${videoId}" style="max-width: 605px;min-width: 325px;" >
-                  <section>
-                     <a target="_blank" title="TikTok Video" href="${pastedText}">Watch this video on TikTok</a>
-                  </section>
-                </blockquote>
-              `;
-
-              const range = editor.getSelection(true);
-              if (range) {
-                // 선택 영역 삭제 후 blockquote 삽입
-                editor.deleteText(range.index, range.length, "user");
-                editor.clipboard.dangerouslyPasteHTML(range.index, blockquoteHTML, "user");
-                editor.setSelection(range.index + 1, 0, "user");
-              } else {
-                // 선택 영역 없으면 맨 끝에 삽입
-                const length = editor.getLength();
-                editor.clipboard.dangerouslyPasteHTML(length, blockquoteHTML, "user");
-                editor.setSelection(length + 1, 0, "user");
-              }
-              return; // TikTok 처리 완료, 이후 로직 실행 안 함
-            }
-            // --- TikTok Blockquote 처리 추가 --- END ---
-
-            // --- Twitter Blockquote 처리 추가 --- START ---
-            const twitterMatch = pastedText.match(TWITTER_REGEX);
-            if (twitterMatch && twitterMatch[3]) {
-              e.preventDefault(); // 기본 텍스트 붙여넣기 방지
+              const embedSrc = `https://www.tiktok.com/embed/v2/${videoId}`;
+              e.preventDefault();
               processed = true;
-
-              // Twitter 임베드용 blockquote HTML 생성
-              // 참고: 스크립트 로딩은 별도 필요 (https://platform.twitter.com/widgets.js)
-              const blockquoteHTML = `
-                <blockquote class="twitter-tweet">
-                  <p lang="ko" dir="ltr"></p>&mdash; Loading tweet... <a href="${pastedText}">${pastedText}</a>
-                </blockquote>
-              `;
-              // 위 코드는 기본 형태이며, widgets.js가 로드되면 내용을 채워줌
-
-              const range = editor.getSelection(true);
               if (range) {
-                // 선택 영역 삭제 후 blockquote 삽입
+                console.log(
+                  "[Paste Handler] Attempting insertEmbed for TikTok:",
+                  embedSrc,
+                  "at range:",
+                  range
+                );
                 editor.deleteText(range.index, range.length, "user");
-                editor.clipboard.dangerouslyPasteHTML(range.index, blockquoteHTML, "user");
+                editor.insertEmbed(range.index, "embed", embedSrc, "user"); // Use insertEmbed
+                console.log(
+                  "[Paste Handler] Editor content after TikTok insertEmbed (range):",
+                  editor.root.innerHTML
+                );
                 editor.setSelection(range.index + 1, 0, "user");
               } else {
-                // 선택 영역 없으면 맨 끝에 삽입
                 const length = editor.getLength();
-                editor.clipboard.dangerouslyPasteHTML(length, blockquoteHTML, "user");
+                console.log(
+                  "[Paste Handler] Attempting insertEmbed for TikTok:",
+                  embedSrc,
+                  "at end (length):",
+                  length
+                );
+                editor.insertEmbed(length, "embed", embedSrc, "user"); // Use insertEmbed
+                console.log(
+                  "[Paste Handler] Editor content after TikTok insertEmbed (end):",
+                  editor.root.innerHTML
+                );
                 editor.setSelection(length + 1, 0, "user");
               }
-              return; // Twitter 처리 완료, 이후 로직 실행 안 함
+              return; // TikTok handled
             }
-            // --- Twitter Blockquote 처리 추가 --- END ---
+            // --- END: Check for TikTok Link ---
 
-            // URL 변환 시도 (YouTube, Vimeo) - 다른 처리가 안 된 경우
-            const embedUrl = transformUrlToEmbed(pastedText);
+            // --- START: Check for YouTube/Vimeo/Instagram Link --- (Generate iframe or use insertEmbed)
+            if (!embedHTML) {
+              // This check remains, but TikTok block now returns early
+              const ytMatch = pastedText.match(YOUTUBE_REGEX);
+              const vimeoMatch = pastedText.match(VIMEO_REGEX);
+              const instagramMatch = pastedText.match(INSTAGRAM_REGEX); // Check Instagram here
 
-            if (embedUrl) {
-              // 변환 성공 시 (YouTube, Vimeo)
-              e.preventDefault(); // 기본 텍스트 붙여넣기 방지
+              if (ytMatch && ytMatch[1]) {
+                const videoId = ytMatch[1];
+                const embedSrc = `https://www.youtube.com/embed/${videoId}`;
+                embedHTML = `<iframe src="${embedSrc}" allowfullscreen></iframe>`;
+              } else if (vimeoMatch && vimeoMatch[1]) {
+                const videoId = vimeoMatch[1];
+                const embedSrc = `https://player.vimeo.com/video/${videoId}`;
+                embedHTML = `<iframe src="${embedSrc}" allowfullscreen></iframe>`;
+              } else if (instagramMatch && instagramMatch[1]) {
+                // Attempt to use insertEmbed for Instagram instead of dangerouslyPasteHTML
+                const shortcode = instagramMatch[1];
+                const embedSrc = `https://www.instagram.com/p/${shortcode}/embed`;
+                // --- START: Use insertEmbed directly ---
+                e.preventDefault(); // Prevent default paste
+                processed = true;
+                if (range) {
+                  console.log(
+                    "[Paste Handler] Attempting insertEmbed for Instagram:",
+                    embedSrc,
+                    "at range:",
+                    range
+                  );
+                  editor.deleteText(range.index, range.length, "user");
+                  editor.insertEmbed(range.index, "embed", embedSrc, "user");
+                  console.log(
+                    "[Paste Handler] Editor content after insertEmbed (range):",
+                    editor.root.innerHTML
+                  );
+                  editor.setSelection(range.index + 1, 0, "user");
+                } else {
+                  const length = editor.getLength();
+                  console.log(
+                    "[Paste Handler] Attempting insertEmbed for Instagram:",
+                    embedSrc,
+                    "at end (length):",
+                    length
+                  );
+                  editor.insertEmbed(length, "embed", embedSrc, "user");
+                  console.log(
+                    "[Paste Handler] Editor content after insertEmbed (end):",
+                    editor.root.innerHTML
+                  );
+                  editor.setSelection(length + 1, 0, "user");
+                }
+                return; // Instagram handled, exit the check block
+                // --- END: Use insertEmbed directly ---
+              }
+            }
+            // --- END: Check for YouTube/Vimeo/Instagram Link ---
+
+            // --- START: Check for Twitter Link --- (Generate blockquote)
+            if (!embedHTML) {
+              const twitterMatch = pastedText.match(TWITTER_REGEX);
+              if (twitterMatch && twitterMatch[3]) {
+                isBlockquote = true; // Twitter uses blockquote
+                targetClass = ".twitter-tweet";
+                processFunc = () => (window as any).twttr?.widgets?.load();
+                embedHTML = `
+                  <blockquote class="twitter-tweet">
+                    <p lang="ko" dir="ltr"></p>&mdash; Loading tweet... <a href="${pastedText}">${pastedText}</a>
+                  </blockquote>
+                `;
+              }
+            }
+            // --- END: Check for Twitter Link ---
+
+            console.log(
+              `[Paste Handler] Reached check for final embedHTML. isBlockquote: ${isBlockquote}, embedHTML exists: ${!!embedHTML}`
+            );
+            // If any embedHTML was generated, paste it
+            if (embedHTML) {
+              console.log("[Paste Handler] Embed HTML generated:", embedHTML); // Log generated HTML
+              e.preventDefault();
               processed = true;
-
-              const range = editor.getSelection(true);
               if (range) {
-                // 선택 영역 삭제 후 임베드 (iframe)
+                console.log(
+                  "[Paste Handler] Inserting embedHTML via dangerouslyPasteHTML at range:",
+                  range
+                );
                 editor.deleteText(range.index, range.length, "user");
-                editor.insertEmbed(range.index, "embed", embedUrl, "user");
+                editor.clipboard.dangerouslyPasteHTML(range.index, embedHTML, "user");
+                console.log(
+                  "[Paste Handler] Editor content after DPH (range):",
+                  editor.root.innerHTML
+                );
                 editor.setSelection(range.index + 1, 0, "user");
               } else {
-                // 선택 영역 없으면 맨 끝에 삽입 (iframe)
                 const length = editor.getLength();
-                editor.insertEmbed(length, "embed", embedUrl, "user");
+                console.log(
+                  "[Paste Handler] Inserting embedHTML via dangerouslyPasteHTML at end (length):",
+                  length
+                );
+                editor.clipboard.dangerouslyPasteHTML(length, embedHTML, "user");
+                console.log(
+                  "[Paste Handler] Editor content after DPH (end):",
+                  editor.root.innerHTML
+                );
                 editor.setSelection(length + 1, 0, "user");
               }
-            } else {
-              // 변환 실패 시 (기타 URL)
-              // 기본 텍스트 붙여넣기 동작에 맡김 (processed = false 유지)
+
+              // Trigger processing only for blockquote types (Twitter)
+              if (isBlockquote) {
+                // isBlockquote should be false for Instagram iframe attempt
+                console.log("[Paste Handler] Triggering processFunc for blockquote.");
+                setTimeout(() => {
+                  try {
+                    if (typeof processFunc === "function") {
+                      processFunc();
+                    }
+                  } catch (scriptError) {
+                    console.error(`Error triggering ${targetClass} script:`, scriptError);
+                  }
+                }, 100);
+              }
+              return; // Link handled
             }
           }
-
-          // ... rest of the paste handler ...
         } catch (error) {
-          // 로깅 제거
+          console.error("Error in handlePaste:", error);
         }
       };
 
@@ -1123,13 +1197,41 @@ const TextEditor: React.FC<TextEditorProps> = ({
         .ql-editor:focus {
           outline: none;
         }
-          .ql-embed { /* embed 블롯 스타일 (기존 ql-video 와 유사하게) */
+          .ql-embed { /* iframe blot wrapper (now less used) */
             display: block;
-            width: 100%; /* 너비 조정 가능 */
-            /* max-width: 560px; */ /* 최대 너비 설정 가능 */
-            height: 315px; /* 기본 높이, 필요시 조정 */
-            margin: 10px auto; /* 가운데 정렬 및 여백 */
+            width: 100%;
+            height: 315px;
+            margin: 10px auto;
           }
+          /* Ensure iframe elements are visible */
+          .ql-editor iframe {
+            display: block !important; /* Ensure display */
+            width: 100%;
+            min-height: 315px; /* Minimum height */
+            height: auto; /* Allow height to adjust or use aspect ratio */
+            aspect-ratio: 16 / 9; /* Common video aspect ratio */
+            border: none;
+            margin: 10px auto;
+          }
+          /* Ensure blockquote embeds are visible */
+          .ql-editor blockquote.tiktok-embed,
+          .ql-editor blockquote.instagram-media,
+          .ql-editor blockquote.twitter-tweet {
+            display: block !important; /* Ensure display */
+            background: #f9f9f9; /* Light background to see the container */
+            border-left: 5px solid #ccc; /* Standard blockquote style */
+            padding: 10px;
+            margin: 10px 0;
+            min-height: 100px; /* Minimum height */
+            box-shadow: none; /* Reset previous complex styles if any */
+            max-width: 540px; /* Consistent max width */
+            width: 100%;
+          }
+          /* Specific overrides if needed, e.g., for TikTok */
+          .ql-editor blockquote.tiktok-embed {
+             min-width: 325px;
+          }
+
           .quill-editor-maintain-focus {
              /* Remove min-height from this potentially conflicting class */
              /* min-height: ${height}; */
