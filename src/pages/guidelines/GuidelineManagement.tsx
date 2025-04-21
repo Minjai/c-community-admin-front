@@ -20,7 +20,11 @@ interface GuidelineWithOrder extends Guideline {
   tags?: string[]; // Explicitly add tags as string array
 }
 
-const GuidelineManagement = ({ boardId = 3 }) => {
+interface GuidelineManagementProps {
+  boardId: number;
+}
+
+const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [guidelines, setGuidelines] = useState<GuidelineWithOrder[]>([]); // GuidelineWithOrder 사용
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +40,12 @@ const GuidelineManagement = ({ boardId = 3 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [currentTagInput, setCurrentTagInput] = useState<string>(""); // State for current tag input
+
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10); // 기본 페이지 크기
+  const [totalItems, setTotalItems] = useState<number>(0);
 
   // TextEditor의 content를 업데이트하는 함수를 useCallback으로 감싸기
   const handleEditorContentChange = useCallback(
@@ -72,186 +82,66 @@ const GuidelineManagement = ({ boardId = 3 }) => {
 
   const { path, title } = getPageInfo();
 
-  // 가이드라인 목록 조회
-  const fetchGuidelines = async () => {
+  // 데이터 조회 함수 (페이지네이션 적용)
+  const fetchGuidelines = async (page: number = 1, limit: number = 10) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await GuidelineApiService.getGuidelines(boardId);
-      // Log removed
+      // GuidelineApiService.getGuidelines에 page와 pageSize 전달
+      const response = await GuidelineApiService.getGuidelines(boardId, page, limit);
 
-      // 응답 구조를 더 자세히 확인
-      if (response?.data) {
-        // Log removed
-      }
-      if (response?.data?.data) {
-        // Log removed
-        // 중요: 첫 번째 객체의 구조를 자세히 로그
-        if (Array.isArray(response.data.data) && response.data.data.length > 0) {
-          // Log removed
-          // Log removed
+      // API 응답 구조에 맞게 데이터와 페이지네이션 정보 추출
+      if (response && response.success && Array.isArray(response.data)) {
+        // position 기준으로 정렬 (서버에서 처리되지 않은 경우) <-- 이 주석과 아래 정렬 로직 제거
+        // const sortedGuidelines = [...response.data].sort(
+        //   (a, b) => (a.position || 0) - (b.position || 0)
+        // );
+        // setGuidelines(sortedGuidelines); <-- sortedGuidelines 대신 response.data 사용
+
+        setGuidelines(response.data); // 서버에서 정렬된 데이터를 그대로 사용
+
+        // 페이지네이션 정보 업데이트
+        if (response.pagination) {
+          setTotalPages(response.pagination.totalPages);
+          setCurrentPage(response.pagination.currentPage);
+          setPageSize(response.pagination.pageSize);
+          setTotalItems(response.pagination.totalItems);
+        } else {
+          // 페이지네이션 정보가 없는 경우 (호환성 유지)
+          setTotalPages(1);
+          setCurrentPage(1);
+          setTotalItems(response.data.length); // sortedGuidelines 대신 response.data 사용
         }
-      }
-
-      // 페이지네이션 정보 확인
-      if (response?.data?.pagination) {
-        // Log removed
-      }
-
-      // 가이드라인 데이터 추출 시도
-      let dataArray = null;
-      let extractedData = null;
-
-      // 1. response.data가 배열인 경우
-      if (response?.data && Array.isArray(response.data)) {
-        dataArray = response.data;
-        // Log removed
-      }
-      // 2. response.data.data가 배열인 경우
-      else if (response?.data?.data && Array.isArray(response.data.data)) {
-        dataArray = response.data.data;
-        // Log removed
-      }
-      // 3. response.data.data가 객체이고 내부에 배열 필드가 있는 경우
-      else if (response?.data?.data && typeof response.data.data === "object") {
-        // Log removed
-        // 가능한 배열 필드 이름들
-        const possibleArrayFields = ["guidelines", "posts", "items", "list", "results", "posts"];
-
-        for (const field of possibleArrayFields) {
-          if (Array.isArray(response.data.data[field])) {
-            dataArray = response.data.data[field];
-            // Log removed
-            break;
-          }
-        }
-
-        // 직접 객체 내용 확인
-        if (!dataArray) {
-          // Log removed
-          // 첫 번째 배열 형태의 값을 찾아 사용
-          for (const key in response.data.data) {
-            if (Array.isArray(response.data.data[key])) {
-              dataArray = response.data.data[key];
-              // Log removed
-              break;
-            }
-          }
-        }
-      }
-      // 4. response.success가 true이고 response.data 자체가 가이드라인 데이터인 경우
-      else if (response?.success === true && response?.data) {
-        // Log removed
-        // response.data가 가이드라인 객체 자체일 수 있음
-        extractedData = response.data;
-      }
-
-      // 페이지네이션이 있는 경우 별도 처리
-      if (response?.data?.pagination && response?.data?.posts) {
-        // Log removed
-        dataArray = response.data.posts;
-      }
-
-      // 데이터가 객체이고 posts 속성을 가진 경우
-      if (!dataArray && extractedData && extractedData.posts) {
-        // Log removed
-        dataArray = extractedData.posts;
-      }
-
-      // response.data에 items 배열이 있는 경우 (로그에서 확인된 실제 구조)
-      if (!dataArray && response?.data?.items && Array.isArray(response.data.items)) {
-        // Log removed
-        dataArray = response.data.items;
-      }
-
-      // 데이터가 객체이고 posts 속성을 가진 경우
-      if (!dataArray && extractedData && extractedData.posts) {
-        // Log removed
-        dataArray = extractedData.posts;
-      }
-
-      // extractedData에 items 배열이 있는 경우
-      if (
-        !dataArray &&
-        extractedData &&
-        extractedData.items &&
-        Array.isArray(extractedData.items)
-      ) {
-        // Log removed
-        dataArray = extractedData.items;
-      }
-
-      // 추출된 데이터 배열이 있으면 정렬하여 표시
-      if (dataArray && dataArray.length > 0) {
-        // Log removed
-
-        // 데이터 매핑 - 필드명이 다를 수 있으므로 확인
-        const mappedData = dataArray.map((item: any) => {
-          // Log removed
-          // 필수 필드가 없는 경우 로그
-          if (!item.id || !item.title) {
-            // Log removed
-          }
-
-          return {
-            id: item.id,
-            title: item.title || "제목 없음",
-            content: item.content || "",
-            createdAt: item.createdAt || item.created_at || new Date().toISOString(),
-            isPublic: item.isPublic !== undefined ? item.isPublic : item.is_public || 1,
-            imageUrl: item.imageUrl || item.image_url || "",
-            position: item.position || item.displayOrder || 0,
-            displayOrder: item.displayOrder || item.position || 0,
-            tags:
-              typeof item.tags === "string"
-                ? item.tags
-                    .split(",")
-                    .map((t: string) => t.trim())
-                    .filter(Boolean)
-                : item.tags || [], // 서버 문자열 -> 배열 변환
-          };
-        });
-
-        // Log removed
-
-        // position 값이 높은 순서대로 내림차순 정렬
-        const sortedGuidelines = [...mappedData].sort(
-          (a: GuidelineWithOrder, b: GuidelineWithOrder) =>
-            (b.position || b.displayOrder || 0) - (a.position || a.displayOrder || 0)
-        );
-        setGuidelines(sortedGuidelines);
-        setError(null); // 성공적으로 데이터 로드
-      } else if (
-        // 성공적인 응답이지만 데이터가 없는 다양한 케이스 처리
-        (response?.success === true &&
-          Array.isArray(response.data) &&
-          response.data.length === 0) ||
-        (dataArray && dataArray.length === 0) ||
-        response?.data?.total === 0 ||
-        response?.total === 0
-      ) {
-        // 정상 응답이지만 데이터가 없는 경우 (빈 배열)
-        // Log removed
-        setGuidelines([]);
-        setError(null); // 성공적인 응답이므로 에러 메시지 삭제
       } else {
-        // Log removed
         setGuidelines([]);
-        setError(`${title} 가이드라인을 불러오는데 실패했습니다.`);
+        setError(response?.message || "가이드라인 데이터를 불러오는 중 오류가 발생했습니다.");
+        setTotalPages(1);
+        setCurrentPage(1);
+        setTotalItems(0);
       }
-    } catch (err) {
-      // Error logging removed
-      setError(`${title} 가이드라인을 불러오는데 실패했습니다.`);
+    } catch (err: any) {
+      console.error("가이드라인 조회 오류:", err);
+      setError(err.message || "가이드라인 목록 조회 중 오류가 발생했습니다.");
       setGuidelines([]);
+      setTotalPages(1);
+      setCurrentPage(1);
+      setTotalItems(0);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchGuidelines();
-  }, [boardId]);
+    fetchGuidelines(currentPage, pageSize);
+  }, [boardId]); // boardId 변경 시에도 재조회
+
+  // 페이지 변경 핸들러
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchGuidelines(page, pageSize);
+    }
+  };
 
   // 이미지 파일 처리 함수
   const handleFile = (file: File | null) => {
@@ -284,7 +174,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       content: "",
       boardId: boardId,
       isPublic: 1,
-      position: guidelines.length + 1,
+      position: totalItems + 1,
       imageUrl: "",
       tags: [], // Initialize as empty array
     });
@@ -346,7 +236,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       }
 
       setShowModal(false);
-      fetchGuidelines();
+      fetchGuidelines(currentPage, pageSize);
     } catch (error) {
       // Error logging removed
       const errorMsg =
@@ -364,7 +254,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
     try {
       await GuidelineApiService.deleteGuideline(id);
       toast.success("가이드라인이 삭제되었습니다.");
-      fetchGuidelines();
+      fetchGuidelines(currentPage, pageSize);
     } catch (err) {
       // Error logging removed
       toast.error("가이드라인 삭제 중 오류가 발생했습니다.");
@@ -387,11 +277,11 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       await GuidelineApiService.updateGuidelinePosition(currentGuideline.id, targetPosition);
       await GuidelineApiService.updateGuidelinePosition(targetGuideline.id, currentPosition);
 
-      fetchGuidelines(); // 목록 새로고침
+      fetchGuidelines(currentPage, pageSize);
     } catch (err) {
       // Error logging removed
       toast.error("순서 변경 중 오류가 발생했습니다.");
-      fetchGuidelines(); // 에러 시 원상복구
+      fetchGuidelines(currentPage, pageSize);
     }
   };
 
@@ -409,11 +299,11 @@ const GuidelineManagement = ({ boardId = 3 }) => {
       await GuidelineApiService.updateGuidelinePosition(currentGuideline.id, targetPosition);
       await GuidelineApiService.updateGuidelinePosition(targetGuideline.id, currentPosition);
 
-      fetchGuidelines();
+      fetchGuidelines(currentPage, pageSize);
     } catch (err) {
       // Error logging removed
       toast.error("순서 변경 중 오류가 발생했습니다.");
-      fetchGuidelines();
+      fetchGuidelines(currentPage, pageSize);
     }
   };
 
@@ -575,6 +465,49 @@ const GuidelineManagement = ({ boardId = 3 }) => {
         emptyMessage="등록된 가이드라인이 없습니다."
       />
 
+      {/* 페이지네이션 UI (배너 페이지와 동일하게) */}
+      {guidelines && guidelines.length > 0 && totalPages > 1 && (
+        <div className="flex justify-center my-6">
+          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+            <button
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
+                currentPage === 1
+                  ? "text-gray-300 cursor-not-allowed"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              이전
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => handlePageChange(page)}
+                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium ${
+                  currentPage === page
+                    ? "bg-indigo-50 text-indigo-600 z-10"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
+                currentPage === totalPages
+                  ? "text-gray-300 cursor-not-allowed"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              다음
+            </button>
+          </nav>
+        </div>
+      )}
+
       {/* 가이드라인 추가/수정 모달 */}
       {currentGuideline && (
         <Modal
@@ -694,7 +627,7 @@ const GuidelineManagement = ({ boardId = 3 }) => {
               content={currentGuideline.content || ""}
               setContent={handleEditorContentChange}
               height="300px"
-              disabled={isSaving}
+              readOnly={isSaving}
             />
           </div>
         </Modal>

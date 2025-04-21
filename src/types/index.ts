@@ -118,6 +118,22 @@ export interface CompanyReview {
 }
 
 // 페이지네이션 타입
+export interface PaginationInfo {
+  totalItems: number;
+  totalPages: number;
+  currentPage: number;
+  pageSize: number;
+}
+
+// Paginated data structure (when pagination is inside the 'data' object)
+export interface PaginatedData<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
 export interface PaginationParams {
   page: number;
   limit: number;
@@ -128,8 +144,8 @@ export interface PaginationParams {
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
-  error?: string;
-  pagination?: PaginationParams;
+  message?: string; // error -> message 로 변경하고 optional 로
+  pagination?: PaginationInfo; // PaginationParams -> PaginationInfo 로 변경
 }
 
 // 스포츠 종목 관련 타입

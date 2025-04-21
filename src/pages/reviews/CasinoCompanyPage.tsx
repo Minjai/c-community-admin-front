@@ -12,6 +12,7 @@ import { formatDate } from "../../utils/dateUtils";
 import axios from "@/api/axios";
 import { extractDataArray } from "../../api/util";
 import LoadingOverlay from "../../components/LoadingOverlay";
+import { ApiResponse, PaginatedData } from "../../types"; // Import ApiResponse and PaginatedData
 
 // .env에서 카지노 정보 URL 접두사 가져오기
 const CASINO_INFO_URL_PREFIX =
@@ -35,69 +36,116 @@ const CasinoCompanyPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isMoving, setIsMoving] = useState<boolean>(false);
 
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10); // 기본 페이지 크기 또는 API 기본값
+  const [totalItems, setTotalItems] = useState<number>(0);
+
   // 초기 상태 설정
   const initialCompanyState: Partial<CasinoCompany> = {
     companyName: "",
     description: "",
     imageUrl: "",
     isPublic: 1,
-    displayOrder: 0,
+    displayOrder: totalItems + 1, // 전체 아이템 수 + 1로 displayOrder 설정
     linkUrl1: "",
     linkUrl2: "",
     rating: 0,
   };
 
-  // 카지노 업체 목록 조회
-  const fetchCompanies = async () => {
+  // 카지노 업체 목록 조회 (페이지네이션 적용)
+  const fetchCompanies = async (page: number = 1, limit: number = 10) => {
     setLoading(true);
     setError(null);
 
     try {
-      // CasinoCompanyApiService 서비스를 사용하여 API 호출
-      const response = await CasinoCompanyApiService.getCasinoCompanies();
+      // CasinoCompanyApiService 서비스를 사용하여 API 호출 (page, limit 전달)
+      // 응답 타입을 ApiResponse<PaginatedData<CasinoCompany>>로 수정
+      const response: ApiResponse<PaginatedData<CasinoCompany>> =
+        await CasinoCompanyApiService.getCasinoCompanies(page, limit);
       console.log("카지노 업체 응답 구조:", response);
 
-      if (response && Array.isArray(response)) {
-        console.log("추출된 업체 데이터:", response);
+      // API 응답 구조 확인 및 데이터 처리 (제공된 구조 기반)
+      if (response && response.success && response.data) {
+        const {
+          items,
+          total,
+          page: currentPageFromApi,
+          limit: pageSizeFromApi,
+          totalPages: totalPagesFromApi,
+        } = response.data;
 
-        // 서버 응답을 컴포넌트에서 사용하는 형식으로 변환
-        const transformedCompanies = response.map((company: any) => ({
-          id: company.id,
-          companyName: company.companyName || company.name || "",
-          description: company.description || company.content || "",
-          imageUrl: company.imageUrl || company.logoUrl || company.logo || "",
-          linkUrl1: company.linkUrl1 || company.website || "",
-          linkUrl2: company.linkUrl2 || "",
-          rating: Number(company.rating || 0),
-          isPublic: company.isPublic === 1 || company.isPublic === true ? 1 : 0,
-          displayOrder: company.displayOrder || company.position || 0,
-          createdAt: company.createdAt || new Date().toISOString(),
-          updatedAt: company.updatedAt || company.createdAt || new Date().toISOString(),
-        })) as CasinoCompany[];
+        console.log("추출된 업체 데이터:", items);
 
-        // displayOrder 기준으로 내림차순 정렬 (높은 값이 위로)
-        const sortedCompanies = [...transformedCompanies].sort(
-          (a, b) => (b.displayOrder || 0) - (a.displayOrder || 0)
-        );
+        if (Array.isArray(items)) {
+          // 서버 응답을 컴포넌트에서 사용하는 형식으로 변환
+          const transformedCompanies = items.map((company: any) => ({
+            id: company.id,
+            companyName: company.companyName || company.name || "",
+            description: company.description || company.content || "",
+            imageUrl: company.imageUrl || company.logoUrl || company.logo || "",
+            linkUrl1: company.linkUrl1 || company.website || "",
+            linkUrl2: company.linkUrl2 || "",
+            rating: Number(company.rating || 0),
+            isPublic: company.isPublic === 1 || company.isPublic === true ? 1 : 0,
+            displayOrder: company.displayOrder || company.position || 0,
+            createdAt: company.createdAt || new Date().toISOString(),
+            updatedAt: company.updatedAt || company.createdAt || new Date().toISOString(),
+          })) as CasinoCompany[];
 
-        setCompanies(sortedCompanies);
+          // 서버에서 정렬된 순서대로 데이터를 제공한다고 가정하고, 클라이언트 측 정렬 제거
+          setCompanies(transformedCompanies);
+
+          // 페이지네이션 정보 업데이트
+          setTotalItems(total);
+          setCurrentPage(currentPageFromApi);
+          setPageSize(pageSizeFromApi);
+          setTotalPages(totalPagesFromApi);
+        } else {
+          console.log("items 데이터가 배열 형식이 아닙니다.");
+          setCompanies([]);
+          setError("카지노 업체 목록 형식이 올바르지 않습니다.");
+          // 페이지네이션 상태 초기화
+          setTotalItems(0);
+          setCurrentPage(1);
+          setPageSize(limit); // 요청한 limit 값으로 설정
+          setTotalPages(1);
+        }
       } else {
         console.log("적절한 업체 데이터를 찾지 못했습니다.");
         setCompanies([]);
-        setError("카지노 업체 목록을 불러오는데 실패했습니다.");
+        setError(response?.message || "카지노 업체 목록을 불러오는데 실패했습니다.");
+        // 페이지네이션 상태 초기화
+        setTotalItems(0);
+        setCurrentPage(1);
+        setPageSize(limit); // 요청한 limit 값으로 설정
+        setTotalPages(1);
       }
     } catch (err) {
       console.error("Error fetching casino companies:", err);
       setError("카지노 업체 목록을 불러오는데 실패했습니다.");
       setCompanies([]);
+      // 페이지네이션 상태 초기화
+      setTotalItems(0);
+      setCurrentPage(1);
+      setPageSize(limit); // 요청한 limit 값으로 설정
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchCompanies();
-  }, []);
+    fetchCompanies(currentPage, pageSize); // 컴포넌트 마운트 시 첫 페이지 데이터 로드
+  }, []); // 최초 렌더링 시에만 실행
+
+  // 페이지 변경 핸들러 추가
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchCompanies(page, pageSize); // 새 페이지 데이터 요청
+    }
+  };
 
   // 이미지 파일 처리 함수
   const handleFile = (file: File) => {
@@ -150,7 +198,7 @@ const CasinoCompanyPage: React.FC = () => {
       description: "",
       imageUrl: "",
       isPublic: 1,
-      displayOrder: companies.length + 1,
+      displayOrder: totalItems + 1, // 전체 아이템 수 + 1로 displayOrder 설정
       linkUrl1: "",
       linkUrl2: "",
       rating: 0,
@@ -500,7 +548,19 @@ const CasinoCompanyPage: React.FC = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
         </div>
       ) : (
-        <DataTable data={companies} columns={columns} />
+        <DataTable
+          columns={columns}
+          data={companies}
+          loading={loading}
+          emptyMessage="등록된 카지노 업체가 없습니다."
+          pagination={{
+            // DataTable에 pagination props 전달
+            currentPage,
+            pageSize,
+            totalItems,
+            onPageChange: handlePageChange,
+          }}
+        />
       )}
 
       {/* 로딩 오버레이 */}
@@ -649,6 +709,31 @@ const CasinoCompanyPage: React.FC = () => {
             />
 
             {renderCasinoInfoField()}
+
+            {/* 별점 필드 */}
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1" htmlFor="rating">
+                별점
+              </label>
+              <select
+                id="rating"
+                name="rating"
+                value={currentCompany?.rating ?? 0}
+                onChange={(e) =>
+                  setCurrentCompany({
+                    ...currentCompany,
+                    rating: Number(e.target.value),
+                  })
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                {[0, 1, 2, 3, 4, 5].map((star) => (
+                  <option key={star} value={star}>
+                    {star}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </Modal>
       )}

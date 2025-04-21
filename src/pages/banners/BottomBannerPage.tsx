@@ -29,34 +29,64 @@ const BottomBannerPage: React.FC = () => {
   const [pcImageFile, setPcImageFile] = useState<File | null>(null);
   const [mobileImageFile, setMobileImageFile] = useState<File | null>(null);
 
-  // 배너 목록 조회
-  const fetchBanners = async () => {
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [totalItems, setTotalItems] = useState<number>(0);
+
+  // 배너 목록 조회 (페이지네이션 적용)
+  const fetchBanners = async (page: number = 1, limit: number = 10) => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await BannerApiService.getBottomBanners();
-      // API 응답의 형식에 맞게 데이터를 추출합니다
-      if (response && Array.isArray(response)) {
-        // 배너를 position 기준으로 내림차순 정렬 (높은 값이 위로)
-        const sortedBanners = [...response].sort((a, b) => (b.position || 0) - (a.position || 0));
+      const response = await BannerApiService.getBottomBanners(page, limit);
+      if (response && response.success && Array.isArray(response.data)) {
+        const sortedBanners = [...response.data].sort(
+          (a, b) => (b.position || 0) - (a.position || 0)
+        );
         setBanners(sortedBanners);
+
+        if (response.pagination) {
+          setTotalPages(response.pagination.totalPages);
+          setCurrentPage(response.pagination.currentPage);
+          setPageSize(response.pagination.pageSize);
+          setTotalItems(response.pagination.totalItems);
+        } else {
+          setTotalPages(1);
+          setCurrentPage(1);
+          setTotalItems(sortedBanners.length);
+        }
       } else {
         setBanners([]);
         setError("배너를 불러오는데 실패했습니다.");
+        setTotalPages(1);
+        setCurrentPage(1);
+        setTotalItems(0);
       }
     } catch (err) {
       console.error("Error fetching banners:", err);
       setError("배너를 불러오는데 실패했습니다.");
       setBanners([]);
+      setTotalPages(1);
+      setCurrentPage(1);
+      setTotalItems(0);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBanners();
+    fetchBanners(currentPage, pageSize);
   }, []);
+
+  // 페이지 변경 핸들러
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchBanners(page, pageSize);
+    }
+  };
 
   // 배너 추가 모달 열기
   const handleAddBanner = () => {
@@ -69,7 +99,7 @@ const BottomBannerPage: React.FC = () => {
       startDate: "",
       endDate: "",
       isPublic: 1,
-      position: banners.length + 1, // 현재 배너 개수 + 1
+      position: totalItems + 1, // totalItems 사용
       bannerType: "bottom",
       linkUrl: "",
     });
@@ -169,8 +199,7 @@ const BottomBannerPage: React.FC = () => {
             변환된_종료일: endDate,
           });
 
-          // 현재 배너 개수 + 1을 position으로 설정
-          const newPosition = banners.length + 1;
+          const newPosition = totalItems + 1; // totalItems 사용
           await BannerApiService.createBottomBanner(
             {
               title: currentBanner.title,
@@ -198,7 +227,7 @@ const BottomBannerPage: React.FC = () => {
 
       // 성공 후 모달 닫기, 배너 목록 다시 불러오기
       setShowModal(false);
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
     } catch (error) {
       console.error("배너 저장 중 오류:", error);
       setModalError("배너 저장 중 예상치 못한 오류가 발생했습니다.");
@@ -213,7 +242,7 @@ const BottomBannerPage: React.FC = () => {
       try {
         await BannerApiService.deleteBottomBanner(id);
         toast.success("배너가 삭제되었습니다.");
-        fetchBanners();
+        fetchBanners(currentPage, pageSize);
       } catch (error) {
         console.error("배너 삭제 중 오류:", error);
         toast.error("배너 삭제 중 오류가 발생했습니다.");
@@ -269,10 +298,10 @@ const BottomBannerPage: React.FC = () => {
       );
 
       // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
     } catch (err) {
       // 에러 발생 시 원래 순서로 되돌림
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
       toast.error("배너 순서 변경 중 오류가 발생했습니다.");
       console.error("Error updating banner order:", err);
     }
@@ -325,10 +354,10 @@ const BottomBannerPage: React.FC = () => {
       );
 
       // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
     } catch (err) {
       // 에러 발생 시 원래 순서로 되돌림
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
       toast.error("배너 순서 변경 중 오류가 발생했습니다.");
       console.error("Error updating banner order:", err);
     }

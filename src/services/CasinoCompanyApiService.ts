@@ -1,5 +1,5 @@
 import axios from "../api/axios";
-import { CasinoCompany, CompanyReview, ApiResponse } from "../types";
+import { CasinoCompany, CompanyReview, ApiResponse, PaginatedData } from "../types";
 import { extractDataArray } from "../api/util";
 
 // .env에서 카지노 정보 URL 접두사 가져오기
@@ -22,35 +22,62 @@ const processCompanyData = (company: CasinoCompany): CasinoCompany => {
 
 // 카지노 업체 API 서비스
 const CasinoCompanyApiService = {
-  // 카지노 업체 목록 조회
-  getCasinoCompanies: async (): Promise<CasinoCompany[]> => {
+  // 카지노 업체 목록 조회 (페이지네이션 추가)
+  getCasinoCompanies: async (
+    page: number = 1,
+    limit: number = 10
+  ): Promise<ApiResponse<PaginatedData<CasinoCompany>>> => {
     try {
-      const response = await axios.get("/companies");
+      const response = await axios.get("/companies", {
+        params: { page, limit }, // 페이지네이션 파라미터 추가
+      });
       console.log("카지노 업체 API 응답:", response.data);
 
-      // extractDataArray 유틸리티 함수를 사용하여 데이터 배열 추출
-      const companiesData = extractDataArray(response.data, true);
-
-      if (companiesData && companiesData.length > 0) {
-        // 각 회사 객체의 linkUrl2에서 접두사 제거
-        return companiesData.map((company) => processCompanyData(company as CasinoCompany));
-      } else if (response.data && typeof response.data === "object") {
-        // 단일 회사 객체인 경우 처리
-        if (response.data.id && response.data.companyName) {
-          return [processCompanyData(response.data as CasinoCompany)];
-        }
-
-        // data 속성 안에 단일 회사 객체가 있는 경우
-        if (response.data.data && typeof response.data.data === "object" && response.data.data.id) {
-          return [processCompanyData(response.data.data as CasinoCompany)];
-        }
+      // API 응답이 ApiResponse<PaginatedData<CasinoCompany>> 형태를 준수한다고 가정하고 그대로 반환
+      // 데이터 유효성 검사 강화
+      if (
+        response.data &&
+        response.data.success &&
+        response.data.data &&
+        Array.isArray(response.data.data.items) &&
+        typeof response.data.data.total === "number" &&
+        typeof response.data.data.page === "number" &&
+        typeof response.data.data.limit === "number" &&
+        typeof response.data.data.totalPages === "number"
+      ) {
+        // linkUrl2 처리 (optional)
+        response.data.data.items = response.data.data.items.map(processCompanyData);
+        return response.data as ApiResponse<PaginatedData<CasinoCompany>>; // Type assertion
+      } else {
+        // 예상된 구조가 아닐 경우 에러 또는 기본값 처리
+        console.warn("API 응답이 예상된 구조와 다릅니다:", response.data);
+        // 기본 페이지네이션 구조를 포함한 빈 응답 반환
+        return {
+          success: false,
+          message: response.data?.message || "데이터 형식이 올바르지 않습니다.",
+          data: {
+            items: [],
+            total: 0,
+            page: 1,
+            limit: limit,
+            totalPages: 1,
+          },
+        };
       }
-
-      console.warn("API에서 반환된 데이터에서 회사 정보를 찾을 수 없습니다:", response.data);
-      return [];
     } catch (error) {
       console.error("카지노 업체 조회 오류:", error);
-      throw error;
+      // 에러 발생 시에도 기본 페이지네이션 구조 반환
+      return {
+        success: false,
+        message: "카지노 업체 조회 중 오류가 발생했습니다.",
+        data: {
+          items: [],
+          total: 0,
+          page: 1,
+          limit: limit,
+          totalPages: 1,
+        },
+      };
     }
   },
 

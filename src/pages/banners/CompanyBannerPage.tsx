@@ -31,6 +31,12 @@ const CompanyBannerPage: React.FC = () => {
   const [pcImageFile, setPcImageFile] = useState<File | null>(null);
   const [mobileImageFile, setMobileImageFile] = useState<File | null>(null);
 
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [totalItems, setTotalItems] = useState<number>(0);
+
   // 배너 초기 상태 - isPublic을 1로 설정
   const initialBannerState = {
     title: "",
@@ -43,33 +49,57 @@ const CompanyBannerPage: React.FC = () => {
   };
 
   // 배너 목록 조회
-  const fetchBanners = async () => {
+  const fetchBanners = async (page: number = 1, limit: number = 10) => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await BannerApiService.getCompanyBanners();
-      // API 응답의 형식에 맞게 데이터를 추출합니다
-      if (response && Array.isArray(response)) {
-        // 배너를 position 기준으로 내림차순 정렬 (높은 값이 위로)
-        const sortedBanners = [...response].sort((a, b) => (b.position || 0) - (a.position || 0));
+      const response = await BannerApiService.getCompanyBanners(page, limit);
+      if (response && response.success && Array.isArray(response.data)) {
+        const sortedBanners = [...response.data].sort(
+          (a, b) => (b.position || 0) - (a.position || 0)
+        );
         setBanners(sortedBanners);
+
+        if (response.pagination) {
+          setTotalPages(response.pagination.totalPages);
+          setCurrentPage(response.pagination.currentPage);
+          setPageSize(response.pagination.pageSize);
+          setTotalItems(response.pagination.totalItems);
+        } else {
+          setTotalPages(1);
+          setCurrentPage(1);
+          setTotalItems(sortedBanners.length);
+        }
       } else {
         setBanners([]);
         setError("배너를 불러오는데 실패했습니다.");
+        setTotalPages(1);
+        setCurrentPage(1);
+        setTotalItems(0);
       }
     } catch (err) {
       console.error("Error fetching banners:", err);
       setError("배너를 불러오는데 실패했습니다.");
       setBanners([]);
+      setTotalPages(1);
+      setCurrentPage(1);
+      setTotalItems(0);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBanners();
+    fetchBanners(currentPage, pageSize);
   }, []);
+
+  // 페이지 변경 핸들러
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchBanners(page, pageSize);
+    }
+  };
 
   // 배너 추가 모달 열기
   const handleAddBanner = () => {
@@ -79,13 +109,12 @@ const CompanyBannerPage: React.FC = () => {
       title: "",
       pUrl: "",
       mUrl: "",
-      startDate: getCurrentDateTimeLocalString(),
-      endDate: formatDateForInput(addDays(new Date(), 30).toISOString()),
+      startDate: "",
+      endDate: "",
       isPublic: 1,
-      position: banners.length + 1, // 현재 배너 개수 + 1
+      position: totalItems + 1,
       bannerType: "company",
       linkUrl: "",
-      linkUrl2: "",
     });
     setPcImageFile(null);
     setMobileImageFile(null);
@@ -128,7 +157,6 @@ const CompanyBannerPage: React.FC = () => {
         return;
       }
 
-      // 저장 시작 시 로딩 상태 활성화
       setIsSaving(true);
       setModalError(null);
 
@@ -150,10 +178,9 @@ const CompanyBannerPage: React.FC = () => {
               position: currentBanner.position,
               bannerType: "company",
               linkUrl: currentBanner.linkUrl,
-              linkUrl2: null,
             },
-            pcImageFile,
-            mobileImageFile
+            pcImageFile || undefined,
+            mobileImageFile || undefined
           );
 
           toast.success("배너가 수정되었습니다.");
@@ -178,8 +205,14 @@ const CompanyBannerPage: React.FC = () => {
           const startDate = new Date(currentBanner.startDate).toISOString();
           const endDate = new Date(currentBanner.endDate).toISOString();
 
-          // 현재 배너 개수 + 1을 position으로 설정
-          const newPosition = banners.length + 1;
+          console.log("업체 배너 생성 날짜 변환:", {
+            원래_시작일: currentBanner.startDate,
+            변환된_시작일: startDate,
+            원래_종료일: currentBanner.endDate,
+            변환된_종료일: endDate,
+          });
+
+          const newPosition = totalItems + 1;
           await BannerApiService.createCompanyBanner(
             {
               title: currentBanner.title,
@@ -189,7 +222,6 @@ const CompanyBannerPage: React.FC = () => {
               position: newPosition,
               bannerType: "company",
               linkUrl: currentBanner.linkUrl,
-              linkUrl2: null,
             },
             pcImageFile,
             mobileImageFile
@@ -206,15 +238,13 @@ const CompanyBannerPage: React.FC = () => {
         }
       }
 
+      // 성공 후 모달 닫기, 배너 목록 다시 불러오기
       setShowModal(false);
-      setPcImageFile(null);
-      setMobileImageFile(null);
-      fetchBanners();
-    } catch (err) {
-      console.error("Error saving banner:", err);
+      fetchBanners(currentPage, pageSize);
+    } catch (error) {
+      console.error("배너 저장 중 오류:", error);
       setModalError("배너 저장 중 예상치 못한 오류가 발생했습니다.");
     } finally {
-      // 저장 완료 후 로딩 상태 비활성화
       setIsSaving(false);
     }
   };
@@ -226,7 +256,7 @@ const CompanyBannerPage: React.FC = () => {
     try {
       await BannerApiService.deleteCompanyBanner(id);
       toast.success("배너가 삭제되었습니다.");
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
     } catch (err) {
       console.error("Error deleting banner:", err);
       toast.error("배너 삭제 중 오류가 발생했습니다.");
@@ -281,10 +311,10 @@ const CompanyBannerPage: React.FC = () => {
       );
 
       // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
     } catch (err) {
       // 에러 발생 시 원래 순서로 되돌림
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
       toast.error("배너 순서 변경 중 오류가 발생했습니다.");
       console.error("Error updating banner order:", err);
     }
@@ -337,10 +367,10 @@ const CompanyBannerPage: React.FC = () => {
       );
 
       // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
     } catch (err) {
       // 에러 발생 시 원래 순서로 되돌림
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
       toast.error("배너 순서 변경 중 오류가 발생했습니다.");
       console.error("Error updating banner order:", err);
     }

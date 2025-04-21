@@ -8,6 +8,8 @@ import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
 import { toast } from "react-toastify";
+import { ApiResponse, PaginationInfo, Post } from "@/types"; // Import necessary types
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 // 뉴스 아이템 타입 정의 (API 응답 기준)
 interface NewsItem {
@@ -38,6 +40,12 @@ const NewsManagementPage = () => {
   const [currentNews, setCurrentNews] = useState<NewsItem | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
 
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10); // 기본 페이지 크기
+  const [totalItems, setTotalItems] = useState<number>(0);
+
   // 뉴스 데이터 상태 (API 필드 반영)
   const [title, setTitle] = useState<string>("");
   const [link, setLink] = useState<string>("");
@@ -47,28 +55,29 @@ const NewsManagementPage = () => {
   const [modalIsSelected, setModalIsSelected] = useState<number>(0); // 인기 여부 상태 추가
   // isSelected state is not needed for UI based on previous request - 이 주석은 제거해도 될 듯
 
-  // 뉴스 목록 전체 조회
-  const fetchNews = async () => {
+  // 뉴스 목록 조회 (페이지네이션 적용)
+  const fetchNews = async (page: number, pageSize: number) => {
     setLoading(true);
     setError(null);
 
     try {
-      // API 호출 (limit 파라미터 명시적 추가)
-      const limit = 10000; // Attempt to override default server limit
-      console.log(`Fetching admin news with explicit limit: ${limit}`);
-      const response = await axios.get("admin-news", {
-        params: { limit },
+      // API 호출 (page, limit 파라미터 다시 추가)
+      console.log(`Fetching admin news with page: ${page}, pageSize: ${pageSize}`);
+      const response = await axios.get("admin-news/admin", {
+        params: { page, pageSize }, // page와 pageSize 파라미터 전달
       });
       console.log("뉴스 관리 응답:", response.data);
 
-      // 서버 응답 구조에 맞춰 데이터 추출: { success: true, data: { articles: [], total: number } }
+      // 새로운 서버 응답 구조 처리: data[], pagination{}
       if (
         response.data?.success &&
-        response.data?.data &&
-        Array.isArray(response.data.data.articles)
+        Array.isArray(response.data?.data) && // data가 배열인지 확인
+        response.data?.pagination // pagination 객체 확인
       ) {
-        const articles = response.data.data.articles;
-        console.log("추출된 뉴스 데이터 (articles):", articles);
+        const articles = response.data.data; // 뉴스 목록 직접 사용
+        const paginationInfo = response.data.pagination; // 페이지 정보 추출
+        console.log("추출된 뉴스 데이터:", articles);
+        console.log("추출된 페이지 정보:", paginationInfo);
 
         const mappedNewsData: NewsItem[] = articles
           .filter((item: any) => {
@@ -84,11 +93,21 @@ const NewsManagementPage = () => {
             description: item.description || null,
           }));
         setNews(mappedNewsData);
-        // We fetched potentially all items, no need to handle server-side pagination state here
+
+        // 페이지네이션 상태 업데이트 (API 응답 기준)
+        setTotalItems(paginationInfo.totalItems);
+        setCurrentPage(paginationInfo.currentPage);
+        setPageSize(paginationInfo.pageSize);
+        setTotalPages(paginationInfo.totalPages);
       } else {
         console.warn("뉴스 데이터를 찾지 못했거나 형식이 다릅니다. 응답:", response.data);
         setNews([]);
         setError(response.data?.message || "뉴스 목록 형식이 올바르지 않습니다.");
+        // 페이지네이션 상태 초기화
+        setTotalItems(0);
+        setCurrentPage(1);
+        setPageSize(pageSize); // 요청 시 사용한 pageSize 값으로 초기화
+        setTotalPages(1);
       }
     } catch (err: any) {
       console.error("뉴스 목록 조회 오류:", err);
@@ -104,14 +123,26 @@ const NewsManagementPage = () => {
       }
       setError(detailedError);
       setNews([]);
+      // 페이지네이션 상태 초기화
+      setTotalItems(0);
+      setCurrentPage(1);
+      setPageSize(pageSize); // 요청 시 사용한 pageSize 값으로 초기화
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchNews();
-  }, []);
+    fetchNews(currentPage, pageSize); // 초기 로딩 시 현재 페이지와 페이지 크기 사용
+  }, []); // 마운트 시 한 번만 실행
+
+  // 페이지 변경 핸들러 추가
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
+      fetchNews(newPage, pageSize); // 새 페이지 데이터 요청
+    }
+  };
 
   // 모달 닫기
   const handleCloseModal = () => {
@@ -144,9 +175,9 @@ const NewsManagementPage = () => {
     // Log the ID before making the delete request
     console.log(`Attempting to delete news with ID: ${id}, Type: ${typeof id}`);
     try {
-      await axios.delete(`admin-news/${id}`);
-      toast.success("뉴스가 삭제되었습니다."); // Use toast for feedback
-      fetchNews();
+      await axios.delete(`admin-news/admin/${id}`);
+      toast.success("뉴스가 삭제되었습니다.");
+      fetchNews(currentPage, pageSize); // 현재 페이지 유지
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || "뉴스 삭제 중 오류가 발생했습니다.";
       toast.error(errorMessage);
@@ -193,7 +224,7 @@ const NewsManagementPage = () => {
 
       if (!isEditing) {
         // POST endpoint might need adjustment too, assuming admin-news for now
-        await axios.post("admin-news", requestData);
+        await axios.post("admin-news/admin", requestData);
         toast.success("뉴스가 성공적으로 추가되었습니다.");
       } else if (currentNews?.id) {
         // Log the ID before making the update request
@@ -207,14 +238,14 @@ const NewsManagementPage = () => {
           setSaving(false);
           return;
         }
-        const requestPath = `news/admin-news/${newsId}`; // Update path to include /news
+        const requestPath = `admin-news/admin/${newsId}`; // Update path to admin-news/admin
         console.log("Constructed PUT request path:", requestPath); // Log the constructed path
         // Update PUT endpoint to /api/news/admin-news/:id (axios instance handles /api)
         await axios.put(requestPath, requestData); // Use the constructed path
         toast.success("뉴스가 성공적으로 수정되었습니다.");
       }
       setShowModal(false);
-      fetchNews();
+      fetchNews(currentPage, pageSize); // 현재 페이지 유지
     } catch (err: any) {
       console.error("Save news error:", err);
       const errorMessage = err.response?.data?.message || "뉴스 저장 중 오류가 발생했습니다.";
@@ -235,10 +266,10 @@ const NewsManagementPage = () => {
     // Log the ID before making the toggle request
     console.log(`Attempting to toggle public status for news ID: ${id}, Type: ${typeof id}`);
     try {
-      await axios.put(`admin-news/${id}/toggle-public`, {
+      await axios.put(`admin-news/admin/${id}/toggle-public`, {
         isPublic: currentStatus === 1 ? 0 : 1,
       });
-      fetchNews();
+      fetchNews(currentPage, pageSize);
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.message || "뉴스 공개 상태 변경 중 오류가 발생했습니다.";
@@ -384,62 +415,78 @@ const NewsManagementPage = () => {
         data={news}
         loading={loading}
         emptyMessage="등록된 뉴스가 없습니다."
+        pagination={{
+          currentPage,
+          pageSize,
+          totalItems,
+          onPageChange: handlePageChange,
+        }}
       />
 
+      {/* Loading Overlay */}
+      <LoadingOverlay isLoading={loading || saving} />
+
       {/* Modal */}
-      <Modal isOpen={showModal} onClose={handleCloseModal} title="뉴스 수정" size="lg">
-        {/* Modal Error Alert (only for save errors now) */}
-        {alertMessage?.type === "error" && (
-          <div className="mb-4">
-            <Alert
-              type="error"
-              message={alertMessage.message}
-              onClose={() => setAlertMessage(null)}
-            />
-          </div>
-        )}
-        {/* Top Control Area (ensure no isSelected) */}
-        <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
-          <div className="flex space-x-3">
-            <Button onClick={handleSaveNews} variant="primary" disabled={saving}>
-              {saving ? "저장 중..." : "수정"}
-            </Button>
-            <Button onClick={handleCloseModal} variant="secondary" disabled={saving}>
-              취소
-            </Button>
-          </div>
-          <div className="flex items-center space-x-4">
-            {/* Public Status Checkbox */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="isPublic-modal"
-                checked={isPublic === 1}
-                onChange={(e) => setIsPublic(e.target.checked ? 1 : 0)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+      {showModal && currentNews && (
+        <Modal
+          isOpen={showModal}
+          onClose={handleCloseModal}
+          title={isEditing ? "뉴스 수정" : "새 뉴스 추가"}
+          size="xl"
+        >
+          {/* Modal Error Alert (only for save errors now) */}
+          {alertMessage?.type === "error" && (
+            <div className="mb-4">
+              <Alert
+                type="error"
+                message={alertMessage.message}
+                onClose={() => setAlertMessage(null)}
               />
-              <label htmlFor="isPublic-modal" className="ml-2 block text-sm text-gray-900">
-                공개 상태
-              </label>
             </div>
-            {/* isSelected (인기 여부) Checkbox 추가 */}
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="isSelected-modal"
-                checked={modalIsSelected === 1}
-                onChange={(e) => setModalIsSelected(e.target.checked ? 1 : 0)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                disabled={saving}
-              />
-              <label htmlFor="isSelected-modal" className="ml-2 block text-sm text-gray-900">
-                인기 여부
-              </label>
+          )}
+          {/* Top Control Area (ensure no isSelected) */}
+          <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
+            <div className="flex space-x-3">
+              <Button onClick={handleSaveNews} variant="primary" disabled={saving}>
+                {saving ? "저장 중..." : "수정"}
+              </Button>
+              <Button onClick={handleCloseModal} variant="secondary" disabled={saving}>
+                취소
+              </Button>
+            </div>
+            <div className="flex items-center space-x-4">
+              {/* Public Status Checkbox */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isPublic-modal"
+                  checked={isPublic === 1}
+                  onChange={(e) => setIsPublic(e.target.checked ? 1 : 0)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="isPublic-modal" className="ml-2 block text-sm text-gray-900">
+                  공개 상태
+                </label>
+              </div>
+              {/* isSelected (인기 여부) Checkbox 추가 */}
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isSelected-modal"
+                  checked={modalIsSelected === 1}
+                  onChange={(e) => setModalIsSelected(e.target.checked ? 1 : 0)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  disabled={saving}
+                />
+                <label htmlFor="isSelected-modal" className="ml-2 block text-sm text-gray-900">
+                  인기 여부
+                </label>
+              </div>
             </div>
           </div>
-        </div>
-        {renderModalContent()}
-      </Modal>
+          {renderModalContent()}
+        </Modal>
+      )}
     </div>
   );
 };

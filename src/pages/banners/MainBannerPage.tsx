@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigation } from "../../services/NavigationService";
 import BannerApiService from "../../services/BannerApiService";
-import { Banner } from "../../types";
+import { Banner, ApiResponse, PaginationInfo } from "../../types";
 import DataTable from "../../components/DataTable";
 import Button from "../../components/Button";
 import ActionButton from "../../components/ActionButton";
@@ -29,6 +29,12 @@ const MainBannerPage: React.FC = () => {
   const [modalError, setModalError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1); // API 연동 전까지 1로 초기화
+  const [pageSize, setPageSize] = useState<number>(10); // 기본 페이지 크기
+  const [totalItems, setTotalItems] = useState<number>(0); // 전체 아이템 수 상태 추가
+
   // 파일 상태 관리
   const [pcImageFile, setPcImageFile] = useState<File | null>(null);
   const [mobileImageFile, setMobileImageFile] = useState<File | null>(null);
@@ -40,34 +46,68 @@ const MainBannerPage: React.FC = () => {
     handleInputChange(name, isoDate);
   };
 
-  // 배너 목록 조회
-  const fetchBanners = async () => {
+  // 배너 목록 조회 (페이지네이션 적용)
+  const fetchBanners = async (page: number = 1, limit: number = 10) => {
     setLoading(true);
-    setError("");
+    setError(null); // 에러 초기화
 
     try {
-      const response = await BannerApiService.getMainBanners();
-      // API 응답의 형식에 맞게 데이터를 추출합니다
-      if (response && Array.isArray(response)) {
-        // 배너를 position 기준으로 내림차순 정렬 (높은 값이 위로)
-        const sortedBanners = [...response].sort((a, b) => (b.position || 0) - (a.position || 0));
-        setBanners(sortedBanners);
+      // BannerApiService.getMainBanners에 page와 limit 파라미터 전달
+      // 반환 타입을 ApiResponse<Banner[]>로 명시
+      const response: ApiResponse<Banner[]> = await BannerApiService.getMainBanners(page, limit);
+      console.log("API Response:", response); // 응답 로깅 (디버깅용)
+
+      // API 응답 구조에 맞게 데이터와 페이지네이션 정보 추출
+      if (response && response.success && Array.isArray(response.data)) {
+        // position 기준으로 내림차순 정렬 (높은 값이 위로)
+        const sortedBanners = [...response.data].sort(
+          (a, b) => (b.position || 0) - (a.position || 0)
+        );
+        setBanners(sortedBanners); // 정렬된 배열을 상태에 저장
+
+        // 페이지네이션 정보 업데이트 (API 응답 사용)
+        if (response.pagination) {
+          setTotalPages(response.pagination.totalPages);
+          setCurrentPage(response.pagination.currentPage);
+          setPageSize(response.pagination.pageSize); // 페이지 크기도 API 기준으로 업데이트
+          setTotalItems(response.pagination.totalItems); // totalItems 상태 업데이트 추가
+        } else {
+          // 페이지네이션 정보가 없는 경우 (API 오류 등) 기본값 처리
+          setTotalPages(1);
+          setCurrentPage(1);
+          setTotalItems(sortedBanners.length); // 페이지네이션 정보 없을 경우 현재 배너 수로 설정
+        }
       } else {
+        // API 요청 실패 또는 data 형식이 배열이 아닌 경우
         setBanners([]);
-        setError("배너를 불러오는데 실패했습니다.");
+        setError(response?.message || "배너 데이터를 불러오는 중 오류가 발생했습니다.");
+        setTotalPages(1);
+        setCurrentPage(1);
+        setTotalItems(0); // 에러 시 0으로 설정
       }
-    } catch (err) {
+    } catch (err: any) {
+      // 네트워크 오류 등 try 블록 외부에서 발생한 에러 처리
       console.error("Error fetching banners:", err);
-      setError("배너를 불러오는데 실패했습니다.");
+      setError(err?.message || "배너 목록 조회 중 오류가 발생했습니다.");
       setBanners([]);
+      setTotalPages(1);
+      setCurrentPage(1);
+      setTotalItems(0); // 에러 시 0으로 설정
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchBanners();
-  }, []);
+    fetchBanners(currentPage, pageSize); // 현재 페이지와 페이지 크기로 조회
+  }, []); // 마운트 시 첫 페이지만 조회 (페이지 변경 시 재조회는 handlePageChange에서)
+
+  // 페이지 변경 핸들러 (CasinoGameManagement.tsx 참고)
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchBanners(page, pageSize); // 새 페이지 데이터 요청
+    }
+  };
 
   // 배너 추가 모달 열기
   const handleAddBanner = () => {
@@ -80,7 +120,7 @@ const MainBannerPage: React.FC = () => {
       startDate: "",
       endDate: "",
       isPublic: 1,
-      position: banners.length + 1, // 현재 배너 개수 + 1
+      position: totalItems + 1, // banners.length -> totalItems 로 변경
       bannerType: "main",
     });
     setShowModal(true);
@@ -192,7 +232,7 @@ const MainBannerPage: React.FC = () => {
           const endDate = new Date(currentBanner.endDate).toISOString();
 
           // 현재 배너 개수 + 1을 position으로 설정
-          const newPosition = banners.length + 1;
+          const newPosition = totalItems + 1; // banners.length -> totalItems 로 변경
           console.log("Creating banner:", {
             data: {
               title: currentBanner.title,
@@ -525,6 +565,49 @@ const MainBannerPage: React.FC = () => {
         loading={loading}
         emptyMessage="등록된 배너가 없습니다."
       />
+
+      {/* 페이지네이션 UI 추가 (CasinoGameManagement.tsx 복사) */}
+      {banners && banners.length > 0 && totalPages > 1 && (
+        <div className="flex justify-center my-6">
+          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+            <button
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
+                currentPage === 1
+                  ? "text-gray-300 cursor-not-allowed"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              이전
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => handlePageChange(page)}
+                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium ${
+                  currentPage === page
+                    ? "bg-indigo-50 text-indigo-600 z-10"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
+                currentPage === totalPages
+                  ? "text-gray-300 cursor-not-allowed"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              다음
+            </button>
+          </nav>
+        </div>
+      )}
 
       {/* 배너 추가/수정 모달 */}
       {currentBanner && (

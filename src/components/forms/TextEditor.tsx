@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useCallback } from "react";
-import ReactQuill, { Quill } from "react-quill";
+import ReactQuill, { Quill } from "react-quill"; // Import Quill directly
 import "react-quill/dist/quill.snow.css";
 
 // React의 findDOMNode 경고 억제
@@ -26,6 +26,7 @@ interface TextEditorProps {
   height?: string;
   onChange?: (content: string) => void;
   onFocus?: () => void;
+  readOnly?: boolean;
 }
 
 const MAX_IMAGE_SIZE_MB = 20; // 이미지 크기 제한 20MB
@@ -382,6 +383,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
   height = "200px",
   onChange,
   onFocus,
+  readOnly = false,
 }) => {
   // Log the received content prop
   // console.log("TextEditor received content prop:", content);
@@ -1181,6 +1183,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
             "align",
             "embed", // embed 포맷 추가
           ]}
+          readOnly={readOnly}
         />
       </div>
       <style>

@@ -1,61 +1,103 @@
 import axios from "../api/axios";
-import { Banner } from "../types";
+import { Banner, ApiResponse, PaginationInfo } from "../types";
 
 // 배너 API 서비스
 const BannerApiService = {
-  // 메인 배너 목록 조회
-  getMainBanners: async (): Promise<Banner[]> => {
+  // 메인 배너 목록 조회 (페이지네이션 적용)
+  getMainBanners: async (page = 1, limit = 10): Promise<ApiResponse<Banner[]>> => {
     try {
-      const response = await axios.get("/banner/main");
-      if (response.data && response.data.success) {
-        return response.data.data;
-      }
-      throw new Error(response.data.message || "메인 배너 조회에 실패했습니다.");
-    } catch (error) {
+      // API 요청 시 page와 limit 파라미터 추가
+      const response = await axios.get("/banner/main", {
+        params: { page, limit },
+      });
+      // 전체 응답 객체 반환 (success, data, pagination 등 포함)
+      return response.data;
+    } catch (error: any) {
       console.error("메인 배너 조회 오류:", error);
-      throw error;
+      // 에러 발생 시에도 ApiResponse 형식으로 반환
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || "메인 배너 조회 중 오류 발생",
+        data: [],
+        pagination: { totalItems: 0, totalPages: 1, currentPage: 1, pageSize: limit },
+      };
     }
   },
 
   // 업체 배너 목록 조회
-  getCompanyBanners: async (): Promise<Banner[]> => {
+  getCompanyBanners: async (page = 1, limit = 10): Promise<ApiResponse<Banner[]>> => {
     try {
-      const response = await axios.get("/banner/company");
-      if (response.data && response.data.success) {
-        return response.data.data;
-      }
-      throw new Error(response.data.message || "업체 배너 조회에 실패했습니다.");
-    } catch (error) {
+      const response = await axios.get("/banner/company", {
+        params: { page, limit },
+      });
+      return response.data;
+    } catch (error: any) {
       console.error("업체 배너 조회 오류:", error);
-      throw error;
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || "업체 배너 조회 중 오류 발생",
+        data: [],
+        pagination: { totalItems: 0, totalPages: 1, currentPage: 1, pageSize: limit },
+      };
     }
   },
 
   // 하단 배너 목록 조회
-  getBottomBanners: async (): Promise<Banner[]> => {
+  getBottomBanners: async (page = 1, limit = 10): Promise<ApiResponse<Banner[]>> => {
     try {
-      const response = await axios.get("/banner/bottom");
+      const response = await axios.get("/banner/bottom", {
+        params: { page, limit },
+      });
+      // API 응답 구조에 맞게 ApiResponse 객체 구성
       if (response.data && response.data.success) {
-        return response.data.data;
+        const totalItems = response.data.count || 0;
+        const totalPages = Math.ceil(totalItems / limit);
+        return {
+          success: true,
+          data: response.data.data || [],
+          message: response.data.message,
+          pagination: {
+            totalItems: totalItems,
+            totalPages: totalPages,
+            currentPage: page,
+            pageSize: limit,
+          },
+        };
+      } else {
+        // API 요청 실패 또는 success: false 인 경우
+        return {
+          success: false,
+          message: response.data?.message || "하단 배너 조회 중 오류 발생",
+          data: [],
+          pagination: { totalItems: 0, totalPages: 1, currentPage: 1, pageSize: limit },
+        };
       }
-      throw new Error(response.data.message || "하단 배너 조회에 실패했습니다.");
-    } catch (error) {
+    } catch (error: any) {
       console.error("하단 배너 조회 오류:", error);
-      throw error;
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || "하단 배너 조회 중 오류 발생",
+        data: [],
+        pagination: { totalItems: 0, totalPages: 1, currentPage: 1, pageSize: limit },
+      };
     }
   },
 
   // 미니 배너 목록 조회
-  getMiniBanners: async (): Promise<Banner[]> => {
+  getMiniBanners: async (page = 1, limit = 10): Promise<ApiResponse<Banner[]>> => {
     try {
-      const response = await axios.get("/banner/mini");
-      if (response.data && response.data.success) {
-        return response.data.data;
-      }
-      throw new Error(response.data.message || "미니 배너 조회에 실패했습니다.");
-    } catch (error) {
+      const response = await axios.get("/banner/mini", {
+        params: { page, limit },
+      });
+      return response.data;
+    } catch (error: any) {
       console.error("미니 배너 조회 오류:", error);
-      throw error;
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || "미니 배너 조회 중 오류 발생",
+        data: [],
+        pagination: { totalItems: 0, totalPages: 1, currentPage: 1, pageSize: limit },
+      };
     }
   },
 
@@ -116,10 +158,20 @@ const BannerApiService = {
   ): Promise<Banner> => {
     const formData = new FormData();
 
+    // position 값이 없으면 기본값 0 설정
+    if (bannerData.position === undefined || bannerData.position === null) {
+      bannerData.position = 0;
+    }
+
     // 텍스트 데이터 추가
     Object.keys(bannerData).forEach((key) => {
       if (bannerData[key] !== undefined && bannerData[key] !== null) {
-        formData.append(key, bannerData[key]);
+        // position 값은 문자열로 변환하여 전송
+        if (key === "position") {
+          formData.append(key, String(bannerData[key]));
+        } else {
+          formData.append(key, bannerData[key]);
+        }
       }
     });
 
@@ -277,6 +329,8 @@ const BannerApiService = {
     mobileImage?: File | null
   ): Promise<Banner> => {
     try {
+      const formData = new FormData();
+
       // 이미지 없이 기본 데이터만 전송하는 방식 시도
       const hasNoImages =
         (!pcImage || !(pcImage instanceof File) || pcImage.size === 0) &&
@@ -316,6 +370,11 @@ const BannerApiService = {
           }
         }
 
+        // position 값은 문자열로 변환
+        if (bannerData.position !== undefined) {
+          bannerData.position = String(bannerData.position);
+        }
+
         // 이미지 파일 없이 JSON 데이터만 PUT 요청
         const response = await axios.put(`/banner/company/${id}`, bannerData, {
           headers: {
@@ -332,12 +391,15 @@ const BannerApiService = {
       }
 
       // 이미지가 있는 경우 formData 사용
-      const formData = new FormData();
-
       // 텍스트 데이터 추가
       Object.keys(bannerData).forEach((key) => {
         if (bannerData[key] !== undefined && bannerData[key] !== null) {
-          formData.append(key, bannerData[key]);
+          // position 값은 문자열로 변환하여 전송
+          if (key === "position") {
+            formData.append(key, String(bannerData[key]));
+          } else {
+            formData.append(key, bannerData[key]);
+          }
         }
       });
 
@@ -417,7 +479,12 @@ const BannerApiService = {
     // 텍스트 데이터 추가
     Object.keys(bannerData).forEach((key) => {
       if (bannerData[key] !== undefined && bannerData[key] !== null) {
-        formData.append(key, bannerData[key]);
+        // position 값은 문자열로 변환하여 전송
+        if (key === "position") {
+          formData.append(key, String(bannerData[key]));
+        } else {
+          formData.append(key, bannerData[key]);
+        }
       }
     });
 
@@ -447,9 +514,17 @@ const BannerApiService = {
   createMiniBanner: async (bannerData: any, pcImage: File, mobileImage: File): Promise<Banner> => {
     const formData = new FormData();
 
-    // 텍스트 데이터 추가
+    // position 값이 없으면 기본값 0 설정
+    if (bannerData.position === undefined || bannerData.position === null) {
+      bannerData.position = 0;
+    }
+
+    // position 값을 먼저 추가하여 항상 전송되도록 함
+    formData.append("position", String(bannerData.position));
+
+    // 나머지 텍스트 데이터 추가
     Object.keys(bannerData).forEach((key) => {
-      if (bannerData[key] !== undefined && bannerData[key] !== null) {
+      if (key !== "position" && bannerData[key] !== undefined && bannerData[key] !== null) {
         formData.append(key, bannerData[key]);
       }
     });
@@ -514,6 +589,11 @@ const BannerApiService = {
           }
         }
 
+        // position 값은 문자열로 변환
+        if (bannerData.position !== undefined) {
+          bannerData.position = String(bannerData.position);
+        }
+
         // 이미지 파일 없이 JSON 데이터만 PUT 요청
         const response = await axios.put(`/banner/bottom/${id}`, bannerData, {
           headers: {
@@ -530,7 +610,12 @@ const BannerApiService = {
         // 텍스트 데이터 추가
         Object.keys(bannerData).forEach((key) => {
           if (bannerData[key] !== undefined && bannerData[key] !== null) {
-            formData.append(key, bannerData[key]);
+            // position 값은 문자열로 변환하여 전송
+            if (key === "position") {
+              formData.append(key, String(bannerData[key]));
+            } else {
+              formData.append(key, bannerData[key]);
+            }
           }
         });
 
@@ -598,6 +683,11 @@ const BannerApiService = {
           }
         }
 
+        // position 값은 문자열로 변환
+        if (bannerData.position !== undefined) {
+          bannerData.position = String(bannerData.position);
+        }
+
         // 이미지 파일 없이 JSON 데이터만 PUT 요청
         const response = await axios.put(`/banner/mini/${id}`, bannerData, {
           headers: {
@@ -614,7 +704,12 @@ const BannerApiService = {
         // 텍스트 데이터 추가
         Object.keys(bannerData).forEach((key) => {
           if (bannerData[key] !== undefined && bannerData[key] !== null) {
-            formData.append(key, bannerData[key]);
+            // position 값은 문자열로 변환하여 전송
+            if (key === "position") {
+              formData.append(key, String(bannerData[key]));
+            } else {
+              formData.append(key, bannerData[key]);
+            }
           }
         });
 

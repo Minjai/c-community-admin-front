@@ -1,5 +1,6 @@
+import { ApiResponse, Post as Guideline, PaginationInfo } from "@/types";
 import axios from "@/api/axios";
-import { Post } from "@/types";
+import { AxiosResponse } from "axios";
 
 /**
  * 가이드라인 API 서비스
@@ -16,18 +17,67 @@ export class GuidelineApiService {
    * @param pageSize 페이지 크기
    * @returns 가이드라인 목록 응답
    */
-  static async getGuidelines(boardId: number, page = 1, pageSize = 100) {
+  static async getGuidelines(
+    boardId: number,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<ApiResponse<Guideline[]>> {
     try {
-      // 모든 가이드라인을 한 번에 가져오기 위해 /guidelines/all 엔드포인트 사용
-      const response = await axios.get("/guidelines/all", {
+      console.log(`Fetching guidelines for category: ${boardId}, page: ${page}, limit: ${limit}`);
+      const response: AxiosResponse<any> = await axios.get("/guidelines", {
         params: {
           boardId,
+          page,
+          limit,
         },
       });
+      console.log("Guideline API Response:", response); // Log the full response
 
-      return response.data;
-    } catch (error) {
-      throw error;
+      if (
+        response.data &&
+        response.data.success &&
+        response.data.data &&
+        Array.isArray(response.data.data.items)
+      ) {
+        // Extract pagination details from response.data.data
+        const { items, total, page: currentPage, limit: pageSize, totalPages } = response.data.data;
+        console.log("Parsed Pagination:", { totalItems: total, currentPage, pageSize, totalPages }); // Log parsed pagination
+
+        const pagination: PaginationInfo = {
+          totalItems: total,
+          currentPage,
+          pageSize,
+          totalPages,
+        };
+        console.log("Parsed Pagination:", pagination); // Log parsed pagination
+
+        return {
+          success: true,
+          data: items,
+          pagination: pagination,
+          message: response.data.message || "Guidelines fetched successfully",
+        };
+      } else {
+        console.error("Invalid response structure:", response.data);
+        return {
+          success: false,
+          message:
+            response.data?.message ||
+            "Failed to fetch guidelines due to invalid response structure.",
+          data: [],
+          pagination: undefined,
+        };
+      }
+    } catch (error: any) {
+      console.error(`Error fetching guidelines for boardId ${boardId}:`, error);
+      const errorMessage =
+        error.response?.data?.message || "An error occurred while fetching guidelines.";
+      return {
+        success: false,
+        message: errorMessage,
+        data: [],
+        pagination: undefined,
+      };
     }
   }
 
