@@ -42,6 +42,11 @@ const CasinoGameManagement = () => {
   const [currentGame, setCurrentGame] = useState<CasinoGame | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
 
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10); // 페이지당 항목 수
+
   // 게임 데이터 상태
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
@@ -53,27 +58,28 @@ const CasinoGameManagement = () => {
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
 
-  // 게임 목록 조회
-  const fetchGames = async () => {
+  // 게임 목록 조회 (페이지네이션 적용)
+  const fetchGames = async (page: number = currentPage, limit: number = pageSize) => {
     setLoading(true);
 
     try {
       const response = await axios.get("/casino", {
         params: {
-          limit: 20,
+          page: page,
+          limit: limit,
         },
       });
 
-      // 유틸리티 함수를 사용하여 데이터 배열 추출
-      const gameData = extractDataArray(response.data, true);
+      // API 응답 구조에 따라 데이터 및 페이지네이션 정보 추출
+      if (response.data && response.data.success) {
+        const gameData = response.data.data || [];
+        const paginationData = response.data.pagination || {};
 
-      if (gameData && gameData.length > 0) {
         // 서버 응답 데이터를 클라이언트 형식으로 변환
         const transformedGames = gameData.map((game: any) => {
           return {
             id: game.id,
             title: game.title,
-            // Prioritize 'content' for description, then 'description'
             description: game.content || game.description || "",
             thumbnailUrl: game.imageUrl || game.thumbnailUrl || "",
             rating: Number(game.rating) || 0,
@@ -87,25 +93,46 @@ const CasinoGameManagement = () => {
           };
         });
 
-        // position 기준으로 내림차순 정렬 (높은 값이 위로)
+        // 정렬 로직은 클라이언트 측에서 유지할지, 서버에 맡길지 결정 필요
+        // 여기서는 createdAt 기준으로 최신순 정렬 유지
         const sortedGames = [...transformedGames].sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         );
         setGames(sortedGames);
+
+        // 페이지네이션 상태 업데이트
+        setCurrentPage(paginationData.currentPage || 1);
+        setTotalPages(paginationData.totalPages || 1);
+        setPageSize(paginationData.pageSize || limit);
       } else {
         setGames([]);
+        setAlertMessage({
+          type: "error",
+          message: response.data.message || "게임 목록을 불러오는데 실패했습니다.",
+        });
+        setCurrentPage(1);
+        setTotalPages(1);
       }
     } catch (err) {
       console.error("Error fetching casino games:", err);
       setAlertMessage({ type: "error", message: "게임 목록을 불러오는데 실패했습니다." });
       setGames([]);
+      setCurrentPage(1);
+      setTotalPages(1);
     } finally {
       setLoading(false);
     }
   };
 
+  // 페이지 변경 핸들러
+  const handlePageChange = (page: number) => {
+    if (page !== currentPage) {
+      fetchGames(page);
+    }
+  };
+
   useEffect(() => {
-    fetchGames();
+    fetchGames(1); // 컴포넌트 마운트 시 첫 페이지 데이터 로드
   }, []);
 
   // Effect to populate modal fields and open modal when editing a game
@@ -630,6 +657,49 @@ const CasinoGameManagement = () => {
         loading={loading}
         emptyMessage="등록된 게임이 없습니다."
       />
+
+      {/* 페이지네이션 UI 추가 */}
+      {games && games.length > 0 && totalPages > 1 && (
+        <div className="flex justify-center my-6">
+          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+            <button
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
+                currentPage === 1
+                  ? "text-gray-300 cursor-not-allowed"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              이전
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => handlePageChange(page)}
+                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium ${
+                  currentPage === page
+                    ? "bg-indigo-50 text-indigo-600 z-10"
+                    : "bg-white text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            <button
+              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
+                currentPage === totalPages
+                  ? "text-gray-300 cursor-not-allowed"
+                  : "text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              다음
+            </button>
+          </nav>
+        </div>
+      )}
 
       <Modal
         isOpen={showModal}
