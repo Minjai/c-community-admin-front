@@ -112,7 +112,12 @@ const CasinoGameManagement = () => {
   useEffect(() => {
     // Only run when currentGame is set for editing
     if (isEditing && currentGame) {
+      console.log(
+        "[CasinoGameManagement useEffect] currentGame.description:",
+        currentGame.description
+      );
       setTitle(currentGame.title || "");
+      setDescription(currentGame.description || "");
       setRating(currentGame.rating || 5.0);
       setReturnRate(currentGame.returnRate || 95);
       setIsDirectLinkEnabled(currentGame.isDirectLinkEnabled || false);
@@ -517,11 +522,7 @@ const CasinoGameManagement = () => {
 
         <div>
           <label className="label">게임 설명</label>
-          <TextEditor
-            content={isEditing && currentGame ? currentGame.description || "" : description}
-            setContent={setDescription}
-            height="200px"
-          />
+          <TextEditor content={description} setContent={setDescription} height="200px" />
         </div>
 
         <div>

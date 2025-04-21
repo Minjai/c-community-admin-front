@@ -491,10 +491,14 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
         // Always attempt to convert the incoming HTML string to Delta format
         try {
-          // Always attempt to convert the incoming HTML string to Delta format
+          console.log("[TextEditor useEffect] Received new content prop:", content); // Log incoming prop
           const delta = quillInstance.clipboard.convert(content);
-          // Set the editor contents using the Delta object, 'silent' prevents triggering 'text-change'
+          console.log("[TextEditor useEffect] Converted to Delta:", JSON.stringify(delta)); // Log converted Delta
           quillInstance.setContents(delta, "silent");
+          console.log(
+            "[TextEditor useEffect] setContents called. Current editor HTML:",
+            quillInstance.root.innerHTML
+          ); // Log HTML after setContents
         } catch (error) {
           console.error("Error setting Quill content in TextEditor:", error);
           // Optional: Set fallback text or handle the error appropriately
@@ -914,9 +918,43 @@ const TextEditor: React.FC<TextEditorProps> = ({
               const instagramMatch = pastedText.match(INSTAGRAM_REGEX); // Check Instagram here
 
               if (ytMatch && ytMatch[1]) {
+                // --- START: Use insertEmbed for YouTube ---
                 const videoId = ytMatch[1];
                 const embedSrc = `https://www.youtube.com/embed/${videoId}`;
-                embedHTML = `<iframe src="${embedSrc}" allowfullscreen></iframe>`;
+                console.log("[Paste Handler] YouTube link matched (insertEmbed):", pastedText);
+                e.preventDefault();
+                processed = true;
+                if (range) {
+                  console.log(
+                    "[Paste Handler] Attempting insertEmbed for YouTube:",
+                    embedSrc,
+                    "at range:",
+                    range
+                  );
+                  editor.deleteText(range.index, range.length, "user");
+                  editor.insertEmbed(range.index, "embed", embedSrc, "user"); // Use insertEmbed
+                  console.log(
+                    "[Paste Handler] Editor content after YouTube insertEmbed (range):",
+                    editor.root.innerHTML
+                  );
+                  editor.setSelection(range.index + 1, 0, "user");
+                } else {
+                  const length = editor.getLength();
+                  console.log(
+                    "[Paste Handler] Attempting insertEmbed for YouTube:",
+                    embedSrc,
+                    "at end (length):",
+                    length
+                  );
+                  editor.insertEmbed(length, "embed", embedSrc, "user"); // Use insertEmbed
+                  console.log(
+                    "[Paste Handler] Editor content after YouTube insertEmbed (end):",
+                    editor.root.innerHTML
+                  );
+                  editor.setSelection(length + 1, 0, "user");
+                }
+                return; // YouTube handled
+                // --- END: Use insertEmbed for YouTube ---
               } else if (vimeoMatch && vimeoMatch[1]) {
                 const videoId = vimeoMatch[1];
                 const embedSrc = `https://player.vimeo.com/video/${videoId}`;
