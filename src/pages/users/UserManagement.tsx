@@ -231,86 +231,106 @@ const UserManagement = () => {
 
   // DataTable 컬럼 정의
   const columns = useMemo(
-    () => [
-      {
-        header: (
-          <input
-            type="checkbox"
-            className="form-checkbox h-4 w-4 text-blue-600"
-            onChange={handleToggleAll}
-            checked={users.length > 0 && selectedUsers.length === users.length}
-            ref={(input) => {
-              if (input) {
-                input.indeterminate =
-                  selectedUsers.length > 0 && selectedUsers.length < users.length;
-              }
-            }}
-            disabled={loading || users.length === 0}
-          />
-        ),
-        accessor: "id" as keyof User,
-        cell: (id: number) => (
-          <div className="flex items-center justify-center">
+    () =>
+      [
+        {
+          header: (
             <input
               type="checkbox"
               className="form-checkbox h-4 w-4 text-blue-600"
-              checked={selectedUsers.includes(id)}
-              onChange={() => handleToggleSelect(id)}
+              onChange={handleToggleAll}
+              checked={users.length > 0 && selectedUsers.length === users.length}
+              ref={(input) => {
+                if (input) {
+                  input.indeterminate =
+                    selectedUsers.length > 0 && selectedUsers.length < users.length;
+                }
+              }}
+              disabled={loading || users.length === 0}
             />
-          </div>
-        ),
-        className: "w-px px-4",
-      },
-      { header: "ID", accessor: "id" as keyof User },
-      { header: "닉네임", accessor: "nickname" as keyof User },
-      { header: "이메일", accessor: "email" as keyof User },
-      {
-        header: "등급",
-        accessor: "rank" as keyof User,
-        cell: (rank: UserRank) => (
-          <div className="flex items-center space-x-2">
-            {rank?.image && <img src={rank.image} alt={rank.rankName} className="h-6 w-6" />}
-            <span>{rank?.rankName || "-"}</span>
-          </div>
-        ),
-      },
-      { header: "포인트", accessor: "score" as keyof User },
-      {
-        header: "상태",
-        accessor: "status" as keyof User,
-        cell: (status: string) => (
-          <span
-            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClassName(
-              status
-            )}`}
-          >
-            {status}
-          </span>
-        ),
-        className: "text-center",
-      },
-      {
-        header: "가입일",
-        accessor: "createdAt" as keyof User,
-        cell: (date: string) => formatDate(date),
-      },
-      {
-        header: "관리",
-        accessor: "id" as keyof User,
-        cell: (id: number) => (
-          <div className="flex space-x-1 justify-center">
-            <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEditUser(id)} />
-            <ActionButton
-              label="삭제"
-              action="delete"
-              size="sm"
-              onClick={() => handleDeleteUser(id)}
-            />
-          </div>
-        ),
-        className: "text-center",
-      },
-    ],
+          ),
+          accessor: "id" as keyof User,
+          cell: (id: number) => (
+            <div className="flex items-center justify-center">
+              <input
+                type="checkbox"
+                className="form-checkbox h-4 w-4 text-blue-600"
+                checked={selectedUsers.includes(id)}
+                onChange={() => handleToggleSelect(id)}
+              />
+            </div>
+          ),
+          className: "w-px px-4",
+        },
+        {
+          header: "이메일",
+          accessor: "email" as keyof User,
+          cell: (value: string, row: User) => (
+            <span
+              className="text-blue-600 hover:underline cursor-pointer"
+              onClick={() => handleEditUser(row.id)}
+            >
+              {value}
+            </span>
+          ),
+        },
+        { header: "닉네임", accessor: "nickname" as keyof User },
+        {
+          header: "등급",
+          accessor: "rank" as keyof User,
+          cell: (rank: UserRank) => (
+            <div className="flex items-center space-x-2">
+              {rank?.image && <img src={rank.image} alt={rank.rankName} className="h-6 w-6" />}
+              <span>{rank?.rankName || "-"}</span>
+            </div>
+          ),
+        },
+        {
+          header: "상태",
+          accessor: "status" as keyof User,
+          cell: (status: string) => (
+            <span
+              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClassName(
+                status
+              )}`}
+            >
+              {status}
+            </span>
+          ),
+          className: "text-center",
+        },
+        {
+          header: "포인트",
+          accessor: "score" as keyof User,
+          cell: (score: number) => score.toLocaleString(),
+        },
+        {
+          header: "가입일",
+          accessor: "createdAt" as keyof User,
+          cell: (value: string) => formatDate(value),
+        },
+        {
+          header: "최근 접속일",
+          accessor: "lastLoginAt" as keyof User,
+          cell: (value?: string) => (value ? formatDate(value) : "-"),
+        },
+        {
+          header: "관리",
+          accessor: "id" as keyof User,
+          cell: (id: number) => (
+            <div className="flex space-x-1">
+              <ActionButton action="edit" size="sm" onClick={() => handleEditUser(id)} />
+              <ActionButton action="delete" size="sm" onClick={() => handleDeleteUser(id)} />
+            </div>
+          ),
+          className: "w-24 text-center",
+        },
+      ].filter(
+        (column) =>
+          column.accessor !== "id" ||
+          typeof column.header !== "string" ||
+          column.header.toLowerCase() !== "id"
+      ),
     [users, selectedUsers, loading, currentPage, pageSize]
   );
 

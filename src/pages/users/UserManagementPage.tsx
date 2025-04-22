@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigation } from '../../services/NavigationService';
-import { getUsers } from '../../api';
-import DataTable from '../../components/DataTable';
-import Button from '../../components/Button';
-import ActionButton from '../../components/ActionButton';
-import Modal from '../../components/Modal';
-import Input from '../../components/forms/Input';
-import Select from '../../components/forms/Select';
-import Alert from '../../components/Alert';
+import React, { useState, useEffect } from "react";
+import { useNavigation } from "../../services/NavigationService";
+import { getUsers } from "../../api";
+import DataTable from "../../components/DataTable";
+import Button from "../../components/Button";
+import ActionButton from "../../components/ActionButton";
+import Modal from "../../components/Modal";
+import Input from "../../components/forms/Input";
+import Select from "../../components/forms/Select";
+import Alert from "../../components/Alert";
 
 const UserManagementPage: React.FC = () => {
   const [users, setUsers] = useState([]);
@@ -19,7 +19,10 @@ const UserManagementPage: React.FC = () => {
   const [showModal, setShowModal] = useState<boolean>(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [alertMessage, setAlertMessage] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // 회원 목록 조회
   const fetchUsers = async () => {
@@ -30,8 +33,8 @@ const UserManagementPage: React.FC = () => {
       setTotalUsers(total);
       setError(null);
     } catch (err) {
-      setError('회원 목록을 불러오는 중 오류가 발생했습니다.');
-      console.error('Error fetching users:', err);
+      setError("회원 목록을 불러오는 중 오류가 발생했습니다.");
+      console.error("Error fetching users:", err);
     } finally {
       setLoading(false);
     }
@@ -61,12 +64,12 @@ const UserManagementPage: React.FC = () => {
 
     try {
       // 실제 구현에서는 API 호출로 회원 정보 업데이트
-      setAlertMessage({ type: 'success', message: '회원 정보가 성공적으로 수정되었습니다.' });
+      setAlertMessage({ type: "success", message: "회원 정보가 성공적으로 수정되었습니다." });
       setShowModal(false);
       fetchUsers();
     } catch (err) {
-      setAlertMessage({ type: 'error', message: '회원 정보 저장 중 오류가 발생했습니다.' });
-      console.error('Error saving user:', err);
+      setAlertMessage({ type: "error", message: "회원 정보 저장 중 오류가 발생했습니다." });
+      console.error("Error saving user:", err);
     }
   };
 
@@ -89,53 +92,40 @@ const UserManagementPage: React.FC = () => {
 
   // 테이블 컬럼 정의
   const columns = [
-    { header: 'ID', accessor: 'id' },
-    { header: '이메일', accessor: 'email' },
-    { header: '닉네임', accessor: 'nickname' },
+    { header: "이메일", accessor: "email" },
+    { header: "닉네임", accessor: "nickname" },
     {
-      header: '역할',
-      accessor: 'role',
+      header: "역할",
+      accessor: "role",
       cell: (value: string) => {
-        let badgeClass = 'bg-gray-100 text-gray-800';
-        if (value === 'admin') badgeClass = 'bg-blue-100 text-blue-800';
-        if (value === 'superadmin') badgeClass = 'bg-purple-100 text-purple-800';
+        let badgeClass = "bg-gray-100 text-gray-800";
+        if (value === "admin") badgeClass = "bg-blue-100 text-blue-800";
+        if (value === "superadmin") badgeClass = "bg-purple-100 text-purple-800";
 
-        return (
-          <span className={`px-2 py-1 rounded-full text-xs ${badgeClass}`}>
-            {value}
-          </span>
-        );
-      }
+        return <span className={`px-2 py-1 rounded-full text-xs ${badgeClass}`}>{value}</span>;
+      },
     },
-    { header: '점수', accessor: 'score' },
+    { header: "점수", accessor: "score" },
     {
-      header: '가입일',
-      accessor: 'createdAt',
-      cell: (value: string) => new Date(value).toLocaleDateString()
+      header: "가입일",
+      accessor: "createdAt",
+      cell: (value: string) => new Date(value).toLocaleDateString(),
     },
     {
-      header: '최근 로그인',
-      accessor: 'lastLoginAt',
-      cell: (value: string) => value ? new Date(value).toLocaleDateString() : '-'
+      header: "최근 로그인",
+      accessor: "lastLoginAt",
+      cell: (value: string) => (value ? new Date(value).toLocaleDateString() : "-"),
     },
     {
-      header: '관리',
-      accessor: 'id',
+      header: "관리",
+      accessor: "id",
       cell: (value: number, row: User) => (
         <div className="flex space-x-2">
-          <ActionButton
-            onClick={() => handleViewUser(row)}
-            icon="view"
-            tooltip="상세 보기"
-          />
-          <ActionButton
-            onClick={() => handleEditUser(row)}
-            icon="edit"
-            tooltip="수정"
-          />
+          <ActionButton onClick={() => handleViewUser(row)} icon="view" tooltip="상세 보기" />
+          <ActionButton onClick={() => handleEditUser(row)} icon="edit" tooltip="수정" />
         </div>
-      )
-    }
+      ),
+    },
   ];
 
   return (
@@ -147,9 +137,9 @@ const UserManagementPage: React.FC = () => {
             value={pageSize.toString()}
             onChange={(e) => handlePageSizeChange(Number(e.target.value))}
             options={[
-              { value: '10', label: '10개씩 보기' },
-              { value: '20', label: '20개씩 보기' },
-              { value: '50', label: '50개씩 보기' },
+              { value: "10", label: "10개씩 보기" },
+              { value: "20", label: "20개씩 보기" },
+              { value: "50", label: "50개씩 보기" },
             ]}
             className="w-32"
           />
@@ -166,12 +156,7 @@ const UserManagementPage: React.FC = () => {
       )}
 
       {error && (
-        <Alert
-          type="error"
-          message={error}
-          onClose={() => setError(null)}
-          className="mb-4"
-        />
+        <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
       <DataTable
@@ -191,7 +176,7 @@ const UserManagementPage: React.FC = () => {
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        title={isEditing ? '회원 정보 수정' : '회원 상세 정보'}
+        title={isEditing ? "회원 정보 수정" : "회원 상세 정보"}
         size="lg"
       >
         {currentUser && (
@@ -200,8 +185,8 @@ const UserManagementPage: React.FC = () => {
               <Input
                 label="이메일"
                 name="email"
-                value={currentUser.email || ''}
-                onChange={(e) => handleInputChange('email', e.target.value)}
+                value={currentUser.email || ""}
+                onChange={(e) => handleInputChange("email", e.target.value)}
                 disabled={!isEditing}
                 required
               />
@@ -209,8 +194,8 @@ const UserManagementPage: React.FC = () => {
               <Input
                 label="닉네임"
                 name="nickname"
-                value={currentUser.nickname || ''}
-                onChange={(e) => handleInputChange('nickname', e.target.value)}
+                value={currentUser.nickname || ""}
+                onChange={(e) => handleInputChange("nickname", e.target.value)}
                 disabled={!isEditing}
                 required
               />
@@ -220,12 +205,12 @@ const UserManagementPage: React.FC = () => {
               <Select
                 label="역할"
                 name="role"
-                value={currentUser.role || ''}
-                onChange={(e) => handleInputChange('role', e.target.value)}
+                value={currentUser.role || ""}
+                onChange={(e) => handleInputChange("role", e.target.value)}
                 options={[
-                  { value: 'user', label: '일반 회원' },
-                  { value: 'admin', label: '관리자' },
-                  { value: 'superadmin', label: '최고 관리자' },
+                  { value: "user", label: "일반 회원" },
+                  { value: "admin", label: "관리자" },
+                  { value: "superadmin", label: "최고 관리자" },
                 ]}
                 disabled={!isEditing}
                 required
@@ -235,8 +220,8 @@ const UserManagementPage: React.FC = () => {
                 label="점수"
                 name="score"
                 type="number"
-                value={currentUser.score?.toString() || '0'}
-                onChange={(e) => handleInputChange('score', parseInt(e.target.value))}
+                value={currentUser.score?.toString() || "0"}
+                onChange={(e) => handleInputChange("score", parseInt(e.target.value))}
                 disabled={!isEditing}
               />
             </div>
@@ -245,14 +230,20 @@ const UserManagementPage: React.FC = () => {
               <Input
                 label="가입일"
                 name="createdAt"
-                value={currentUser.createdAt ? new Date(currentUser.createdAt).toLocaleDateString() : ''}
+                value={
+                  currentUser.createdAt ? new Date(currentUser.createdAt).toLocaleDateString() : ""
+                }
                 disabled
               />
 
               <Input
                 label="최근 로그인"
                 name="lastLoginAt"
-                value={currentUser.lastLoginAt ? new Date(currentUser.lastLoginAt).toLocaleDateString() : '-'}
+                value={
+                  currentUser.lastLoginAt
+                    ? new Date(currentUser.lastLoginAt).toLocaleDateString()
+                    : "-"
+                }
                 disabled
               />
             </div>
@@ -262,9 +253,7 @@ const UserManagementPage: React.FC = () => {
                 <Button variant="secondary" onClick={() => setShowModal(false)}>
                   취소
                 </Button>
-                <Button onClick={handleSaveUser}>
-                  저장
-                </Button>
+                <Button onClick={handleSaveUser}>저장</Button>
               </div>
             )}
 
@@ -273,9 +262,7 @@ const UserManagementPage: React.FC = () => {
                 <Button variant="secondary" onClick={() => setShowModal(false)}>
                   닫기
                 </Button>
-                <Button onClick={() => setIsEditing(true)}>
-                  수정
-                </Button>
+                <Button onClick={() => setIsEditing(true)}>수정</Button>
               </div>
             )}
           </div>

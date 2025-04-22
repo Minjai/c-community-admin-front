@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import axios from "@/api/axios";
 import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
@@ -62,46 +62,53 @@ const AdminManagement: React.FC = () => {
   } | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalItems, setTotalItems] = useState<number>(0);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [saving, setSaving] = useState<boolean>(false);
 
   // 선택된 관리자 ID 상태 추가
   const [selectedAdminIds, setSelectedAdminIds] = useState<number[]>([]);
 
   // 관리자 목록 조회
-  const fetchAdmins = async (page: number = 1) => {
+  const fetchAdmins = async (page: number = 1, limit: number = pageSize) => {
     setLoading(true);
     setError(null);
     const currentSelected = [...selectedAdminIds]; // 선택 상태 유지
 
     try {
-      const response = await axios.get<AdminResponse>(`/admin/admins?page=${page}`);
+      const response = await axios.get<AdminResponse>(`/admin/admins?page=${page}&limit=${limit}`);
 
       if (response.data) {
         setAdmins(response.data.users);
         setCurrentPage(response.data.page);
         setTotalPages(response.data.totalPages);
+        setTotalItems(response.data.total);
         // 선택 상태 복원
         setSelectedAdminIds(
           currentSelected.filter((id) => response.data.users.some((admin) => admin.id === id))
         );
       } else {
         setAdmins([]);
+        setTotalItems(0);
         setSelectedAdminIds([]); // 에러 시 선택 초기화
         setError("관리자 목록을 불러오는데 실패했습니다.");
+        setPageSize(limit); // Reset pageSize on error
       }
     } catch (err) {
       console.error("Error fetching admins:", err);
       setAdmins([]);
+      setTotalItems(0);
       setSelectedAdminIds([]); // 에러 시 선택 초기화
       setError("관리자 목록을 불러오는데 실패했습니다.");
+      setPageSize(limit); // Reset pageSize on error
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchAdmins(currentPage);
-  }, [currentPage]);
+    fetchAdmins(currentPage, pageSize);
+  }, [currentPage, pageSize]);
 
   // 페이지 변경 핸들러
   const handlePageChange = (page: number) => {
@@ -199,7 +206,7 @@ const AdminManagement: React.FC = () => {
       // 모달 닫고 목록 갱신
       setShowModal(false);
       setSelectedAdminIds([]); // 저장 후 선택 해제
-      fetchAdmins(currentPage);
+      fetchAdmins(currentPage, pageSize);
     } catch (error: any) {
       console.error("Error saving admin:", error);
       setAlertMessage({
@@ -225,7 +232,7 @@ const AdminManagement: React.FC = () => {
       await axios.delete(`/admin/account/${id}`);
       setAlertMessage({ type: "success", message: "관리자가 삭제되었습니다." });
       setSelectedAdminIds((prev) => prev.filter((adminId) => adminId !== id)); // 선택 해제
-      fetchAdmins(currentPage);
+      fetchAdmins(currentPage, pageSize);
     } catch (error: any) {
       console.error("Error deleting admin:", error);
       setAlertMessage({
@@ -340,103 +347,114 @@ const AdminManagement: React.FC = () => {
       });
     }
 
-    fetchAdmins(currentPage);
+    fetchAdmins(currentPage, pageSize);
   };
 
   // DataTable 컬럼 정의
-  const columns = [
-    // 체크박스 컬럼 추가
-    {
-      header: (
-        <input
-          type="checkbox"
-          className="form-checkbox h-4 w-4 text-blue-600"
-          onChange={handleSelectAllAdmins}
-          checked={admins.length > 0 && selectedAdminIds.length === admins.length}
-          ref={(input) => {
-            if (input) {
-              input.indeterminate =
-                selectedAdminIds.length > 0 && selectedAdminIds.length < admins.length;
-            }
-          }}
-          disabled={loading || admins.length === 0 || saving}
-        />
-      ),
-      accessor: "id" as keyof AdminUser,
-      cell: (id: number) => (
-        <input
-          type="checkbox"
-          className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedAdminIds.includes(id)}
-          onChange={() => handleSelectAdmin(id)}
-          disabled={loading || saving}
-        />
-      ),
-      className: "w-px px-4",
-      size: 50,
-    },
-    {
-      header: "관리자 명",
-      accessor: "nickname" as keyof AdminUser,
-      cell: (value: string, row: AdminUser) => (
-        <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
-          onClick={() => handleEditAdmin(row)}
-          title={value}
-        >
-          {value}
-        </span>
-      ),
-    },
-    {
-      header: "이메일",
-      accessor: "email" as keyof AdminUser,
-    },
-    {
-      header: "권한",
-      accessor: "role" as keyof AdminUser,
-      cell: (value: string) => (
-        <span className={`px-2 py-1 rounded ${getRoleClassName(value)} text-xs font-medium`}>
-          {value}
-        </span>
-      ),
-    },
-    {
-      header: "상태",
-      accessor: "status" as keyof AdminUser,
-      cell: (value: string) => (
-        <span className={`px-2 py-1 rounded ${getStatusClassName(value)} text-xs font-medium`}>
-          {value}
-        </span>
-      ),
-    },
-    {
-      header: "등록일자",
-      accessor: "createdAt" as keyof AdminUser,
-      cell: (value: string) => formatDate(value),
-    },
-    {
-      header: "관리",
-      accessor: "id" as keyof AdminUser,
-      cell: (id: number, row: AdminUser) => (
-        <div className="flex space-x-2">
-          <ActionButton
-            label="수정"
-            action="edit"
+  const columns = useMemo(
+    () => [
+      // 체크박스 컬럼 추가
+      {
+        header: (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            onChange={handleSelectAllAdmins}
+            checked={admins.length > 0 && selectedAdminIds.length === admins.length}
+            ref={(input) => {
+              if (input) {
+                input.indeterminate =
+                  selectedAdminIds.length > 0 && selectedAdminIds.length < admins.length;
+              }
+            }}
+            disabled={loading || admins.length === 0 || saving}
+          />
+        ),
+        accessor: "id" as keyof AdminUser,
+        cell: (id: number) => (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            checked={selectedAdminIds.includes(id)}
+            onChange={() => handleSelectAdmin(id)}
+            disabled={loading || saving}
+          />
+        ),
+        className: "w-px px-4",
+        size: 50,
+      },
+      {
+        header: "관리자 명",
+        accessor: "nickname" as keyof AdminUser,
+        cell: (value: string, row: AdminUser) => (
+          <span
+            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
             onClick={() => handleEditAdmin(row)}
-            disabled={loading || saving}
-          />
-          <ActionButton
-            label="삭제"
-            action="delete"
-            onClick={() => handleDeleteAdmin(id)}
-            disabled={loading || saving}
-          />
-        </div>
-      ),
-      size: 120,
-    },
-  ];
+            title={value}
+          >
+            {value}
+          </span>
+        ),
+      },
+      {
+        header: "이메일",
+        accessor: "email" as keyof AdminUser,
+      },
+      {
+        header: "권한",
+        accessor: "role" as keyof AdminUser,
+        cell: (value: string) => (
+          <span className={`px-2 py-1 rounded ${getRoleClassName(value)} text-xs font-medium`}>
+            {value}
+          </span>
+        ),
+      },
+      {
+        header: "상태",
+        accessor: "status" as keyof AdminUser,
+        cell: (value: string) => (
+          <span className={`px-2 py-1 rounded ${getStatusClassName(value)} text-xs font-medium`}>
+            {value}
+          </span>
+        ),
+      },
+      {
+        header: "등록일자",
+        accessor: "createdAt" as keyof AdminUser,
+        cell: (value: string) => formatDate(value),
+      },
+      {
+        header: "관리",
+        accessor: "id" as keyof AdminUser,
+        cell: (id: number, row: AdminUser) => (
+          <div className="flex space-x-2">
+            <ActionButton
+              label="수정"
+              action="edit"
+              onClick={() => handleEditAdmin(row)}
+              disabled={loading || saving}
+            />
+            <ActionButton
+              label="삭제"
+              action="delete"
+              onClick={() => handleDeleteAdmin(id)}
+              disabled={loading || saving}
+            />
+          </div>
+        ),
+        size: 120,
+      },
+    ],
+    [
+      admins,
+      selectedAdminIds,
+      loading,
+      handleSelectAllAdmins,
+      handleSelectAdmin,
+      handleEditAdmin,
+      handleDeleteAdmin,
+    ]
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -478,9 +496,9 @@ const AdminManagement: React.FC = () => {
           loading={loading}
           emptyMessage="등록된 관리자가 없습니다."
           pagination={{
-            currentPage: currentPage,
-            pageSize: 10,
-            totalItems: totalPages * 10,
+            currentPage,
+            pageSize,
+            totalItems,
             onPageChange: handlePageChange,
           }}
         />
