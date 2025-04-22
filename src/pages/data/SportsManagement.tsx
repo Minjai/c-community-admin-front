@@ -13,6 +13,8 @@ import ActionButton from "@/components/ActionButton";
 import DataTable from "@/components/DataTable";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import Input from "@/components/forms/Input";
+import Select from "@/components/forms/Select";
 
 // 스포츠 이름 매핑 객체 추가
 const sportNameMapping: Record<string, string> = {
@@ -638,7 +640,7 @@ export default function SportsManagement() {
 
           {/* 3. 종목 경기 선택 (기존 필드 순서 유지) */}
           <div className="mt-4">
-            <label className="block text-sm font-medium text-gray-700 mb-1">종목 경기</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">종목 선택</label>
             <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-60 overflow-y-auto p-2 border rounded-md">
               {sportOptions.map((sport) => (
                 <label key={sport} className="inline-flex items-center">
