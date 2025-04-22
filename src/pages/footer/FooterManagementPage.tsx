@@ -1,5 +1,5 @@
 // src/pages/footer/FooterManagementPage.tsx
-import React, { useState, useEffect, useMemo, ReactNode } from "react";
+import React, { useState, useEffect, useMemo, ReactNode, useCallback } from "react";
 import axios from "@/api/axios";
 import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
@@ -8,10 +8,11 @@ import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
 import FooterFormModal from "./FooterFormModal";
 import type { Footer } from "./types";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 // Define column type based on DataTable.tsx
 interface FooterColumnDef {
-  header: string;
+  header: string | ReactNode;
   accessor: keyof Footer | ((item: Footer) => ReactNode);
   cell?: (value: any, row: Footer, index?: number) => React.ReactNode;
   className?: string; // Match DataTable prop
@@ -41,7 +42,7 @@ function FooterManagementPage() {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [showFormModal, setShowFormModal] = useState<boolean>(false);
   const [footerToEdit, setFooterToEdit] = useState<Footer | null>(null);
-  const [deleting, setDeleting] = useState<boolean>(false);
+  const [saving, setSaving] = useState<boolean>(false);
 
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -49,29 +50,33 @@ function FooterManagementPage() {
   const [pageSize, setPageSize] = useState<number>(10);
   const [totalItems, setTotalItems] = useState<number>(0);
 
-  async function fetchFooters(page: number = 1, limit: number = 10) {
-    // page, limit 파라미터 추가
+  const fetchFooters = useCallback(async (page: number = 1, limit: number = 10) => {
     setLoading(true);
     setError(null);
     try {
-      // 전체 데이터 요청 (API가 페이지네이션 지원 안 함 가정)
-      const response = await axios.get<{ data: Footer[] }>("/footer/all");
-      const allFooters = response.data?.data || response.data || [];
+      // 페이지네이션 파라미터와 함께 API 호출 (엔드포인트 /admin/footer 가정)
+      const response = await axios.get(`/admin/footer?page=${page}&limit=${limit}`);
+      console.log("푸터 응답:", response.data);
 
-      // 클라이언트 측 페이지네이션 로직 추가
-      const total = allFooters.length;
-      const pages = Math.ceil(total / limit);
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedData = allFooters.slice(startIndex, endIndex);
+      // API 응답 구조 { data: [], pagination: {} } 처리
+      if (response.data && response.data.data && response.data.pagination) {
+        const fetchedFooters = response.data.data || [];
+        const pagination = response.data.pagination;
 
-      setFooters(paginatedData);
-      setTotalItems(total);
-      setTotalPages(pages);
-      setCurrentPage(page);
-      setPageSize(limit);
-      // 페이지 변경 시 선택 상태 초기화 (필요에 따라 조정)
-      setSelectedIds(new Set());
+        setFooters(fetchedFooters);
+        setTotalItems(pagination.totalItems || 0);
+        setTotalPages(pagination.totalPages || 0);
+        setCurrentPage(pagination.currentPage || page);
+        setPageSize(pagination.pageSize || limit);
+        setSelectedIds(new Set());
+      } else {
+        console.error("푸터 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
+        setFooters([]);
+        setTotalItems(0);
+        setTotalPages(0);
+        setCurrentPage(1);
+        setError("푸터 데이터 형식이 올바르지 않습니다.");
+      }
     } catch (err) {
       console.error("Error fetching footers:", err);
       setError("푸터 목록을 불러오는데 실패했습니다.");
@@ -79,48 +84,46 @@ function FooterManagementPage() {
       setTotalItems(0);
       setTotalPages(0);
       setCurrentPage(1);
-      setPageSize(limit);
       setSelectedIds(new Set());
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    fetchFooters(); // 첫 페이지 로드
   }, []);
 
-  // 페이지 변경 핸들러 추가
+  useEffect(() => {
+    fetchFooters(currentPage, pageSize);
+  }, [fetchFooters, currentPage, pageSize]);
+
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      fetchFooters(page, pageSize);
+      setCurrentPage(page);
     }
   };
 
-  const isAllSelected = footers.length > 0 && selectedIds.size === footers.length;
+  const isAllSelectedOnPage =
+    footers.length > 0 &&
+    selectedIds.size === footers.length &&
+    footers.every((f) => selectedIds.has(f.id));
 
-  function handleSelect(id: number, isSelected: boolean) {
+  function handleSelect(id: number) {
     setSelectedIds((prev) => {
       const newSelected = new Set(prev);
-      if (isSelected) {
-        newSelected.add(id);
-      } else {
+      if (newSelected.has(id)) {
         newSelected.delete(id);
+      } else {
+        newSelected.add(id);
       }
       return newSelected;
     });
   }
 
-  function handleSelectAll(isSelected: boolean) {
-    setSelectedIds((prev) => {
-      const newSelected = new Set(prev);
-      if (isSelected) {
-        footers.forEach((footer) => newSelected.add(footer.id));
-      } else {
-        newSelected.clear();
-      }
-      return newSelected;
-    });
+  function handleSelectAll() {
+    if (isAllSelectedOnPage) {
+      setSelectedIds(new Set());
+    } else {
+      const currentPageIds = new Set(footers.map((f) => f.id));
+      setSelectedIds(currentPageIds);
+    }
   }
 
   function handleCreateClick() {
@@ -142,26 +145,32 @@ function FooterManagementPage() {
       return;
     }
 
-    setDeleting(true);
+    setSaving(true);
     setAlertMessage(null);
     try {
-      await axios.delete(`/footer/${id}`);
+      await axios.delete(`/admin/footer/${id}`);
       setAlertMessage({ type: "success", message: "푸터 항목이 삭제되었습니다." });
       setSelectedIds((prev) => {
         const newSelected = new Set(prev);
         newSelected.delete(id);
         return newSelected;
       });
-      fetchFooters();
+
+      const newTotalItems = totalItems - 1;
+      const newTotalPages = Math.ceil(newTotalItems / pageSize);
+      if (footers.length === 1 && currentPage > 1 && currentPage > newTotalPages) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        fetchFooters(Math.min(currentPage, newTotalPages || 1), pageSize);
+      }
     } catch (err) {
       console.error("Error deleting footer:", err);
       setAlertMessage({ type: "error", message: "푸터 항목 삭제 중 오류가 발생했습니다." });
     } finally {
-      setDeleting(false);
+      setSaving(false);
     }
   }
 
-  // Re-add handleDeleteSelectedClick function
   async function handleDeleteSelectedClick() {
     if (
       selectedIds.size === 0 ||
@@ -172,131 +181,144 @@ function FooterManagementPage() {
       return;
     }
 
-    setDeleting(true);
+    setSaving(true);
     setAlertMessage(null);
     const idsToDelete = Array.from(selectedIds);
 
     try {
-      // Assume bulk delete expects { ids: [...] } in the body
-      await axios.delete(`/footer`, { data: { ids: idsToDelete } });
+      await axios.delete(`/admin/footer`, { data: { ids: idsToDelete } });
       setAlertMessage({
         type: "success",
         message: `${idsToDelete.length}개의 푸터 항목이 삭제되었습니다.`,
       });
       setSelectedIds(new Set());
-      fetchFooters();
+
+      const deletedCount = idsToDelete.length;
+      const remainingItemsOnPage =
+        footers.length - footers.filter((f) => idsToDelete.includes(f.id)).length;
+      const newTotalItems = totalItems - deletedCount;
+      const newTotalPages = Math.ceil(newTotalItems / pageSize);
+
+      if (remainingItemsOnPage <= 0 && currentPage > 1 && currentPage > newTotalPages) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        fetchFooters(Math.min(currentPage, newTotalPages || 1), pageSize);
+      }
     } catch (err) {
       console.error("Error deleting selected footers:", err);
       setAlertMessage({ type: "error", message: "선택된 푸터 항목 삭제 중 오류가 발생했습니다." });
     } finally {
-      setDeleting(false);
+      setSaving(false);
     }
   }
 
-  // Define columns matching DataTable.tsx props
-  const columns: FooterColumnDef[] = [
-    {
-      header: "선택",
-      accessor: (item: Footer) => item.id, // Use a function accessor
-      cell: (_: any, row: Footer) => (
-        <input
-          type="checkbox"
-          checked={selectedIds.has(row.id)}
-          onChange={(e) => handleSelect(row.id, e.target.checked)}
-          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-        />
-      ),
-    },
-    {
-      header: "제목",
-      accessor: "title", // Use keyof Footer
-      cell: (value: string, row: Footer) => (
-        <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
-          onClick={() => handleEditClick(row)}
-          title={value}
-        >
-          {value}
-        </span>
-      ),
-    },
-    {
-      header: "내용",
-      accessor: "content", // Use keyof Footer
-      cell: (
-        value: string // Add type for value
-      ) => (
-        <div className="truncate max-w-xs" title={createPreview(value, 500)}>
-          {createPreview(value, 50)}
-        </div>
-      ),
-    },
-    {
-      header: "공개 여부",
-      accessor: "isPublic", // Use keyof Footer
-      cell: (
-        value: number // Add type for value
-      ) => (
-        <span
-          className={`px-2 py-1 rounded text-xs font-medium ${
-            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}
-        >
-          {value === 1 ? "공개" : "비공개"}
-        </span>
-      ),
-    },
-    {
-      header: "관리",
-      accessor: (item: Footer) => item.id, // Keep function accessor
-      cell: (_: any, row: Footer) => (
-        // Apply the banner button style
-        <div className="flex space-x-1">
-          <ActionButton
-            label="수정" // Use label prop
-            action="edit"
-            size="sm" // Use sm size
+  const columns: FooterColumnDef[] = useMemo(
+    () => [
+      {
+        header: (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            onChange={handleSelectAll}
+            checked={isAllSelectedOnPage}
+            ref={(input) => {
+              if (input) {
+                input.indeterminate = selectedIds.size > 0 && selectedIds.size < footers.length;
+              }
+            }}
+            disabled={loading || footers.length === 0}
+          />
+        ),
+        accessor: "id",
+        cell: (_: any, row: Footer) => (
+          <input
+            type="checkbox"
+            checked={selectedIds.has(row.id)}
+            onChange={() => handleSelect(row.id)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+        ),
+        className: "w-px px-4",
+      },
+      { header: "ID", accessor: "id" },
+      {
+        header: "제목",
+        accessor: "title",
+        cell: (value: string, row: Footer) => (
+          <span
+            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
             onClick={() => handleEditClick(row)}
-            disabled={deleting}
-          />
-          <ActionButton
-            label="삭제" // Use label prop
-            action="delete"
-            size="sm" // Use sm size
-            onClick={() => handleDeleteClick(row.id)}
-            disabled={deleting}
-          />
-        </div>
-      ),
-    },
-  ];
+            title={value}
+          >
+            {value}
+          </span>
+        ),
+      },
+      {
+        header: "내용",
+        accessor: "content",
+        cell: (value: string) => (
+          <div className="truncate max-w-xs" title={createPreview(value, 500)}>
+            {createPreview(value, 50)}
+          </div>
+        ),
+      },
+      {
+        header: "공개 여부",
+        accessor: "isPublic",
+        cell: (value: number) => (
+          <span
+            className={`px-2 py-1 rounded text-xs font-medium ${
+              value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            }`}
+          >
+            {value === 1 ? "공개" : "비공개"}
+          </span>
+        ),
+        className: "text-center",
+      },
+      { header: "생성일", accessor: "createdAt", cell: (v: string) => formatDate(v) },
+      {
+        header: "관리",
+        accessor: "id",
+        cell: (id: number, row: Footer) => (
+          <div className="flex space-x-1 justify-center">
+            <ActionButton
+              label="수정"
+              action="edit"
+              size="sm"
+              onClick={() => handleEditClick(row)}
+              disabled={saving}
+            />
+            <ActionButton
+              label="삭제"
+              action="delete"
+              size="sm"
+              onClick={() => handleDeleteClick(id)}
+              disabled={saving}
+            />
+          </div>
+        ),
+        className: "text-center",
+      },
+    ],
+    [footers, selectedIds, loading, saving, isAllSelectedOnPage]
+  );
 
   return (
-    <div className="container mx-auto px-4 py-6">
+    <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">하단 푸터 관리</h1>
-        <div className="flex items-center space-x-2">
-          <div className="flex items-center pr-4">
-            <input
-              type="checkbox"
-              id="select-all-footers"
-              checked={isAllSelected}
-              onChange={(e) => handleSelectAll(e.target.checked)}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-            />
-            <label htmlFor="select-all-footers" className="ml-2 text-sm text-gray-700">
-              전체 선택
-            </label>
-          </div>
+        <h1 className="text-2xl font-semibold">하단 푸터 관리</h1>
+        <div className="flex space-x-2">
           <Button
             variant="danger"
             onClick={handleDeleteSelectedClick}
-            disabled={deleting || selectedIds.size === 0}
+            disabled={selectedIds.size === 0 || loading || saving}
           >
-            {deleting ? "삭제 중..." : `선택 항목 삭제 (${selectedIds.size})`}
+            {`선택 삭제 (${selectedIds.size})`}
           </Button>
-          <Button variant="primary" onClick={handleCreateClick}>
-            푸터 생성
+          <Button variant="primary" onClick={handleCreateClick} disabled={loading || saving}>
+            새 항목 추가
           </Button>
         </div>
       </div>
@@ -314,12 +336,13 @@ function FooterManagementPage() {
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
-      {/* Footer Table */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      <LoadingOverlay isLoading={loading || saving} />
+
+      <div className="bg-white rounded-lg shadow overflow-hidden">
         <DataTable
           columns={columns}
           data={footers}
-          loading={loading} // Pass loading state
+          loading={loading}
           emptyMessage="등록된 푸터 항목이 없습니다."
           pagination={{
             currentPage: currentPage,
@@ -330,20 +353,21 @@ function FooterManagementPage() {
         />
       </div>
 
-      <FooterFormModal
-        isOpen={showFormModal}
-        onClose={() => setShowFormModal(false)}
-        onSuccess={() => {
-          setShowFormModal(false);
-          fetchFooters();
-          setAlertMessage({
-            type: "success",
-            message: footerToEdit ? "푸터 정보가 수정되었습니다." : "푸터 정보가 생성되었습니다.",
-          });
-          setTimeout(() => setAlertMessage(null), 3000);
-        }}
-        footerToEdit={footerToEdit}
-      />
+      {showFormModal && (
+        <FooterFormModal
+          isOpen={showFormModal}
+          onClose={() => setShowFormModal(false)}
+          footerToEdit={footerToEdit}
+          onSuccess={() => {
+            setShowFormModal(false);
+            fetchFooters(currentPage, pageSize);
+            setAlertMessage({
+              type: "success",
+              message: footerToEdit ? "푸터가 수정되었습니다." : "푸터가 추가되었습니다.",
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

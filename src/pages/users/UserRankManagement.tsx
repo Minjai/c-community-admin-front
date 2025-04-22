@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "@/api/axios";
 import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
@@ -8,7 +8,6 @@ import Input from "@/components/forms/Input";
 import FileUpload from "@/components/forms/FileUpload";
 import Alert from "@/components/Alert";
 import { formatDate } from "@/utils/dateUtils";
-import { extractDataArray } from "../../api/util";
 import LoadingOverlay from "@/components/LoadingOverlay";
 
 // 회원 등급 타입 정의
@@ -49,24 +48,22 @@ const UserRankManagement: React.FC = () => {
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   // 등급 목록 조회
-  const fetchRanks = async (page: number = 1, limit: number = 10) => {
-    // page, limit 파라미터 추가
+  const fetchRanks = useCallback(async (page: number = 1, limit: number = 10) => {
     setLoading(true);
     setError(null);
-    // const currentSelected = [...selectedRankIds]; // 페이지 변경 시 선택 초기화
 
     try {
-      const response = await axios.get("/admin/ranks");
-      console.log("회원 등급 응답 구조:", response);
+      // API 호출 시 page, limit 파라미터 전달
+      const response = await axios.get(`/admin/ranks?page=${page}&limit=${limit}`);
+      console.log("회원 등급 응답 구조:", response.data);
 
-      // 유틸리티 함수를 사용하여 데이터 배열 추출
-      const rankData = extractDataArray(response.data, true);
-
-      if (rankData && rankData.length > 0) {
-        console.log("추출된 등급 데이터:", rankData);
+      // 응답 구조 ({ ranks: [], pagination: {} }) 확인 및 처리
+      if (response.data && response.data.ranks && response.data.pagination) {
+        const fetchedRanks = response.data.ranks || [];
+        const pagination = response.data.pagination;
 
         // 필드 매핑 및 처리
-        const processedRanks = rankData.map((rank: any) => ({
+        const processedRanks = fetchedRanks.map((rank: any) => ({
           id: rank.id,
           rankName: rank.rankName || rank.name || "",
           image: rank.image || rank.imageUrl || "",
@@ -76,56 +73,45 @@ const UserRankManagement: React.FC = () => {
           updatedAt: rank.updatedAt || rank.createdAt || "",
         }));
 
-        // 등급을 position 기준으로 내림차순 정렬 (높은 값이 위로)
+        // 정렬은 서버에서 지원하지 않으면 여기서 유지 가능
         const sortedRanks = [...processedRanks].sort(
           (a, b) => (b.position || 0) - (a.position || 0)
         );
 
-        // 클라이언트 측 페이지네이션 처리
-        const total = sortedRanks.length;
-        const pages = Math.ceil(total / limit);
-        const startIndex = (page - 1) * limit;
-        const endIndex = startIndex + limit;
-        const paginatedData = sortedRanks.slice(startIndex, endIndex);
-
-        setRanks(paginatedData);
-        setTotalItems(total);
-        setTotalPages(pages);
-        setCurrentPage(page);
-        setPageSize(limit);
+        setRanks(sortedRanks); // 현재 페이지 데이터 설정
+        setTotalItems(pagination.totalItems || 0);
+        setTotalPages(pagination.totalPages || 0);
+        setCurrentPage(pagination.currentPage || page);
+        setPageSize(pagination.pageSize || limit);
         setSelectedRankIds([]); // 페이지 변경 시 선택 초기화
       } else {
-        console.log("적절한 등급 데이터를 찾지 못했습니다.");
+        console.error("회원 등급 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
         setRanks([]);
-        setSelectedRankIds([]);
-        setError("회원 등급을 불러오는데 실패했습니다.");
         setTotalItems(0);
         setTotalPages(0);
         setCurrentPage(1);
-        setPageSize(limit);
+        setError("회원 등급 데이터 형식이 올바르지 않습니다.");
       }
     } catch (err) {
       console.error("Error fetching user ranks:", err);
       setRanks([]);
-      setSelectedRankIds([]);
-      setError("회원 등급을 불러오는데 실패했습니다.");
       setTotalItems(0);
       setTotalPages(0);
       setCurrentPage(1);
-      setPageSize(limit);
+      setError("회원 등급을 불러오는데 실패했습니다.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchRanks(); // 첫 페이지 로드
-  }, []);
+    fetchRanks(currentPage, pageSize);
+  }, [fetchRanks, currentPage, pageSize]);
 
   // 페이지 변경 핸들러 추가
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      fetchRanks(page, pageSize);
+      setCurrentPage(page); // setCurrentPage만 호출 -> useEffect 트리거
     }
   };
 
@@ -137,7 +123,6 @@ const UserRankManagement: React.FC = () => {
       image: "",
       score: 0,
       createdAt: new Date().toISOString(),
-      position: ranks.length + 1, // 현재 등급 개수 + 1
     });
     setShowModal(true);
     setIsEditing(false);
@@ -175,7 +160,6 @@ const UserRankManagement: React.FC = () => {
       const formData = new FormData();
       formData.append("rankName", currentRank.rankName);
       formData.append("score", currentRank.score.toString());
-      formData.append("position", (currentRank.position || 0).toString());
 
       if (imageFile) {
         formData.append("image", imageFile);
@@ -201,7 +185,7 @@ const UserRankManagement: React.FC = () => {
 
       setShowModal(false);
       setSelectedRankIds([]);
-      fetchRanks();
+      fetchRanks(currentPage, pageSize);
     } catch (error: any) {
       console.error("Error saving rank:", error);
       setAlertMessage({
@@ -227,7 +211,7 @@ const UserRankManagement: React.FC = () => {
       await axios.delete(`/admin/ranks/${id}`);
       setAlertMessage({ type: "success", message: "등급이 삭제되었습니다." });
       setSelectedRankIds((prev) => prev.filter((rankId) => rankId !== id));
-      fetchRanks();
+      fetchRanks(currentPage, pageSize);
     } catch (error: any) {
       console.error("Error deleting rank:", error);
       setAlertMessage({
@@ -254,7 +238,8 @@ const UserRankManagement: React.FC = () => {
 
   // 전체 선택 핸들러 추가
   const handleSelectAllRanks = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked) {
+    const isChecked = event.target.checked;
+    if (isChecked) {
       setSelectedRankIds(ranks.map((rank) => rank.id));
     } else {
       setSelectedRankIds([]);
@@ -309,12 +294,12 @@ const UserRankManagement: React.FC = () => {
       });
     }
 
-    fetchRanks();
+    fetchRanks(currentPage, pageSize);
   };
 
   // 등급 순서 위로 이동
   const handleMoveUp = async (index: number) => {
-    if (index <= 0 || ranks.length < 2) return;
+    if (index <= 0 && currentPage === 1) return;
     setMoving(true);
     setAlertMessage(null);
     setSelectedRankIds([]);
@@ -353,7 +338,7 @@ const UserRankManagement: React.FC = () => {
           error.response?.data?.message || error.message
         }`,
       });
-      fetchRanks();
+      fetchRanks(currentPage, pageSize);
     } finally {
       setMoving(false);
     }
@@ -361,7 +346,7 @@ const UserRankManagement: React.FC = () => {
 
   // 등급 순서 아래로 이동
   const handleMoveDown = async (index: number) => {
-    if (index >= ranks.length - 1 || ranks.length < 2) return;
+    if (index >= ranks.length - 1 && currentPage === totalPages) return;
     setMoving(true);
     setAlertMessage(null);
     setSelectedRankIds([]);
@@ -400,7 +385,7 @@ const UserRankManagement: React.FC = () => {
           error.response?.data?.message || error.message
         }`,
       });
-      fetchRanks();
+      fetchRanks(currentPage, pageSize);
     } finally {
       setMoving(false);
     }
@@ -420,110 +405,95 @@ const UserRankManagement: React.FC = () => {
     setImageFile(null);
   };
 
+  // 파일 변경 핸들러
+  const handleFileChange = (file: File | null) => {
+    setImageFile(file);
+  };
+
   // DataTable 컬럼 정의
-  const columns = [
-    {
-      header: (
-        <input
-          type="checkbox"
-          className="form-checkbox h-4 w-4 text-blue-600"
-          onChange={handleSelectAllRanks}
-          checked={ranks.length > 0 && selectedRankIds.length === ranks.length}
-          ref={(input) => {
-            if (input) {
-              input.indeterminate =
-                selectedRankIds.length > 0 && selectedRankIds.length < ranks.length;
-            }
-          }}
-          disabled={loading || ranks.length === 0 || saving || moving}
-        />
-      ),
-      accessor: "id" as keyof UserRank,
-      cell: (id: number) => (
-        <input
-          type="checkbox"
-          className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedRankIds.includes(id)}
-          onChange={() => handleSelectRank(id)}
-          disabled={loading || saving || moving}
-        />
-      ),
-      className: "w-px px-4",
-      size: 50,
-    },
-    {
-      header: "등급명",
-      accessor: "rankName" as keyof UserRank,
-      cell: (value: string, row: UserRank) => (
-        <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
-          onClick={() => handleEditRank(row)}
-          title={value}
-        >
-          {value}
-        </span>
-      ),
-    },
-    {
-      header: "이미지",
-      accessor: "image" as keyof UserRank,
-      cell: (value: string) =>
-        value ? <img src={value} alt="등급 이미지" className="h-10 w-auto object-contain" /> : "-",
-      size: 100,
-    },
-    {
-      header: "점수",
-      accessor: "score" as keyof UserRank,
-      cell: (value: number) => value.toLocaleString(),
-      size: 100,
-    },
-    {
-      header: "순서",
-      accessor: "id" as keyof UserRank,
-      cell: (id: number, row: UserRank, index?: number) => (
-        <div className="flex space-x-1">
-          <ActionButton
-            label="▲"
-            action="up"
-            size="sm"
-            onClick={() => handleMoveUp(index ?? 0)}
-            disabled={moving || loading || saving || index === 0}
+  const columns = useMemo(
+    () => [
+      {
+        header: (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            onChange={handleSelectAllRanks}
+            checked={ranks.length > 0 && selectedRankIds.length === ranks.length}
+            ref={(input) => {
+              if (input) {
+                input.indeterminate =
+                  selectedRankIds.length > 0 && selectedRankIds.length < ranks.length;
+              }
+            }}
+            disabled={loading || ranks.length === 0}
           />
-          <ActionButton
-            label="▼"
-            action="down"
-            size="sm"
-            onClick={() => handleMoveDown(index ?? 0)}
-            disabled={moving || loading || saving || index === ranks.length - 1}
+        ),
+        accessor: "id" as keyof UserRank,
+        cell: (id: number) => (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            checked={selectedRankIds.includes(id)}
+            onChange={() => handleSelectRank(id)}
           />
-        </div>
-      ),
-      size: 80,
-    },
-    {
-      header: "관리",
-      accessor: "id" as keyof UserRank,
-      cell: (id: number, row: UserRank) => (
-        <div className="flex space-x-2">
-          <ActionButton
-            label="수정"
-            action="edit"
-            size="sm"
-            onClick={() => handleEditRank(row)}
-            disabled={loading || saving || moving}
+        ),
+        className: "w-px px-4",
+      },
+      { header: "ID", accessor: "id" as keyof UserRank },
+      {
+        header: "이미지",
+        accessor: "image" as keyof UserRank,
+        cell: (image: string, row: UserRank) => (
+          <img
+            src={image || "/placeholder-image.png"} // 기본 이미지 경로 설정
+            alt={row.rankName}
+            className="h-10 w-10 object-cover rounded"
+            onError={(e) => (e.currentTarget.src = "/placeholder-image.png")}
           />
-          <ActionButton
-            label="삭제"
-            action="delete"
-            size="sm"
-            onClick={() => handleDeleteRank(id)}
-            disabled={loading || saving || moving}
-          />
-        </div>
-      ),
-      size: 120,
-    },
-  ];
+        ),
+      },
+      { header: "등급명", accessor: "rankName" as keyof UserRank },
+      { header: "기준 포인트", accessor: "score" as keyof UserRank },
+      { header: "생성일", accessor: "createdAt" as keyof UserRank, cell: formatDate },
+      {
+        header: "관리",
+        accessor: "id" as keyof UserRank,
+        cell: (id: number, row: UserRank, index: number) => (
+          <div className="flex space-x-1 justify-center">
+            <ActionButton
+              label="위로"
+              action="up"
+              size="sm"
+              onClick={() => handleMoveUp(index)}
+              disabled={moving || (index <= 0 && currentPage === 1)}
+            />
+            <ActionButton
+              label="아래로"
+              action="down"
+              size="sm"
+              onClick={() => handleMoveDown(index)}
+              disabled={moving || (index >= ranks.length - 1 && currentPage === totalPages)}
+            />
+            <ActionButton
+              label="수정"
+              action="edit"
+              size="sm"
+              onClick={() => handleEditRank(row)}
+            />
+            <ActionButton
+              label="삭제"
+              action="delete"
+              size="sm"
+              onClick={() => handleDeleteRank(id)}
+            />
+          </div>
+        ),
+        className: "text-center",
+      },
+    ],
+    [ranks, selectedRankIds, loading, moving, currentPage, totalPages] // 의존성 업데이트
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -533,7 +503,7 @@ const UserRankManagement: React.FC = () => {
           <Button
             variant="danger"
             onClick={handleBulkDelete}
-            disabled={selectedRankIds.length === 0 || loading || saving || moving}
+            disabled={selectedRankIds.length === 0 || loading}
           >
             {`선택 삭제 (${selectedRankIds.length})`}
           </Button>

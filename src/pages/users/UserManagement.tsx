@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "@/api/axios";
 import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
@@ -25,20 +25,16 @@ interface User {
   createdAt: string;
   status: string;
   rank: UserRank;
-}
-
-interface UserResponse {
-  users: User[];
-  totalCount: number;
-  currentPage: number;
-  totalPages: number;
+  profileImageUrl?: string;
+  lastLoginAt?: string;
 }
 
 const UserManagement = () => {
   const [users, setUsers] = useState<User[]>([]);
-  const [totalCount, setTotalCount] = useState<number>(0);
+  const [totalItems, setTotalItems] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [alertMessage, setAlertMessage] = useState<{
@@ -59,61 +55,55 @@ const UserManagement = () => {
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined);
 
   // 회원 목록 조회
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async (page: number, limit: number) => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await axios.get("/admin/users");
+      const response = await axios.get(`/admin/users?page=${page}&limit=${limit}`);
       console.log("회원 정보 API 응답:", response.data);
 
-      if (response.data) {
-        // 서버 응답 구조에 따라 데이터 추출
-        // 1. 응답이 { users, totalCount, currentPage, totalPages } 형식인 경우
-        if (response.data.users && Array.isArray(response.data.users)) {
-          const data = response.data;
-          setUsers(data.users);
-          setTotalCount(data.totalCount || data.users.length);
-          setCurrentPage(data.currentPage || 1);
-          setTotalPages(data.totalPages || Math.ceil((data.totalCount || data.users.length) / 10));
-        }
-        // 2. 응답이 배열인 경우
-        else if (Array.isArray(response.data)) {
-          setUsers(response.data);
-          setTotalCount(response.data.length);
-          setCurrentPage(1);
-          setTotalPages(Math.ceil(response.data.length / 10));
-        }
-        // 3. 응답이 { data: users[] } 형식인 경우
-        else if (response.data.data && Array.isArray(response.data.data)) {
-          const users = response.data.data;
-          setUsers(users);
-          setTotalCount(users.length);
-          setCurrentPage(1);
-          setTotalPages(Math.ceil(users.length / 10));
-        }
-        // 응답 구조가 예상과 다른 경우
-        else {
-          console.error("회원 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
-          setUsers([]);
-          setError("회원 데이터 형식이 올바르지 않습니다.");
-        }
+      if (response.data && response.data.data && response.data.pagination) {
+        const fetchedUsers = response.data.data || [];
+        const pagination = response.data.pagination;
+
+        setUsers(fetchedUsers);
+        setTotalItems(pagination.totalItems || 0);
+        setTotalPages(pagination.totalPages || 0);
+        setCurrentPage(pagination.currentPage || page);
+        setPageSize(pagination.pageSize || limit);
+        setSelectedUsers([]);
+        setAllSelected(false);
       } else {
+        console.error("회원 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
         setUsers([]);
+        setTotalItems(0);
+        setTotalPages(0);
+        setCurrentPage(1);
         setError("회원 데이터 형식이 올바르지 않습니다.");
       }
     } catch (err) {
       console.error("Error fetching users:", err);
       setError("회원 목록을 불러오는데 실패했습니다.");
       setUsers([]);
+      setTotalItems(0);
+      setTotalPages(0);
+      setCurrentPage(1);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    fetchUsers(currentPage, pageSize);
+  }, [fetchUsers, currentPage, pageSize]);
+
+  // handlePageChange 구현
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      setCurrentPage(page);
+    }
+  };
 
   // 체크박스 토글 핸들러
   const handleToggleSelect = (userId: number) => {
@@ -127,13 +117,13 @@ const UserManagement = () => {
   };
 
   // 전체 선택 토글 핸들러
-  const handleToggleAll = () => {
-    if (allSelected) {
-      setSelectedUsers([]);
-    } else {
+  const handleToggleAll = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const isChecked = event.target.checked;
+    if (isChecked) {
       setSelectedUsers(users.map((user) => user.id));
+    } else {
+      setSelectedUsers([]);
     }
-    setAllSelected(!allSelected);
   };
 
   // 상태에 따른 색상
@@ -197,8 +187,7 @@ const UserManagement = () => {
         message: `${selectedUsers.length}명의 회원에게 ${pointAmount}P가 지급되었습니다.`,
       });
 
-      // 회원 목록 새로고침
-      fetchUsers();
+      fetchUsers(currentPage, pageSize);
     } catch (err) {
       console.error("Error distributing points:", err);
       setAlertMessage({
@@ -224,8 +213,7 @@ const UserManagement = () => {
         message: "회원이 성공적으로 삭제되었습니다.",
       });
 
-      // 회원 목록 새로고침
-      fetchUsers();
+      fetchUsers(currentPage, pageSize);
     } catch (err) {
       console.error("Error deleting user:", err);
       setAlertMessage({
@@ -242,102 +230,97 @@ const UserManagement = () => {
   };
 
   // DataTable 컬럼 정의
-  const columns = [
-    {
-      header: "선택",
-      accessor: "id" as keyof User,
-      cell: (value: number) => (
-        <div className="flex items-center justify-center">
+  const columns = useMemo(
+    () => [
+      {
+        header: (
           <input
             type="checkbox"
-            checked={selectedUsers.includes(value)}
-            onChange={() => handleToggleSelect(value)}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            onChange={handleToggleAll}
+            checked={users.length > 0 && selectedUsers.length === users.length}
+            ref={(input) => {
+              if (input) {
+                input.indeterminate =
+                  selectedUsers.length > 0 && selectedUsers.length < users.length;
+              }
+            }}
+            disabled={loading || users.length === 0}
           />
-        </div>
-      ),
-    },
-    {
-      header: "닉네임",
-      accessor: "nickname" as keyof User,
-      cell: (value: string, row: User) => (
-        <span
-          className="text-blue-600 cursor-pointer hover:underline"
-          onClick={() => handleEditUser(row.id)}
-        >
-          {value}
-        </span>
-      ),
-    },
-    {
-      header: "이메일",
-      accessor: "email" as keyof User,
-    },
-    {
-      header: "등급",
-      accessor: "rank" as keyof User,
-      cell: (value: UserRank | null) => (
-        <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-          {value?.rankName || "등급 없음"}
-        </span>
-      ),
-    },
-    {
-      header: "포인트",
-      accessor: "score" as keyof User,
-      cell: (value: number) => `${value.toLocaleString()}P`,
-    },
-    {
-      header: "가입일자",
-      accessor: "createdAt" as keyof User,
-      cell: (value: string) => formatDate(value),
-    },
-    {
-      header: "상태",
-      accessor: "status" as keyof User,
-      cell: (value: string) => {
-        const className = getStatusClassName(value);
-        return <span className={`px-2 py-1 rounded text-xs ${className}`}>{value}</span>;
+        ),
+        accessor: "id" as keyof User,
+        cell: (id: number) => (
+          <div className="flex items-center justify-center">
+            <input
+              type="checkbox"
+              className="form-checkbox h-4 w-4 text-blue-600"
+              checked={selectedUsers.includes(id)}
+              onChange={() => handleToggleSelect(id)}
+            />
+          </div>
+        ),
+        className: "w-px px-4",
       },
-    },
-    {
-      header: "관리",
-      accessor: "id" as keyof User,
-      cell: (value: number) => (
-        <div className="flex items-center space-x-2">
-          <ActionButton
-            label="수정"
-            onClick={() => handleEditUser(value)}
-            color="blue"
-            action="edit"
-          />
-          <ActionButton
-            label="삭제"
-            onClick={() => handleDeleteUser(value)}
-            color="red"
-            action="delete"
-          />
-        </div>
-      ),
-    },
-  ];
+      { header: "ID", accessor: "id" as keyof User },
+      { header: "닉네임", accessor: "nickname" as keyof User },
+      { header: "이메일", accessor: "email" as keyof User },
+      {
+        header: "등급",
+        accessor: "rank" as keyof User,
+        cell: (rank: UserRank) => (
+          <div className="flex items-center space-x-2">
+            {rank?.image && <img src={rank.image} alt={rank.rankName} className="h-6 w-6" />}
+            <span>{rank?.rankName || "-"}</span>
+          </div>
+        ),
+      },
+      { header: "포인트", accessor: "score" as keyof User },
+      {
+        header: "상태",
+        accessor: "status" as keyof User,
+        cell: (status: string) => (
+          <span
+            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClassName(
+              status
+            )}`}
+          >
+            {status}
+          </span>
+        ),
+        className: "text-center",
+      },
+      {
+        header: "가입일",
+        accessor: "createdAt" as keyof User,
+        cell: (date: string) => formatDate(date),
+      },
+      {
+        header: "관리",
+        accessor: "id" as keyof User,
+        cell: (id: number) => (
+          <div className="flex space-x-1 justify-center">
+            <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEditUser(id)} />
+            <ActionButton
+              label="삭제"
+              action="delete"
+              size="sm"
+              onClick={() => handleDeleteUser(id)}
+            />
+          </div>
+        ),
+        className: "text-center",
+      },
+    ],
+    [users, selectedUsers, loading, currentPage, pageSize]
+  );
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold">회원 정보 관리</h1>
-        <div className="flex items-center space-x-2">
-          <Button onClick={handleToggleAll} variant="secondary" className="mr-2">
-            {allSelected ? "전체 해제" : "전체 선택"}
-          </Button>
-          <Button
-            onClick={handleOpenPointModal}
-            variant="primary"
-            disabled={selectedUsers.length === 0}
-          >
-            포인트 일괄 지급
-          </Button>
-        </div>
+        <h1 className="text-2xl font-semibold mb-6">회원 관리</h1>
+        <Button onClick={handleOpenPointModal} disabled={selectedUsers.length === 0 || loading}>
+          포인트 일괄 지급
+        </Button>
       </div>
 
       {alertMessage && (
@@ -353,37 +336,52 @@ const UserManagement = () => {
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
-      <DataTable
-        columns={columns}
-        data={users}
-        loading={loading}
-        emptyMessage="등록된 회원이 없습니다."
-      />
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={users}
+          loading={loading}
+          emptyMessage="등록된 회원이 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
+        />
+      </div>
 
-      {/* 포인트 일괄 지급 모달 - 새로운 컴포넌트로 교체 */}
       <BulkPointModal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         selectedUsers={users
           .filter((user) => selectedUsers.includes(user.id))
-          .map((user) => ({
-            id: user.id,
-            nickname: user.nickname,
-          }))}
+          .map((user) => ({ id: user.id, nickname: user.nickname }))}
         onSuccess={() => {
           setSelectedUsers([]);
           setAllSelected(false);
-          fetchUsers();
+          setAlertMessage({
+            type: "success",
+            message: `포인트 지급이 완료되었습니다.`,
+          });
+          fetchUsers(currentPage, pageSize);
         }}
       />
 
-      {/* 회원 상세 모달 */}
-      <UserDetail
-        isOpen={showUserDetailModal}
-        onClose={() => setShowUserDetailModal(false)}
-        userId={selectedUserId}
-        onUserUpdated={fetchUsers}
-      />
+      {selectedUserId !== undefined && (
+        <UserDetail
+          userId={selectedUserId}
+          isOpen={showUserDetailModal}
+          onClose={() => {
+            setShowUserDetailModal(false);
+            setSelectedUserId(undefined);
+          }}
+          onUserUpdated={() => {
+            fetchUsers(currentPage, pageSize);
+            setAlertMessage({ type: "success", message: "회원 정보가 수정되었습니다." });
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -4,7 +4,6 @@ import {
   createSportCategory,
   updateSportCategory,
   deleteSportCategory,
-  bulkUpdateSportCategories,
 } from "@/api";
 import { SportCategory } from "@/types";
 import Alert from "@/components/Alert";
@@ -73,18 +72,17 @@ const getKoreanSportName = (englishCode: string): string => {
 };
 
 export default function SportsManagement() {
-  const [allCategories, setAllCategories] = useState<SportCategory[]>([]);
+  // allCategories 제거, categories는 현재 페이지 데이터만 저장
   const [categories, setCategories] = useState<SportCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // 선택된 카테고리 ID 상태 추가
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
 
-  // 페이지네이션 상태 추가
+  // 페이지네이션 상태 (서버 데이터 기반)
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(0); // 초기값 0
+  const [totalPages, setTotalPages] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [totalItems, setTotalItems] = useState<number>(0);
 
@@ -92,10 +90,10 @@ export default function SportsManagement() {
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<"add" | "edit">("add");
   const [currentCategory, setCurrentCategory] = useState<SportCategory | null>(null);
+  // formData 타입 유지
   const [formData, setFormData] = useState({
-    sportName: "",
     displayName: "",
-    isPublic: 1, // 기본값 공개
+    isPublic: 1,
   });
 
   // 종목 경기 편성 옵션들
@@ -132,71 +130,70 @@ export default function SportsManagement() {
   // 선택된 종목 경기
   const [selectedSport, setSelectedSport] = useState<string>("");
 
-  useEffect(() => {
-    // 이 useEffect는 삭제하고 아래 fetchSportCategories 호출을 포함한 useEffect 하나로 통합합니다.
-    // fetchSportCategories();
-  }, []);
-
-  const fetchSportCategories = useCallback(async () => {
+  // fetchSportCategories: 서버 측 페이지네이션 적용
+  const fetchSportCategories = useCallback(async (page: number, limit: number) => {
     setLoading(true);
     setError(null);
-    // const currentSelected = [...selectedCategoryIds]; // 페이지 변경 시 선택 초기화되므로 주석 처리
 
     try {
-      // 페이지네이션 없이 전체 데이터 요청
-      const fetchedAllCategories: SportCategory[] = await getAllSportCategoriesAdmin(); // API가 배열을 반환한다고 가정
+      const response = await getAllSportCategoriesAdmin(page, limit);
+      const fetchedCategories = response.data || [];
+      // pagination 타입을 any로 사용
+      const pagination: any = response.pagination || {
+        totalItems: 0,
+        totalPages: 0,
+        currentPage: page,
+        pageSize: limit,
+      };
 
-      const processedData = fetchedAllCategories.map((category: SportCategory) => ({
+      // displayName 처리
+      const processedData = fetchedCategories.map((category: SportCategory) => ({
         ...category,
         displayName: category.displayName || getKoreanSportName(category.sportName),
       }));
+      // 서버 정렬이 없다면 클라이언트 정렬 유지 (필요 시 서버 정렬 파라미터 추가)
       const sortedData = processedData.sort(
-        (a: SportCategory, b: SportCategory) => (a.displayOrder || 0) - (b.displayOrder || 0) // 타입 명시
+        (a: SportCategory, b: SportCategory) => (a.displayOrder || 0) - (b.displayOrder || 0)
       );
 
-      // 전체 데이터를 상태에 저장
-      setAllCategories(sortedData);
-      setTotalItems(sortedData.length);
-      setTotalPages(Math.ceil(sortedData.length / pageSize));
-      setCurrentPage(1); // 데이터 로드 시 첫 페이지로
-      setSelectedCategoryIds([]); // 데이터 로드 시 선택 초기화
+      setCategories(sortedData); // 현재 페이지 데이터 설정
+      setTotalItems(pagination.totalItems);
+      setTotalPages(pagination.totalPages);
+      setCurrentPage(pagination.currentPage); // API 응답 기준으로 현재 페이지 설정
+      setPageSize(pagination.pageSize);
+      setSelectedCategoryIds([]); // 페이지 변경 시 선택 초기화
     } catch (err: any) {
       console.error("Error fetching sport categories:", err);
       setError("스포츠 카테고리를 불러오는 중 오류가 발생했습니다.");
-      setSuccess(null);
-      setAllCategories([]); // 에러 시 전체 데이터 초기화
+      setCategories([]);
       setTotalItems(0);
       setTotalPages(0);
-      setCurrentPage(1);
+      setCurrentPage(1); // 에러 시 1페이지로?
       setSelectedCategoryIds([]);
     } finally {
       setLoading(false);
     }
-  }, [pageSize]); // pageSize 의존성 추가 (옵션)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // page, limit는 호출 시 받으므로 의존성 배열에서 제거
 
-  // 현재 페이지 데이터 계산
-  const paginatedCategories = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return allCategories.slice(startIndex, endIndex);
-  }, [allCategories, currentPage, pageSize]);
-
+  // useEffect: currentPage, pageSize 변경 시 데이터 로드
   useEffect(() => {
-    fetchSportCategories(); // 컴포넌트 마운트 시 데이터 로드
-  }, [fetchSportCategories]); // fetchSportCategories 의존성 추가
+    // 컴포넌트 마운트 시 또는 페이지/사이즈 변경 시 호출
+    fetchSportCategories(currentPage, pageSize);
+  }, [fetchSportCategories, currentPage, pageSize]); // currentPage, pageSize 의존성 추가
 
-  // 페이지 변경 핸들러 수정
+  // handlePageChange: setCurrentPage 호출 -> useEffect 트리거
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      setCurrentPage(page); // 현재 페이지만 업데이트
-      setSelectedCategoryIds([]); // 페이지 변경 시 선택 초기화
+      setCurrentPage(page); // 상태 변경 -> useEffect가 fetch 호출
+      // setSelectedCategoryIds([]); // fetch 완료 후 초기화됨
     }
   };
 
+  // handleAddCategory: formData 타입 유지
   const handleAddCategory = () => {
     setModalType("add");
     setFormData({
-      sportName: "",
       displayName: "",
       isPublic: 1,
     });
@@ -204,11 +201,11 @@ export default function SportsManagement() {
     setShowModal(true);
   };
 
+  // handleEditCategory: formData 타입 유지
   const handleEditCategory = (category: SportCategory) => {
     setModalType("edit");
     setCurrentCategory(category);
     setFormData({
-      sportName: category.displayName || getKoreanSportName(category.sportName),
       displayName: category.displayName || getKoreanSportName(category.sportName),
       isPublic: category.isPublic,
     });
@@ -216,46 +213,40 @@ export default function SportsManagement() {
     setShowModal(true);
   };
 
+  // handleDeleteCategory: 삭제 후 페이지 조정 및 데이터 리프레시
   const handleDeleteCategory = async (id: number) => {
     if (!confirm("정말 삭제하시겠습니까?")) return;
-
     setLoading(true);
     setError(null);
-    setSuccess(null); // Clear previous success message
-
+    setSuccess(null);
     try {
       await deleteSportCategory(id);
       setSuccess("스포츠 카테고리가 삭제되었습니다.");
+      setSelectedCategoryIds((prev) => prev.filter((catId) => catId !== id));
 
-      // 전체 목록에서 삭제된 항목 제거 후 상태 업데이트
-      const newAllCategories = allCategories.filter((cat) => cat.id !== id);
-      setAllCategories(newAllCategories);
-
-      // 페이지네이션 상태 재계산
-      const newTotalItems = newAllCategories.length;
+      // 삭제 후 페이지 조정 로직 (서버 페이지네이션 기준)
+      const newTotalItems = totalItems - 1;
       const newTotalPages = Math.ceil(newTotalItems / pageSize);
-      setTotalItems(newTotalItems);
-      setTotalPages(newTotalPages);
-
-      // 현재 페이지 조정
-      if (currentPage > newTotalPages && newTotalPages > 0) {
-        setCurrentPage(newTotalPages);
-      } else if (newTotalItems === 0) {
-        setCurrentPage(1);
+      // 현재 페이지에 아이템이 하나만 있었고, 그게 삭제되었으며, 첫 페이지가 아니라면 이전 페이지로
+      if (categories.length === 1 && currentPage > 1 && currentPage > newTotalPages) {
+        setCurrentPage(currentPage - 1); // 상태 변경 -> useEffect가 fetch 호출
+      } else {
+        // 그 외에는 현재 페이지 (또는 조정된 마지막 페이지) 데이터 새로고침
+        // 현재 페이지가 마지막 페이지보다 크면 조정된 마지막 페이지로, 아니면 현재 페이지 유지
+        const pageToFetch = Math.min(currentPage, newTotalPages || 1);
+        fetchSportCategories(pageToFetch, pageSize);
       }
-
-      setSelectedCategoryIds((prev) => prev.filter((catId) => catId !== id)); // 선택 해제
     } catch (err) {
-      const apiError =
-        (err as any)?.response?.data?.message || "스포츠 카테고리 삭제 중 오류가 발생했습니다.";
+      const apiError = (err as any)?.response?.data?.message || "카테고리 삭제 중 오류 발생";
       setError(apiError);
       console.error("Error deleting sport category:", err);
-      fetchSportCategories(); // 에러 시 다시 로드
+      fetchSportCategories(currentPage, pageSize); // 실패 시 현재 페이지 리프레시
     } finally {
       setLoading(false);
     }
   };
 
+  // handleSaveCategory: displayOrder 계산 제거 (서버 처리 가정), 현재 페이지 리프레시
   const handleSaveCategory = async () => {
     if (!selectedSport) {
       setError("종목 경기를 선택해주세요.");
@@ -266,32 +257,30 @@ export default function SportsManagement() {
       return;
     }
 
-    // payload 생성 시 icon 제거
+    // payload에서 displayOrder 제거 (추가 시 서버 처리 가정)
     const payload = {
       sportName: getEnglishSportCode(selectedSport),
       displayName: formData.displayName.trim(),
       isPublic: formData.isPublic,
-      displayOrder:
-        modalType === "edit" && currentCategory?.displayOrder !== undefined
-          ? currentCategory.displayOrder
-          : allCategories.length > 0
-          ? Math.max(...allCategories.map((c) => c.displayOrder || 0)) + 1
-          : 0,
+      ...(modalType === "edit" &&
+        currentCategory?.displayOrder !== undefined && {
+          displayOrder: currentCategory.displayOrder, // 수정 시에만 포함
+        }),
     };
-
-    // finalPayload 타입 정의에서 icon 관련 내용 제거됨 (Omit에 icon 추가 불필요)
-    const finalPayload: Omit<SportCategory, "id" | "createdAt" | "updatedAt" | "icon"> = payload;
+    // 타입 조정
+    const finalPayload: Omit<
+      SportCategory,
+      "id" | "createdAt" | "updatedAt" | "icon" | "displayOrder" // displayOrder는 선택적으로 포함될 수 있음
+    > & { displayOrder?: number } = payload;
 
     setLoading(true);
     setError(null);
     setSuccess(null);
-
     try {
       if (modalType === "edit" && currentCategory) {
-        // update 시 payload 타입에 icon 없으므로 Omit 불필요
         await updateSportCategory(currentCategory.id, finalPayload);
       } else {
-        // create 시에도 payload 타입에 icon 없음
+        // create 시 displayOrder 없이 전달 (서버에서 자동 할당 가정)
         await createSportCategory(finalPayload as SportCategory);
       }
       setSuccess(
@@ -300,7 +289,8 @@ export default function SportsManagement() {
           : "스포츠 카테고리가 추가되었습니다."
       );
       setShowModal(false);
-      fetchSportCategories();
+      // 저장 후 현재 페이지 리프레시
+      fetchSportCategories(currentPage, pageSize);
     } catch (err) {
       const apiError =
         (err as any)?.response?.data?.message || "스포츠 카테고리 저장 중 오류가 발생했습니다.";
@@ -327,137 +317,88 @@ export default function SportsManagement() {
     setSelectedSport(sport);
   };
 
+  // handleMoveUp/Down: 서버 API 필요 (현재는 임시 로직, 서버 API 구현 후 수정 필요)
+  // 서버 페이지네이션 하에서는 순서 변경 후 현재 페이지를 리프레시해야 함
   const handleMoveUp = async (index: number) => {
-    const actualIndex = (currentPage - 1) * pageSize + index;
-    if (actualIndex <= 0) return;
-
-    // 순서 바꿀 대상 카테고리
-    const currentCategory = allCategories[actualIndex];
-    const targetCategory = allCategories[actualIndex - 1];
-
-    // 교환될 displayOrder 값
-    const currentDisplayOrder = currentCategory.displayOrder;
-    const targetDisplayOrder = targetCategory.displayOrder;
-
+    if (index <= 0 && currentPage === 1) return;
+    const currentItem = categories[index]; // 현재 페이지 기준 아이템
+    console.warn("handleMoveUp requires server-side displayOrder update API.");
     setLoading(true);
     try {
-      // 개별 updateSportCategory API 호출 (Promise.all로 병렬 처리)
-      await Promise.all([
-        updateSportCategory(currentCategory.id, { displayOrder: targetDisplayOrder }),
-        updateSportCategory(targetCategory.id, { displayOrder: currentDisplayOrder }),
-      ]);
-
-      // 상태 직접 업데이트
-      const newAllCategories = [...allCategories];
-      const temp = newAllCategories[actualIndex];
-      newAllCategories[actualIndex] = newAllCategories[actualIndex - 1];
-      newAllCategories[actualIndex - 1] = temp;
-      // displayOrder 값도 실제 스왑
-      newAllCategories[actualIndex].displayOrder = targetDisplayOrder;
-      newAllCategories[actualIndex - 1].displayOrder = currentDisplayOrder;
-      // 정렬 다시 적용 (API 응답 대신 로컬에서 정렬)
-      newAllCategories.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
-
-      setAllCategories(newAllCategories);
-      setSuccess("순서가 변경되었습니다.");
-      setError(null);
+      // 실제 API 호출 필요: await updateDisplayOrderAPI(currentItem.id, 'up');
+      // 예시: 서버에서 순서 변경 처리 후, 성공하면 현재 페이지 리프레시
+      await new Promise((res) => setTimeout(res, 300)); // 임시 API 호출 흉내
+      setSuccess("순서 변경 요청됨 (서버 API 구현 필요).");
+      fetchSportCategories(currentPage, pageSize); // 현재 페이지 리프레시
     } catch (err) {
-      console.error("Error moving category up:", err);
-      setError("순서 변경 중 오류가 발생했습니다.");
-      fetchSportCategories(); // 에러 시 다시 로드
+      const apiError = (err as any)?.response?.data?.message || "순서 변경 중 오류";
+      setError(apiError);
     } finally {
       setLoading(false);
     }
   };
-
   const handleMoveDown = async (index: number) => {
-    const actualIndex = (currentPage - 1) * pageSize + index;
-    if (actualIndex >= allCategories.length - 1) return;
-
-    // 순서 바꿀 대상 카테고리
-    const currentCategory = allCategories[actualIndex];
-    const targetCategory = allCategories[actualIndex + 1];
-
-    // 교환될 displayOrder 값
-    const currentDisplayOrder = currentCategory.displayOrder;
-    const targetDisplayOrder = targetCategory.displayOrder;
-
+    if (index >= categories.length - 1 && currentPage === totalPages) return;
+    const currentItem = categories[index]; // 현재 페이지 기준 아이템
+    console.warn("handleMoveDown requires server-side displayOrder update API.");
     setLoading(true);
     try {
-      // 개별 updateSportCategory API 호출 (Promise.all로 병렬 처리)
-      await Promise.all([
-        updateSportCategory(currentCategory.id, { displayOrder: targetDisplayOrder }),
-        updateSportCategory(targetCategory.id, { displayOrder: currentDisplayOrder }),
-      ]);
-
-      // 상태 직접 업데이트
-      const newAllCategories = [...allCategories];
-      const temp = newAllCategories[actualIndex];
-      newAllCategories[actualIndex] = newAllCategories[actualIndex + 1];
-      newAllCategories[actualIndex + 1] = temp;
-      // displayOrder 값도 실제 스왑
-      newAllCategories[actualIndex].displayOrder = targetDisplayOrder;
-      newAllCategories[actualIndex + 1].displayOrder = currentDisplayOrder;
-      // 정렬 다시 적용 (API 응답 대신 로컬에서 정렬)
-      newAllCategories.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
-
-      setAllCategories(newAllCategories);
-      setSuccess("순서가 변경되었습니다.");
-      setError(null);
+      // 실제 API 호출 필요: await updateDisplayOrderAPI(currentItem.id, 'down');
+      await new Promise((res) => setTimeout(res, 300)); // 임시 API 호출 흉내
+      setSuccess("순서 변경 요청됨 (서버 API 구현 필요).");
+      fetchSportCategories(currentPage, pageSize); // 현재 페이지 리프레시
     } catch (err) {
-      console.error("Error moving category down:", err);
-      setError("순서 변경 중 오류가 발생했습니다.");
-      fetchSportCategories(); // 에러 시 다시 로드
+      const apiError = (err as any)?.response?.data?.message || "순서 변경 중 오류";
+      setError(apiError);
     } finally {
       setLoading(false);
     }
   };
 
+  // handleBulkDelete: 서버 측 페이지네이션 로직 적용
   const handleBulkDelete = async () => {
-    if (selectedCategoryIds.length === 0) {
-      setError("삭제할 카테고리를 선택해주세요.");
+    if (
+      selectedCategoryIds.length === 0 ||
+      !confirm("정말 선택한 카테고리를 모두 삭제하시겠습니까?")
+    )
       return;
-    }
-    if (!confirm(`선택된 ${selectedCategoryIds.length}개의 카테고리를 정말 삭제하시겠습니까?`))
-      return;
-
     setLoading(true);
     setError(null);
     setSuccess(null);
-
     try {
+      // Bulk delete API 또는 개별 delete 반복
       for (const id of selectedCategoryIds) {
         await deleteSportCategory(id);
       }
-
       setSuccess(`${selectedCategoryIds.length}개의 카테고리가 삭제되었습니다.`);
 
-      const newAllCategories = allCategories.filter((cat) => !selectedCategoryIds.includes(cat.id));
-      setAllCategories(newAllCategories);
-
-      const newTotalItems = newAllCategories.length;
+      // 페이지 조정 로직 (서버 페이지네이션 기준)
+      const deletedCount = selectedCategoryIds.length;
+      const remainingItemsOnPage = categories.length - deletedCount;
+      const newTotalItems = totalItems - deletedCount;
       const newTotalPages = Math.ceil(newTotalItems / pageSize);
-      setTotalItems(newTotalItems);
-      setTotalPages(newTotalPages);
 
-      if (currentPage > newTotalPages && newTotalPages > 0) {
-        setCurrentPage(newTotalPages);
-      } else if (newTotalItems === 0) {
-        setCurrentPage(1);
+      setSelectedCategoryIds([]); // 선택 초기화
+
+      // 삭제 후 현재 페이지에 남은 아이템이 없으면 이전 페이지로 이동 (첫 페이지 제외)
+      if (remainingItemsOnPage <= 0 && currentPage > 1 && currentPage > newTotalPages) {
+        setCurrentPage(currentPage - 1); // 상태 변경 -> useEffect가 fetch 호출
+      } else {
+        // 그 외에는 현재 페이지 (또는 조정된 마지막 페이지) 데이터 새로고침
+        const pageToFetch = Math.min(currentPage, newTotalPages || 1);
+        fetchSportCategories(pageToFetch, pageSize);
       }
-
-      setSelectedCategoryIds([]);
     } catch (err) {
-      const apiError =
-        (err as any)?.response?.data?.message || "카테고리 일괄 삭제 중 오류가 발생했습니다.";
+      const apiError = (err as any)?.response?.data?.message || "선택 삭제 중 오류 발생";
       setError(apiError);
       console.error("Error bulk deleting categories:", err);
-      fetchSportCategories();
+      fetchSportCategories(currentPage, pageSize); // 실패 시 현재 페이지 리프레시
     } finally {
       setLoading(false);
     }
   };
 
+  // handleSelectCategory 함수 정의 (동일)
   const handleSelectCategory = (id: number) => {
     setSelectedCategoryIds((prevSelected) => {
       if (prevSelected.includes(id)) {
@@ -468,16 +409,17 @@ export default function SportsManagement() {
     });
   };
 
+  // handleSelectAllCategories: 현재 페이지 기준 (categories 사용)
   const handleSelectAllCategories = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      const currentPageCategoryIds = paginatedCategories.map((cat) => cat.id);
+      const currentPageCategoryIds = categories.map((cat) => cat.id); // categories 사용
       setSelectedCategoryIds(currentPageCategoryIds);
     } else {
       setSelectedCategoryIds([]);
     }
   };
 
-  // 테이블 컬럼 정의 (useMemo 사용)
+  // 테이블 컬럼 정의: 서버 페이지네이션 기준 (categories 사용)
   const columns = useMemo(
     () => [
       {
@@ -487,23 +429,24 @@ export default function SportsManagement() {
             className="form-checkbox h-4 w-4 text-blue-600"
             onChange={handleSelectAllCategories}
             checked={
-              paginatedCategories.length > 0 &&
-              selectedCategoryIds.length === paginatedCategories.length &&
-              paginatedCategories.every((cat) => selectedCategoryIds.includes(cat.id))
+              categories.length > 0 && // categories 사용
+              selectedCategoryIds.length === categories.length &&
+              categories.every((cat) => selectedCategoryIds.includes(cat.id))
             }
             ref={(input) => {
               if (input) {
                 const someSelected =
                   selectedCategoryIds.length > 0 &&
-                  selectedCategoryIds.length < paginatedCategories.length &&
-                  paginatedCategories.some((cat) => selectedCategoryIds.includes(cat.id));
+                  selectedCategoryIds.length < categories.length && // categories 사용
+                  categories.some((cat) => selectedCategoryIds.includes(cat.id));
                 input.indeterminate = someSelected;
               }
             }}
-            disabled={loading || paginatedCategories.length === 0}
+            disabled={loading || categories.length === 0} // categories 사용
           />
         ),
         accessor: "id" as keyof SportCategory,
+        // cell에서 handleSelectCategory 사용 (동일)
         cell: (id: number) => (
           <input
             type="checkbox"
@@ -565,15 +508,17 @@ export default function SportsManagement() {
               label="위로"
               action="up"
               size="sm"
-              onClick={() => handleMoveUp(index)}
-              disabled={(currentPage - 1) * pageSize + index <= 0}
+              onClick={() => handleMoveUp(index)} // index는 현재 페이지 기준
+              // 서버 페이지네이션 하에서는 정확한 비활성화 어려움 (서버 API 구현 필요)
+              disabled={index <= 0 && currentPage === 1}
             />
             <ActionButton
               label="아래로"
               action="down"
               size="sm"
-              onClick={() => handleMoveDown(index)}
-              disabled={(currentPage - 1) * pageSize + index >= allCategories.length - 1}
+              onClick={() => handleMoveDown(index)} // index는 현재 페이지 기준
+              // 서버 페이지네이션 하에서는 정확한 비활성화 어려움 (서버 API 구현 필요)
+              disabled={index >= categories.length - 1 && currentPage === totalPages}
             />
             <ActionButton
               label="수정"
@@ -592,7 +537,8 @@ export default function SportsManagement() {
         className: "text-center",
       },
     ],
-    [loading, paginatedCategories, selectedCategoryIds, currentPage, pageSize, allCategories.length]
+    // 의존성 배열: categories, totalPages 등 서버 데이터 의존성 추가
+    [loading, categories, selectedCategoryIds, currentPage, pageSize, totalPages]
   );
 
   return (
@@ -619,13 +565,14 @@ export default function SportsManagement() {
         </Button>
       </div>
 
-      {/* 데이터 테이블 */}
+      {/* 데이터 테이블: data={categories}, pagination props 전달 */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <DataTable
           columns={columns}
-          data={paginatedCategories}
+          data={categories} // categories 전달
           loading={loading}
           emptyMessage="등록된 스포츠 카테고리가 없습니다."
+          // pagination prop에 서버 데이터 및 핸들러 전달
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,

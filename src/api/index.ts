@@ -1,8 +1,7 @@
 import axios from "@/api/axios";
+import { SportCategory } from "@/types";
 
 // 통계 관련 API 함수
-
-
 
 // 스포츠 경기 관련 API 함수
 export const getSportGames = async (params = {}): Promise<{ data: any[]; meta: any }> => {
@@ -113,15 +112,29 @@ export const getSportCategories = async (): Promise<any[]> => {
   }
 };
 
-export const getAllSportCategoriesAdmin = async (): Promise<any[]> => {
+export const getAllSportCategoriesAdmin = async (
+  page: number = 1,
+  limit: number = 10
+): Promise<{ data: SportCategory[]; pagination: any }> => {
   try {
-    const response = await axios.get("/sport-categories/admin");
+    const response = await axios.get(`/sport-categories/admin?page=${page}&limit=${limit}`);
 
     if (response.data && response.data.success) {
-      return response.data.data || [];
+      return {
+        data: response.data.data || [],
+        pagination: response.data.pagination || {
+          totalItems: 0,
+          totalPages: 0,
+          currentPage: 1,
+          pageSize: limit,
+        },
+      };
     }
 
-    return [];
+    return {
+      data: [],
+      pagination: { totalItems: 0, totalPages: 0, currentPage: 1, pageSize: limit },
+    };
   } catch (error) {
     console.error("Error fetching admin sport categories:", error);
     throw error;

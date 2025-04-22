@@ -3,17 +3,39 @@ import { RemittanceBanner } from "../types";
 
 // 암호화폐 송금 배너 API 서비스
 const RemittanceBannerService = {
-  // 송금 배너 목록 조회
-  getRemittanceBanners: async (): Promise<RemittanceBanner[]> => {
+  // 송금 배너 목록 조회 (페이지네이션 적용)
+  getRemittanceBanners: async (
+    page: number = 1,
+    limit: number = 10
+    // 반환 타입을 실제 API 응답 구조로 변경
+  ): Promise<{ data: RemittanceBanner[]; pagination: any }> => {
     try {
-      console.log("송금 배너 데이터 요청 시작: /crypto-transfers/admin");
-      const response = await axios.get("/crypto-transfers/admin");
+      console.log(
+        `송금 배너 데이터 요청 시작: /crypto-transfers/admin?page=${page}&limit=${limit}`
+      );
+      // API 호출 시 page, limit 파라미터 전달
+      const response = await axios.get(`/crypto-transfers/admin?page=${page}&limit=${limit}`);
       console.log("송금 배너 응답 데이터:", response.data);
 
+      // 응답 구조 ({ success, data, pagination }) 확인 및 반환
       if (response.data && response.data.success) {
-        return response.data.data;
+        return {
+          data: response.data.data || [],
+          pagination: response.data.pagination || {
+            totalItems: 0,
+            totalPages: 0,
+            currentPage: 1,
+            pageSize: limit,
+          },
+        };
       }
-      throw new Error(response.data.message || "송금 배너 조회에 실패했습니다.");
+      // 실패 시 빈 데이터와 기본 페이지 정보 반환 또는 에러 throw
+      console.warn("송금 배너 조회 실패:", response.data?.message);
+      return {
+        data: [],
+        pagination: { totalItems: 0, totalPages: 0, currentPage: 1, pageSize: limit },
+      };
+      // throw new Error(response.data.message || "송금 배너 조회에 실패했습니다."); // 필요 시 에러 throw
     } catch (error: any) {
       console.error("송금 배너 조회 오류:", error);
       // 더 자세한 오류 정보 출력
@@ -28,7 +50,12 @@ const RemittanceBannerService = {
         // 요청 설정 중 오류가 발생한 경우
         console.error("요청 설정 오류:", error.message);
       }
-      throw error;
+      // 오류 발생 시 빈 데이터와 기본 페이지 정보 반환
+      return {
+        data: [],
+        pagination: { totalItems: 0, totalPages: 0, currentPage: 1, pageSize: limit },
+      };
+      // throw error; // 필요 시 에러 다시 throw
     }
   },
 

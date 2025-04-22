@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import RemittanceBannerService from "../../services/RemittanceBannerService";
 import { RemittanceBanner } from "../../types";
 import DataTable from "../../components/DataTable";
@@ -49,52 +49,73 @@ const RemittanceBannerPage: React.FC = () => {
     return `${year}.${month}.${day} ${hours}:${minutes}`;
   };
 
-  // 배너 목록 조회
-  const fetchBanners = async (page: number = 1, limit: number = 10) => {
+  // 배너 목록 조회 (서버 측 페이지네이션으로 수정)
+  const fetchBanners = useCallback(async (page: number = 1, limit: number = 10) => {
     setLoading(true);
-    setError("");
+    setError(null);
 
     try {
-      const allBanners = await RemittanceBannerService.getRemittanceBanners();
-      // 배너를 displayOrder 기준으로 오름차순 정렬 (낮은 값이 위로)
-      const sortedBanners = [...allBanners].sort(
-        (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
-      );
+      // 서비스 함수가 page, limit를 받고 { data, pagination } 구조를 반환한다고 가정
+      const response = await RemittanceBannerService.getRemittanceBanners(page, limit);
+      console.log("송금 배너 응답:", response); // 응답 구조 확인용
 
-      // 클라이언트 측 페이지네이션 처리
-      const total = sortedBanners.length;
-      const pages = Math.ceil(total / limit);
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedData = sortedBanners.slice(startIndex, endIndex);
+      // 실제 응답 구조에 맞춰 처리 (예: response.data.data, response.data.pagination)
+      // 여기서는 사용자님이 보여주신 { success, data, pagination } 구조로 가정
+      if (response && response.data && response.pagination) {
+        const fetchedBanners = response.data || [];
+        const pagination = response.pagination;
 
-      setBanners(paginatedData);
-      setTotalItems(total);
-      setTotalPages(pages);
-      setCurrentPage(page);
-      setPageSize(limit);
-      setSelectedBannerIds([]);
+        // 필드 매핑 (필요 시)
+        const processedBanners = fetchedBanners.map((banner: any) => ({
+          id: banner.id,
+          name: banner.name || "",
+          link: banner.link || "",
+          imageUrl: banner.imageUrl || banner.image || "", // imageUrl 또는 image 필드 사용
+          isPublic: banner.isPublic === undefined ? 1 : banner.isPublic,
+          displayOrder: banner.displayOrder || 0,
+          createdAt: banner.createdAt || "",
+          updatedAt: banner.updatedAt || "",
+        }));
+
+        // 정렬은 서버에서 지원하지 않으면 여기서 유지 가능
+        const sortedBanners = [...processedBanners].sort(
+          (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
+        );
+
+        setBanners(sortedBanners);
+        setTotalItems(pagination.totalItems || 0);
+        setTotalPages(pagination.totalPages || 0);
+        setCurrentPage(pagination.currentPage || page);
+        setPageSize(pagination.pageSize || limit);
+        setSelectedBannerIds([]);
+      } else {
+        console.error("송금 배너 불러오기 실패: 응답 형식이 예상과 다릅니다", response);
+        setBanners([]);
+        setTotalItems(0);
+        setTotalPages(0);
+        setCurrentPage(1);
+        setError("송금 배너 데이터 형식이 올바르지 않습니다.");
+      }
     } catch (err) {
+      console.error("Error fetching remittance banners:", err);
       setError("송금 배너를 불러오는데 실패했습니다.");
       setBanners([]);
-      setSelectedBannerIds([]);
       setTotalItems(0);
       setTotalPages(0);
       setCurrentPage(1);
-      setPageSize(limit);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchBanners();
-  }, []);
+    fetchBanners(currentPage, pageSize);
+  }, [fetchBanners, currentPage, pageSize]);
 
   // 페이지 변경 핸들러 추가
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      fetchBanners(page, pageSize);
+      setCurrentPage(page);
     }
   };
 
@@ -106,7 +127,6 @@ const RemittanceBannerPage: React.FC = () => {
       link: "",
       imageUrl: "",
       isPublic: 1,
-      displayOrder: banners.length > 0 ? Math.max(...banners.map((b) => b.displayOrder)) + 1 : 1,
       createdAt: "",
       updatedAt: "",
     });
@@ -119,9 +139,7 @@ const RemittanceBannerPage: React.FC = () => {
 
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: RemittanceBanner) => {
-    setCurrentBanner({
-      ...banner,
-    });
+    setCurrentBanner({ ...banner });
     setLogoFile(null);
     setShowModal(true);
     setIsEditing(true);
@@ -186,7 +204,7 @@ const RemittanceBannerPage: React.FC = () => {
       // 모달 닫고 배너 목록 새로고침
       setShowModal(false);
       setSelectedBannerIds([]);
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
     } catch (err) {
       console.error("Error saving remittance banner:", err);
       setAlertMessage({ type: "error", message: "송금 배너 저장 중 오류가 발생했습니다." });
@@ -207,7 +225,7 @@ const RemittanceBannerPage: React.FC = () => {
       if (success) {
         setAlertMessage({ type: "success", message: "송금 배너가 삭제되었습니다." });
         setSelectedBannerIds((prev) => prev.filter((bannerId) => bannerId !== id));
-        fetchBanners();
+        fetchBanners(currentPage, pageSize);
       } else {
         setAlertMessage({ type: "error", message: "송금 배너 삭제에 실패했습니다." });
       }
@@ -232,7 +250,8 @@ const RemittanceBannerPage: React.FC = () => {
 
   // 전체 선택 핸들러 추가
   const handleSelectAllBanners = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked) {
+    const isChecked = event.target.checked;
+    if (isChecked) {
       setSelectedBannerIds(banners.map((banner) => banner.id));
     } else {
       setSelectedBannerIds([]);
@@ -293,12 +312,12 @@ const RemittanceBannerPage: React.FC = () => {
       });
     }
 
-    fetchBanners();
+    fetchBanners(currentPage, pageSize);
   };
 
   // 배너 위로 이동
   const handleMoveUp = async (index: number) => {
-    if (index <= 0) return;
+    if (index <= 0 && currentPage === 1) return;
     setMoving(true);
     setAlertMessage(null);
     setSelectedBannerIds([]);
@@ -335,10 +354,10 @@ const RemittanceBannerPage: React.FC = () => {
       });
 
       // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
     } catch (err) {
       // 에러 발생 시 원래 순서로 되돌림
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
       setAlertMessage({ type: "error", message: "송금 배너 순서 변경 중 오류가 발생했습니다." });
       console.error("Error updating remittance banner order:", err);
     } finally {
@@ -348,7 +367,7 @@ const RemittanceBannerPage: React.FC = () => {
 
   // 배너 아래로 이동
   const handleMoveDown = async (index: number) => {
-    if (index >= banners.length - 1) return;
+    if (index >= banners.length - 1 && currentPage === totalPages) return;
     setMoving(true);
     setAlertMessage(null);
     setSelectedBannerIds([]);
@@ -385,10 +404,10 @@ const RemittanceBannerPage: React.FC = () => {
       });
 
       // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
     } catch (err) {
       // 에러 발생 시 원래 순서로 되돌림
-      fetchBanners();
+      fetchBanners(currentPage, pageSize);
       setAlertMessage({ type: "error", message: "송금 배너 순서 변경 중 오류가 발생했습니다." });
       console.error("Error updating remittance banner order:", err);
     } finally {
@@ -396,116 +415,130 @@ const RemittanceBannerPage: React.FC = () => {
     }
   };
 
+  // 입력 변경 핸들러
+  const handleInputChange = (name: string, value: any) => {
+    if (currentBanner) {
+      if (name === "isPublic") {
+        setCurrentBanner({ ...currentBanner, [name]: value === "1" ? 1 : 0 });
+      } else {
+        setCurrentBanner({ ...currentBanner, [name]: value });
+      }
+    }
+  };
+
+  // 모달 닫기 핸들러
+  const handleCloseModal = () => {
+    setShowModal(false);
+  };
+
+  // 파일 변경 핸들러
+  const handleFileChange = (file: File | null) => {
+    setLogoFile(file);
+  };
+
   // DataTable 컬럼 정의
-  const columns = [
-    {
-      header: (
-        <input
-          type="checkbox"
-          className="form-checkbox h-4 w-4 text-blue-600"
-          onChange={handleSelectAllBanners}
-          checked={banners.length > 0 && selectedBannerIds.length === banners.length}
-          ref={(input) => {
-            if (input) {
-              input.indeterminate =
-                selectedBannerIds.length > 0 && selectedBannerIds.length < banners.length;
-            }
-          }}
-          disabled={loading || banners.length === 0 || saving || moving}
-        />
-      ),
-      accessor: "id" as keyof RemittanceBanner,
-      cell: (id: number) => (
-        <input
-          type="checkbox"
-          className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedBannerIds.includes(id)}
-          onChange={() => handleSelectBanner(id)}
-          disabled={loading || saving || moving}
-        />
-      ),
-      className: "w-px px-4",
-      size: 50,
-    },
-    {
-      header: "사이트명",
-      accessor: "name" as keyof RemittanceBanner,
-      cell: (value: string, row: RemittanceBanner) => (
-        <span
-          className="text-blue-600 hover:underline cursor-pointer"
-          onClick={() => handleEditBanner(row)}
-        >
-          {value}
-        </span>
-      ),
-    },
-    {
-      header: "로고 이미지",
-      accessor: "imageUrl" as keyof RemittanceBanner,
-      cell: (value: string) =>
-        value ? <img src={value} alt="로고" className="h-10 w-auto object-contain" /> : "-",
-    },
-    {
-      header: "이동 링크",
-      accessor: "link" as keyof RemittanceBanner,
-      cell: (value: string) => (
-        <a
-          href={value}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-500 hover:underline"
-          title={value}
-        >
-          {value}
-        </a>
-      ),
-    },
-    {
-      header: "상태",
-      accessor: "isPublic" as keyof RemittanceBanner,
-      cell: (value: number) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}
-        >
-          {value === 1 ? "공개" : "비공개"}
-        </span>
-      ),
-    },
-    {
-      header: "등록일",
-      accessor: "createdAt" as keyof RemittanceBanner,
-      cell: (value: string) => formatDate(value),
-    },
-    {
-      header: "관리",
-      accessor: "id" as keyof RemittanceBanner,
-      cell: (id: number, row: RemittanceBanner) => (
-        <div className="flex space-x-2">
-          <ActionButton
-            label="수정"
-            action="edit"
-            size="sm"
-            onClick={() => handleEditBanner(row)}
-            disabled={loading || saving || moving}
+  const columns = useMemo(
+    () => [
+      {
+        header: (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            onChange={handleSelectAllBanners}
+            checked={banners.length > 0 && selectedBannerIds.length === banners.length}
+            ref={(input) => {
+              if (input) {
+                input.indeterminate =
+                  selectedBannerIds.length > 0 && selectedBannerIds.length < banners.length;
+              }
+            }}
+            disabled={loading || banners.length === 0}
           />
-          <ActionButton
-            label="삭제"
-            action="delete"
-            size="sm"
-            onClick={() => handleDeleteBanner(id)}
-            disabled={loading || saving || moving}
+        ),
+        accessor: "id" as keyof RemittanceBanner,
+        cell: (id: number) => (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            checked={selectedBannerIds.includes(id)}
+            onChange={() => handleSelectBanner(id)}
           />
-        </div>
-      ),
-      size: 120,
-    },
-  ];
+        ),
+        className: "w-px px-4",
+      },
+      { header: "ID", accessor: "id" as keyof RemittanceBanner },
+      {
+        header: "로고",
+        accessor: "imageUrl" as keyof RemittanceBanner,
+        cell: (imageUrl: string, row: RemittanceBanner) => (
+          <img
+            src={imageUrl || "/placeholder-image.png"}
+            alt={row.name}
+            className="h-8 w-auto object-contain"
+            onError={(e) => (e.currentTarget.src = "/placeholder-image.png")}
+          />
+        ),
+        className: "text-center",
+      },
+      { header: "사이트명", accessor: "name" as keyof RemittanceBanner },
+      { header: "이동링크", accessor: "link" as keyof RemittanceBanner },
+      {
+        header: "공개여부",
+        accessor: "isPublic" as keyof RemittanceBanner,
+        cell: (isPublic: number) => (
+          <span
+            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+              isPublic === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            }`}
+          >
+            {isPublic === 1 ? "공개" : "비공개"}
+          </span>
+        ),
+        className: "text-center",
+      },
+      { header: "생성일", accessor: "createdAt" as keyof RemittanceBanner, cell: formatDate },
+      {
+        header: "관리",
+        accessor: "id" as keyof RemittanceBanner,
+        cell: (id: number, row: RemittanceBanner, index: number) => (
+          <div className="flex space-x-1 justify-center">
+            <ActionButton
+              label="위로"
+              action="up"
+              size="sm"
+              onClick={() => handleMoveUp(index)}
+              disabled={moving || (index <= 0 && currentPage === 1)}
+            />
+            <ActionButton
+              label="아래로"
+              action="down"
+              size="sm"
+              onClick={() => handleMoveDown(index)}
+              disabled={moving || (index >= banners.length - 1 && currentPage === totalPages)}
+            />
+            <ActionButton
+              label="수정"
+              action="edit"
+              size="sm"
+              onClick={() => handleEditBanner(row)}
+            />
+            <ActionButton
+              label="삭제"
+              action="delete"
+              size="sm"
+              onClick={() => handleDeleteBanner(id)}
+            />
+          </div>
+        ),
+        className: "text-center",
+      },
+    ],
+    [banners, selectedBannerIds, loading, moving, currentPage, totalPages]
+  );
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">송금 배너 관리</h1>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-semibold mb-6">송금 배너 관리</h1>
 
       {alertMessage && (
         <Alert
@@ -519,20 +552,20 @@ const RemittanceBannerPage: React.FC = () => {
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
-      <div className="flex justify-end mb-4 space-x-2">
+      <LoadingOverlay isLoading={loading || saving || moving} />
+
+      <div className="flex justify-end space-x-2 mb-4">
         <Button
-          variant="danger"
           onClick={handleBulkDelete}
-          disabled={selectedBannerIds.length === 0 || loading || saving || moving}
+          variant="danger"
+          disabled={selectedBannerIds.length === 0 || loading}
         >
           {`선택 삭제 (${selectedBannerIds.length})`}
         </Button>
-        <Button variant="primary" onClick={handleAddBanner} disabled={loading || saving || moving}>
-          송금 배너 추가
+        <Button onClick={handleAddBanner} disabled={loading}>
+          배너 등록
         </Button>
       </div>
-
-      <LoadingOverlay isLoading={loading || saving || moving} />
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <DataTable
@@ -551,78 +584,65 @@ const RemittanceBannerPage: React.FC = () => {
 
       <Modal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title={isEditing ? "송금 배너 수정" : "새 송금 배너 추가"}
-        size="lg"
+        onClose={handleCloseModal}
+        title={isEditing ? "배너 수정" : "배너 등록"}
       >
-        {currentBanner && (
-          <div className="space-y-4">
-            {alertMessage && alertMessage.type === "error" && (
-              <div className="mb-4">
-                <Alert
-                  type="error"
-                  message={alertMessage.message}
-                  onClose={() => setAlertMessage(null)}
-                />
-              </div>
-            )}
-            <Input
-              label="사이트명"
-              name="name"
-              value={currentBanner.name || ""}
-              onChange={(e) =>
-                setCurrentBanner((prev) => (prev ? { ...prev, name: e.target.value } : null))
-              }
-              required
-              disabled={saving || moving}
+        {alertMessage && (
+          <div className="mb-4">
+            <Alert
+              type={alertMessage.type}
+              message={alertMessage.message}
+              onClose={() => setAlertMessage(null)}
             />
-            <Input
-              label="이동 링크"
-              name="link"
-              value={currentBanner.link || ""}
-              onChange={(e) =>
-                setCurrentBanner((prev) => (prev ? { ...prev, link: e.target.value } : null))
-              }
-              required
-              disabled={saving || moving}
-            />
-            <FileUpload
-              label="로고 이미지"
-              onChange={setLogoFile}
-              value={currentBanner.imageUrl}
-              disabled={saving || moving}
-            />
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="isPublic-modal"
-                checked={currentBanner.isPublic === 1}
-                onChange={(e) =>
-                  setCurrentBanner((prev) =>
-                    prev ? { ...prev, isPublic: e.target.checked ? 1 : 0 } : null
-                  )
-                }
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                disabled={saving || moving}
-              />
-              <label htmlFor="isPublic-modal" className="text-sm font-medium text-gray-700">
-                공개 여부
-              </label>
-            </div>
-            <div className="flex justify-end space-x-2 pt-4 border-t">
-              <Button
-                variant="secondary"
-                onClick={() => setShowModal(false)}
-                disabled={saving || moving}
-              >
-                취소
-              </Button>
-              <Button variant="primary" onClick={handleSaveBanner} disabled={saving || moving}>
-                {saving ? "저장 중..." : "저장"}
-              </Button>
-            </div>
           </div>
         )}
+        <div className="space-y-4">
+          <Input
+            label="사이트명"
+            name="name"
+            value={currentBanner?.name || ""}
+            onChange={(e) => handleInputChange("name", e.target.value)}
+            required
+          />
+          <Input
+            label="이동링크"
+            name="link"
+            value={currentBanner?.link || ""}
+            onChange={(e) => handleInputChange("link", e.target.value)}
+            required
+            placeholder="https://example.com"
+          />
+          <FileUpload
+            label="로고 이미지"
+            value={currentBanner?.imageUrl}
+            onChange={handleFileChange}
+            accept="image/*"
+            required={!isEditing}
+          />
+          <div>
+            <label htmlFor="isPublic" className="block text-sm font-medium text-gray-700">
+              공개여부
+            </label>
+            <select
+              id="isPublic"
+              name="isPublic"
+              value={currentBanner?.isPublic === undefined ? 1 : currentBanner.isPublic}
+              onChange={(e) => handleInputChange("isPublic", e.target.value)}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+            >
+              <option value="1">공개</option>
+              <option value="0">비공개</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex justify-end space-x-2 mt-6">
+          <Button variant="secondary" onClick={handleCloseModal} disabled={saving}>
+            취소
+          </Button>
+          <Button onClick={handleSaveBanner} disabled={saving}>
+            {saving ? "저장 중..." : "저장"}
+          </Button>
+        </div>
       </Modal>
     </div>
   );
