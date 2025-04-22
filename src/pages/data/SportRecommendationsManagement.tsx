@@ -135,47 +135,53 @@ export default function SportRecommendationsManagement() {
     (games: SportGame[], query: string) => {
       const normalizedQuery = query.toLowerCase().trim();
       let gamesToFilter = [...games];
+      let sortedGames: SportGame[]; // 정렬된 결과를 담을 변수
 
       if (!normalizedQuery) {
-        // 검색어가 없을 때: dateTime 기준 내림차순 정렬 (안전하게 복원)
-        const sortedGames = gamesToFilter.sort((a, b) => {
-          // 유효하지 않은 날짜는 0 (또는 음수)으로 처리하여 뒤로 보내기
+        // 검색어가 없을 때: dateTime 기준 내림차순 정렬
+        sortedGames = gamesToFilter.sort((a, b) => {
           const dateA = a.dateTime ? new Date(a.dateTime).getTime() : 0;
           const dateB = b.dateTime ? new Date(b.dateTime).getTime() : 0;
-          // NaN 체크 추가: getTime()이 NaN을 반환할 수 있음
           const timeA = !isNaN(dateA) ? dateA : 0;
           const timeB = !isNaN(dateB) ? dateB : 0;
           return timeB - timeA; // 내림차순
         });
-        setFilteredGames(sortedGames);
-        return;
+      } else {
+        // 검색어가 있을 때: 필터링 후 dateTime 기준 내림차순 정렬
+        let alternativeTerms: string[] = [];
+        if (sportMapping[normalizedQuery]) {
+          alternativeTerms = sportMapping[normalizedQuery];
+        } else if (korToEngMapping[normalizedQuery]) {
+          alternativeTerms = korToEngMapping[normalizedQuery];
+        }
+        const allSearchTerms = [normalizedQuery, ...alternativeTerms];
+
+        const filtered = gamesToFilter.filter((game) => {
+          if (!game) return false;
+          const searchableFields = [
+            game.matchName,
+            game.homeTeam,
+            game.awayTeam,
+            game.league,
+            game.sport,
+          ].map((field) => (field || "").toLowerCase());
+          return allSearchTerms.some((term) =>
+            searchableFields.some((field) => field.includes(term))
+          );
+        });
+
+        // 필터링된 결과를 dateTime 기준으로 내림차순 정렬
+        sortedGames = filtered.sort((a, b) => {
+          const dateA = a.dateTime ? new Date(a.dateTime).getTime() : 0;
+          const dateB = b.dateTime ? new Date(b.dateTime).getTime() : 0;
+          const timeA = !isNaN(dateA) ? dateA : 0;
+          const timeB = !isNaN(dateB) ? dateB : 0;
+          return timeB - timeA; // 내림차순
+        });
       }
 
-      // 검색어가 있을 때: 필터링 후 customGameSort 적용 (기존 로직 유지)
-      let alternativeTerms: string[] = [];
-      if (sportMapping[normalizedQuery]) {
-        alternativeTerms = sportMapping[normalizedQuery];
-      } else if (korToEngMapping[normalizedQuery]) {
-        alternativeTerms = korToEngMapping[normalizedQuery];
-      }
-      const allSearchTerms = [normalizedQuery, ...alternativeTerms];
-
-      const filtered = gamesToFilter.filter((game) => {
-        if (!game) return false;
-        const searchableFields = [
-          game.matchName,
-          game.homeTeam,
-          game.awayTeam,
-          game.league,
-          game.sport,
-        ].map((field) => (field || "").toLowerCase());
-        return allSearchTerms.some((term) =>
-          searchableFields.some((field) => field.includes(term))
-        );
-      });
-
-      const sortedFilteredGames = filtered.sort(customGameSort);
-      setFilteredGames(sortedFilteredGames);
+      // 최종 정렬된 결과를 상태에 반영
+      setFilteredGames(sortedGames);
     },
     [sportMapping, korToEngMapping]
   );
@@ -236,15 +242,16 @@ export default function SportRecommendationsManagement() {
 
   // sportGames 또는 debouncedSearchQuery 변경 시 게임 목록 필터링/정렬 및 매핑 업데이트
   useEffect(() => {
-    if (sportGames.length > 0) {
-      console.log("sportGames updated, running post-processing.");
-      // 매핑 업데이트는 여기서 수행
-      updateSportMappings(sportGames);
-      // 필터링 및 정렬 수행
-      filterAndSortGames(sportGames, debouncedSearchQuery);
-    } else {
-      setFilteredGames([]);
-    }
+    // [임시 비움] 라우팅 문제 진단을 위해 내부 로직 비활성화
+    // if (sportGames.length > 0) {
+    //   console.log("sportGames updated, running post-processing.");
+    //   // 매핑 업데이트는 여기서 수행
+    //   updateSportMappings(sportGames);
+    //   // 필터링 및 정렬 수행
+    //   filterAndSortGames(sportGames, debouncedSearchQuery);
+    // } else {
+    //   setFilteredGames([]);
+    // }
   }, [sportGames, debouncedSearchQuery, updateSportMappings, filterAndSortGames]);
 
   // 추천 추가 모달 열기
