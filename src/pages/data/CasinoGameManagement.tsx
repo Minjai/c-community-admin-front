@@ -97,11 +97,13 @@ const CasinoGameManagement = () => {
           };
         });
 
-        // 정렬 로직은 클라이언트 측에서 유지할지, 서버에 맡길지 결정 필요
-        // 여기서는 createdAt 기준으로 최신순 정렬 유지
-        const sortedGames = [...transformedGames].sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        // 게임 이름을 기준으로 오름차순 정렬 (숫자 포함 자연 정렬) - 이전 상태로 복구
+        const sortedGames = [...transformedGames].sort((a, b) => {
+          const titleA = a.title || "";
+          const titleB = b.title || "";
+          return titleA.localeCompare(titleB, undefined, { numeric: true, sensitivity: "base" });
+        });
+
         setGames(sortedGames);
 
         // 페이지네이션 상태 업데이트

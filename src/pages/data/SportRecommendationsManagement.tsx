@@ -59,6 +59,28 @@ export default function SportRecommendationsManagement() {
   // 한글-영문 매핑 생성
   const [korToEngMapping, setKorToEngMapping] = useState<Record<string, string[]>>({});
 
+  // Helper function to check if a string starts with a number
+  const startsWithNumber = (str: string): boolean => {
+    return /^[0-9]/.test(str.trim());
+  };
+
+  // Custom sort function: Letters first, then numbers, then natural sort within groups
+  const customGameSort = (a: SportGame, b: SportGame): number => {
+    const nameA = a.matchName || "";
+    const nameB = b.matchName || "";
+    const aIsNumeric = startsWithNumber(nameA);
+    const bIsNumeric = startsWithNumber(nameB);
+
+    if (!aIsNumeric && bIsNumeric) {
+      return -1; // Letters come before numbers
+    } else if (aIsNumeric && !bIsNumeric) {
+      return 1; // Numbers come after letters
+    } else {
+      // Both are numbers or both are letters, use natural sort
+      return nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: "base" });
+    }
+  };
+
   // 폼 데이터
   const [formData, setFormData] = useState({
     title: "",
@@ -158,6 +180,13 @@ export default function SportRecommendationsManagement() {
 
     const normalizedQuery = query.toLowerCase().trim();
 
+    // 검색어가 비어있으면 모든 게임을 커스텀 정렬하여 반환
+    if (!normalizedQuery) {
+      const sortedGames = [...games].sort(customGameSort);
+      setFilteredGames(sortedGames);
+      return;
+    }
+
     // 검색어가 비어있으면 모든 게임 반환
     if (!normalizedQuery) {
       setFilteredGames(games);
@@ -197,8 +226,11 @@ export default function SportRecommendationsManagement() {
       return allSearchTerms.some((term) => searchableFields.some((field) => field.includes(term)));
     });
 
-    console.log("Filtered games count:", filtered.length);
-    setFilteredGames(filtered);
+    // 필터링된 결과를 커스텀 정렬
+    const sortedFilteredGames = [...filtered].sort(customGameSort);
+
+    console.log("Filtered games count:", sortedFilteredGames.length);
+    setFilteredGames(sortedFilteredGames);
   };
 
   // 컴포넌트 마운트 시 데이터 로드
@@ -209,15 +241,16 @@ export default function SportRecommendationsManagement() {
 
   // 검색어 변경 시 게임 데이터 필터링
   useEffect(() => {
-    // 이미 데이터가 있는 경우 로컬 필터링만 수행
     if (sportGames.length > 0) {
       if (searchQuery.trim()) {
         filterGamesBySearchTerm(sportGames, searchQuery.trim());
       } else {
-        setFilteredGames(sportGames);
+        // 검색어가 없을 때도 커스텀 정렬하여 설정
+        const sortedGames = [...sportGames].sort(customGameSort);
+        setFilteredGames(sortedGames);
       }
     }
-  }, [searchQuery]);
+  }, [searchQuery, sportGames]);
 
   // 추천 추가 모달 열기
   const handleAddRecommendation = () => {
