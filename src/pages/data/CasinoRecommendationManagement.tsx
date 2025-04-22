@@ -749,8 +749,8 @@ const CasinoRecommendationManagement = () => {
         <Modal
           isOpen={showModal}
           onClose={handleCloseModal}
-          title={isEditing ? "추천 수정" : "새 추천 추가"}
-          size="xl"
+          title={isEditing ? "게임 추천 수정" : "새 게임 추천 추가"}
+          size="3xl"
         >
           {/* Modal Error Alert (below title, above controls) */}
           {error && (
