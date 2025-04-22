@@ -32,7 +32,9 @@ function createPreview(htmlContent: string, maxLength: number = 50): string {
 }
 
 function FooterManagementPage() {
-  const [footers, setFooters] = useState<Footer[]>([]);
+  // allFooters 상태 제거
+  // const [allFooters, setAllFooters] = useState<Footer[]>([]); // 제거
+  const [footers, setFooters] = useState<Footer[]>([]); // 현재 페이지 데이터 유지
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [alertMessage, setAlertMessage] = useState<{
@@ -44,21 +46,22 @@ function FooterManagementPage() {
   const [footerToEdit, setFooterToEdit] = useState<Footer | null>(null);
   const [saving, setSaving] = useState<boolean>(false);
 
-  // 페이지네이션 상태 추가
+  // 페이지네이션 상태 유지
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(0); // 초기값 0
+  const [totalPages, setTotalPages] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [totalItems, setTotalItems] = useState<number>(0);
 
+  // fetchFooters (서버 측 페이지네이션으로 복원)
   const fetchFooters = useCallback(async (page: number = 1, limit: number = 10) => {
     setLoading(true);
     setError(null);
     try {
-      // 페이지네이션 파라미터와 함께 API 호출 (엔드포인트 /admin/footer 가정)
-      const response = await axios.get(`/admin/footer?page=${page}&limit=${limit}`);
+      // API 엔드포인트에 페이지네이션 파라미터 추가
+      const response = await axios.get(`/footer/all?page=${page}&limit=${limit}`);
       console.log("푸터 응답:", response.data);
 
-      // API 응답 구조 { data: [], pagination: {} } 처리
+      // API 응답 구조 { data: [], pagination: {} } 처리 복원
       if (response.data && response.data.data && response.data.pagination) {
         const fetchedFooters = response.data.data || [];
         const pagination = response.data.pagination;
@@ -68,14 +71,14 @@ function FooterManagementPage() {
         setTotalPages(pagination.totalPages || 0);
         setCurrentPage(pagination.currentPage || page);
         setPageSize(pagination.pageSize || limit);
-        setSelectedIds(new Set());
+        setSelectedIds(new Set()); // 페이지 변경 시 선택 초기화
       } else {
         console.error("푸터 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
         setFooters([]);
         setTotalItems(0);
         setTotalPages(0);
         setCurrentPage(1);
-        setError("푸터 데이터 형식이 올바르지 않습니다.");
+        setSelectedIds(new Set());
       }
     } catch (err) {
       console.error("Error fetching footers:", err);
@@ -88,18 +91,22 @@ function FooterManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, []); // 의존성 배열 비움 (페이지 변경 시 fetch는 handlePageChange에서)
 
+  // useEffect 수정: currentPage, pageSize 변경 시 fetchFooters 호출
   useEffect(() => {
     fetchFooters(currentPage, pageSize);
-  }, [fetchFooters, currentPage, pageSize]);
+  }, [currentPage, pageSize]); // fetchFooters는 useCallback으로 감싸져 있으므로 넣지 않음
 
+  // 페이지 변경 핸들러 수정: fetchFooters 호출
   const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages && page !== currentPage) {
-      setCurrentPage(page);
+    if (page >= 1 && page !== currentPage) {
+      // totalPages 검사 제거 (API가 처리)
+      setCurrentPage(page); // 상태 변경 -> useEffect 트리거
     }
   };
 
+  // isAllSelectedOnPage 계산 (동일)
   const isAllSelectedOnPage =
     footers.length > 0 &&
     selectedIds.size === footers.length &&
@@ -136,6 +143,7 @@ function FooterManagementPage() {
     setShowFormModal(true);
   }
 
+  // handleDeleteClick 수정 (페이지 조정 및 fetchFooters 호출)
   async function handleDeleteClick(id: number) {
     const footerToDelete = footers.find((f) => f.id === id);
     if (
@@ -148,7 +156,7 @@ function FooterManagementPage() {
     setSaving(true);
     setAlertMessage(null);
     try {
-      await axios.delete(`/admin/footer/${id}`);
+      await axios.delete(`/footer/${id}`);
       setAlertMessage({ type: "success", message: "푸터 항목이 삭제되었습니다." });
       setSelectedIds((prev) => {
         const newSelected = new Set(prev);
@@ -156,11 +164,14 @@ function FooterManagementPage() {
         return newSelected;
       });
 
+      // 페이지 조정 로직 (서버 측 기준)
       const newTotalItems = totalItems - 1;
       const newTotalPages = Math.ceil(newTotalItems / pageSize);
       if (footers.length === 1 && currentPage > 1 && currentPage > newTotalPages) {
-        setCurrentPage(currentPage - 1);
+        // 마지막 항목 삭제 후 이전 페이지로 이동
+        setCurrentPage(currentPage - 1); // 상태 변경 -> useEffect 트리거
       } else {
+        // 현재 페이지 또는 최대 페이지로 새로고침
         fetchFooters(Math.min(currentPage, newTotalPages || 1), pageSize);
       }
     } catch (err) {
@@ -171,6 +182,7 @@ function FooterManagementPage() {
     }
   }
 
+  // handleDeleteSelectedClick 수정 (페이지 조정 및 fetchFooters 호출)
   async function handleDeleteSelectedClick() {
     if (
       selectedIds.size === 0 ||
@@ -186,13 +198,14 @@ function FooterManagementPage() {
     const idsToDelete = Array.from(selectedIds);
 
     try {
-      await axios.delete(`/admin/footer`, { data: { ids: idsToDelete } });
+      await axios.delete(`/footer`, { data: { ids: idsToDelete } });
       setAlertMessage({
         type: "success",
         message: `${idsToDelete.length}개의 푸터 항목이 삭제되었습니다.`,
       });
       setSelectedIds(new Set());
 
+      // 페이지 조정 로직 (서버 측 기준)
       const deletedCount = idsToDelete.length;
       const remainingItemsOnPage =
         footers.length - footers.filter((f) => idsToDelete.includes(f.id)).length;
@@ -200,8 +213,10 @@ function FooterManagementPage() {
       const newTotalPages = Math.ceil(newTotalItems / pageSize);
 
       if (remainingItemsOnPage <= 0 && currentPage > 1 && currentPage > newTotalPages) {
+        // 현재 페이지 모든 항목 삭제 후 이전 페이지로
         setCurrentPage(currentPage - 1);
       } else {
+        // 현재 페이지 또는 최대 페이지로 새로고침
         fetchFooters(Math.min(currentPage, newTotalPages || 1), pageSize);
       }
     } catch (err) {
@@ -347,8 +362,9 @@ function FooterManagementPage() {
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,
-            totalItems: totalItems,
+            totalItems: totalItems, // 서버에서 받은 totalItems
             onPageChange: handlePageChange,
+            // totalPages는 DataTable 내부에서 계산하므로 전달 X (선택적)
           }}
         />
       </div>
@@ -360,7 +376,7 @@ function FooterManagementPage() {
           footerToEdit={footerToEdit}
           onSuccess={() => {
             setShowFormModal(false);
-            fetchFooters(currentPage, pageSize);
+            fetchFooters(currentPage, pageSize); // 현재 페이지 새로고침
             setAlertMessage({
               type: "success",
               message: footerToEdit ? "푸터가 수정되었습니다." : "푸터가 추가되었습니다.",
