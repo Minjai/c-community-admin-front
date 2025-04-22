@@ -39,14 +39,21 @@ const UserRankManagement: React.FC = () => {
   // 선택된 등급 ID 상태 추가
   const [selectedRankIds, setSelectedRankIds] = useState<number[]>([]);
 
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(0); // 초기값 0
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [totalItems, setTotalItems] = useState<number>(0);
+
   // 파일 상태 관리
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   // 등급 목록 조회
-  const fetchRanks = async () => {
+  const fetchRanks = async (page: number = 1, limit: number = 10) => {
+    // page, limit 파라미터 추가
     setLoading(true);
     setError(null);
-    const currentSelected = [...selectedRankIds];
+    // const currentSelected = [...selectedRankIds]; // 페이지 변경 시 선택 초기화
 
     try {
       const response = await axios.get("/admin/ranks");
@@ -74,30 +81,53 @@ const UserRankManagement: React.FC = () => {
           (a, b) => (b.position || 0) - (a.position || 0)
         );
 
-        setRanks(sortedRanks);
-        // 선택 상태 복원
-        setSelectedRankIds(
-          currentSelected.filter((id) => sortedRanks.some((rank) => rank.id === id))
-        );
+        // 클라이언트 측 페이지네이션 처리
+        const total = sortedRanks.length;
+        const pages = Math.ceil(total / limit);
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedData = sortedRanks.slice(startIndex, endIndex);
+
+        setRanks(paginatedData);
+        setTotalItems(total);
+        setTotalPages(pages);
+        setCurrentPage(page);
+        setPageSize(limit);
+        setSelectedRankIds([]); // 페이지 변경 시 선택 초기화
       } else {
         console.log("적절한 등급 데이터를 찾지 못했습니다.");
         setRanks([]);
         setSelectedRankIds([]);
         setError("회원 등급을 불러오는데 실패했습니다.");
+        setTotalItems(0);
+        setTotalPages(0);
+        setCurrentPage(1);
+        setPageSize(limit);
       }
     } catch (err) {
       console.error("Error fetching user ranks:", err);
       setRanks([]);
       setSelectedRankIds([]);
       setError("회원 등급을 불러오는데 실패했습니다.");
+      setTotalItems(0);
+      setTotalPages(0);
+      setCurrentPage(1);
+      setPageSize(limit);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchRanks();
+    fetchRanks(); // 첫 페이지 로드
   }, []);
+
+  // 페이지 변경 핸들러 추가
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchRanks(page, pageSize);
+    }
+  };
 
   // 등급 추가 모달 열기
   const handleAddRank = () => {
@@ -528,12 +558,20 @@ const UserRankManagement: React.FC = () => {
 
       <LoadingOverlay isLoading={loading || saving || moving} />
 
-      <DataTable
-        columns={columns}
-        data={ranks}
-        loading={false}
-        emptyMessage="등록된 등급이 없습니다."
-      />
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={ranks}
+          loading={loading}
+          emptyMessage="등록된 회원 등급이 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
+        />
+      </div>
 
       {/* 등급 추가/수정 모달 */}
       <Modal

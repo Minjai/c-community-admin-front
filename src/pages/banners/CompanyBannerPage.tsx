@@ -33,7 +33,7 @@ const CompanyBannerPage: React.FC = () => {
 
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
   const [totalItems, setTotalItems] = useState<number>(0);
 
@@ -634,6 +634,12 @@ const CompanyBannerPage: React.FC = () => {
           data={banners}
           loading={loading}
           emptyMessage="등록된 배너가 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
         />
       </div>
 

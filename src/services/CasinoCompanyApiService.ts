@@ -201,6 +201,32 @@ const CasinoCompanyApiService = {
     }
   },
 
+  // --- NEW: Update Display Order Only ---
+  updateDisplayOrder: async (id: number, displayOrder: number): Promise<void> => {
+    try {
+      console.log(
+        `Attempting to PATCH /companies/${id}/display-order with displayOrder: ${displayOrder}`
+      );
+      const response = await axios.patch(`/companies/${id}/display-order`, {
+        displayOrder: displayOrder, // Send only displayOrder in JSON body
+      });
+
+      if (response.data && !response.data.success) {
+        // Handle server-side errors indicated in the response body
+        throw new Error(
+          response.data.message || "카지노 업체 순서 변경(displayOrder)에 실패했습니다."
+        );
+      }
+      console.log(`Successfully PATCHed displayOrder for company ${id}`);
+      // No specific data expected on success for PATCH in this case, return void
+    } catch (error) {
+      console.error(`카지노 업체 순서 변경 오류 (ID: ${id}, Order: ${displayOrder}):`, error);
+      // Re-throw the error to be caught by the calling function (handleMoveUp/Down)
+      throw error;
+    }
+  },
+  // --- END: Update Display Order Only ---
+
   // 카지노 업체 삭제
   deleteCasinoCompany: async (id: number): Promise<void> => {
     try {

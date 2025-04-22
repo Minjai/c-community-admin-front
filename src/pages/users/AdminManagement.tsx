@@ -471,18 +471,20 @@ const AdminManagement: React.FC = () => {
 
       <LoadingOverlay isLoading={loading || saving} />
 
-      <DataTable
-        columns={columns}
-        data={admins}
-        loading={false}
-        emptyMessage="등록된 관리자가 없습니다."
-        pagination={{
-          currentPage,
-          pageSize: 10,
-          totalItems: admins.length,
-          onPageChange: handlePageChange,
-        }}
-      />
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={admins}
+          loading={loading}
+          emptyMessage="등록된 관리자가 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: 10,
+            totalItems: totalPages * 10,
+            onPageChange: handlePageChange,
+          }}
+        />
+      </div>
 
       {/* 관리자 추가/수정 모달 */}
       <Modal

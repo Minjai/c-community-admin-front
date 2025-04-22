@@ -442,31 +442,34 @@ const CasinoCompanyPage: React.FC = () => {
 
   // 업체 순서 변경 (위로 이동)
   const handleMoveUp = async (company: CasinoCompany, index: number) => {
-    if (index <= 0) return; // 이미 첫 번째 항목인 경우
+    if (index <= 0 || isMoving) return;
 
+    const prevCompany = companies[index - 1];
+    if (!prevCompany) return;
+
+    const currentDisplayOrder = company.displayOrder;
+    const prevDisplayOrder = prevCompany.displayOrder;
+
+    if (currentDisplayOrder === prevDisplayOrder) {
+      console.warn("Attempted to move up, but display orders are the same.");
+      // fetchCompanies(); // No need to fetch if nothing changed
+      return;
+    }
+
+    setIsMoving(true);
     try {
-      setIsMoving(true);
-      // 현재 업체와 이전 업체의 displayOrder 값을 서로 교환
-      const prevCompany = companies[index - 1];
-      const currentDisplayOrder = company.displayOrder;
-      const prevDisplayOrder = prevCompany.displayOrder;
+      // Call the API to update displayOrder for both companies
+      await CasinoCompanyApiService.updateDisplayOrder(company.id, prevDisplayOrder);
+      await CasinoCompanyApiService.updateDisplayOrder(prevCompany.id, currentDisplayOrder);
 
-      await CasinoCompanyApiService.updateCasinoCompany(
-        company.id,
-        { ...company, displayOrder: prevDisplayOrder },
-        undefined
-      );
-
-      await CasinoCompanyApiService.updateCasinoCompany(
-        prevCompany.id,
-        { ...prevCompany, displayOrder: currentDisplayOrder },
-        undefined
-      );
-
-      fetchCompanies();
+      // Fetch data again to get the correct order from the server
+      await fetchCompanies(currentPage, pageSize); // Refetch current page
+      setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
     } catch (error) {
       console.error("Error moving company up:", error);
       setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+      // Fetch data even on error to try and sync state
+      fetchCompanies(currentPage, pageSize);
     } finally {
       setIsMoving(false);
     }
@@ -474,31 +477,34 @@ const CasinoCompanyPage: React.FC = () => {
 
   // 업체 순서 변경 (아래로 이동)
   const handleMoveDown = async (company: CasinoCompany, index: number) => {
-    if (index >= companies.length - 1) return; // 이미 마지막 항목인 경우
+    if (index >= companies.length - 1 || isMoving) return;
 
+    const nextCompany = companies[index + 1];
+    if (!nextCompany) return;
+
+    const currentDisplayOrder = company.displayOrder;
+    const nextDisplayOrder = nextCompany.displayOrder;
+
+    if (currentDisplayOrder === nextDisplayOrder) {
+      console.warn("Attempted to move down, but display orders are the same.");
+      // fetchCompanies(); // No need to fetch if nothing changed
+      return;
+    }
+
+    setIsMoving(true);
     try {
-      setIsMoving(true);
-      // 현재 업체와 다음 업체의 displayOrder 값을 서로 교환
-      const nextCompany = companies[index + 1];
-      const currentDisplayOrder = company.displayOrder;
-      const nextDisplayOrder = nextCompany.displayOrder;
+      // Call the API to update displayOrder for both companies
+      await CasinoCompanyApiService.updateDisplayOrder(company.id, nextDisplayOrder);
+      await CasinoCompanyApiService.updateDisplayOrder(nextCompany.id, currentDisplayOrder);
 
-      await CasinoCompanyApiService.updateCasinoCompany(
-        company.id,
-        { ...company, displayOrder: nextDisplayOrder },
-        undefined
-      );
-
-      await CasinoCompanyApiService.updateCasinoCompany(
-        nextCompany.id,
-        { ...nextCompany, displayOrder: currentDisplayOrder },
-        undefined
-      );
-
-      fetchCompanies();
+      // Fetch data again to get the correct order from the server
+      await fetchCompanies(currentPage, pageSize); // Refetch current page
+      setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
     } catch (error) {
       console.error("Error moving company down:", error);
       setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+      // Fetch data even on error to try and sync state
+      fetchCompanies(currentPage, pageSize);
     } finally {
       setIsMoving(false);
     }

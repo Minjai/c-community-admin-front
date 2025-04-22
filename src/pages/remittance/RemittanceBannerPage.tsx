@@ -26,6 +26,12 @@ const RemittanceBannerPage: React.FC = () => {
   const [moving, setMoving] = useState<boolean>(false);
   const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
 
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(0); // 초기값 0
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [totalItems, setTotalItems] = useState<number>(0);
+
   // 날짜 포맷 변환 함수
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "";
@@ -44,25 +50,38 @@ const RemittanceBannerPage: React.FC = () => {
   };
 
   // 배너 목록 조회
-  const fetchBanners = async () => {
+  const fetchBanners = async (page: number = 1, limit: number = 10) => {
     setLoading(true);
     setError("");
-    const currentSelected = [...selectedBannerIds];
 
     try {
-      const response = await RemittanceBannerService.getRemittanceBanners();
+      const allBanners = await RemittanceBannerService.getRemittanceBanners();
       // 배너를 displayOrder 기준으로 오름차순 정렬 (낮은 값이 위로)
-      const sortedBanners = [...response].sort(
+      const sortedBanners = [...allBanners].sort(
         (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
       );
-      setBanners(sortedBanners);
-      setSelectedBannerIds(
-        currentSelected.filter((id) => sortedBanners.some((banner) => banner.id === id))
-      );
+
+      // 클라이언트 측 페이지네이션 처리
+      const total = sortedBanners.length;
+      const pages = Math.ceil(total / limit);
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedData = sortedBanners.slice(startIndex, endIndex);
+
+      setBanners(paginatedData);
+      setTotalItems(total);
+      setTotalPages(pages);
+      setCurrentPage(page);
+      setPageSize(limit);
+      setSelectedBannerIds([]);
     } catch (err) {
       setError("송금 배너를 불러오는데 실패했습니다.");
       setBanners([]);
       setSelectedBannerIds([]);
+      setTotalItems(0);
+      setTotalPages(0);
+      setCurrentPage(1);
+      setPageSize(limit);
     } finally {
       setLoading(false);
     }
@@ -71,6 +90,13 @@ const RemittanceBannerPage: React.FC = () => {
   useEffect(() => {
     fetchBanners();
   }, []);
+
+  // 페이지 변경 핸들러 추가
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchBanners(page, pageSize);
+    }
+  };
 
   // 배너 추가 모달 열기
   const handleAddBanner = () => {
@@ -508,12 +534,20 @@ const RemittanceBannerPage: React.FC = () => {
 
       <LoadingOverlay isLoading={loading || saving || moving} />
 
-      <DataTable
-        columns={columns}
-        data={banners}
-        loading={false}
-        emptyMessage="등록된 송금 배너가 없습니다."
-      />
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={banners}
+          loading={loading}
+          emptyMessage="등록된 송금 배너가 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
+        />
+      </div>
 
       <Modal
         isOpen={showModal}

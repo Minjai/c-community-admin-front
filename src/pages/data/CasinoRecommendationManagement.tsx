@@ -83,19 +83,31 @@ const CasinoRecommendationManagement = () => {
   // 선택된 추천 ID 상태 추가
   const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<number[]>([]);
 
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(0); // 초기값 0으로 설정
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [totalItems, setTotalItems] = useState<number>(0);
+
   // 공개 설정 상태 관리
   useEffect(() => {
     setIsPublic(publicSettings === "public" ? 1 : 0);
   }, [publicSettings]);
 
-  // 게임 추천 목록 조회
-  const fetchRecommendations = async () => {
+  // 게임 추천 목록 조회 (페이지네이션 적용)
+  const fetchRecommendations = useCallback(async (page: number = 1, limit: number = 10) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get("/casino-recommends");
-      const recommendationData = extractDataArray(response.data, true);
-      if (recommendationData && recommendationData.length > 0) {
+      // 페이지네이션 파라미터 추가
+      const response = await axios.get("/casino-recommends", {
+        params: { page, limit },
+      });
+
+      // API 응답 구조 확인 및 처리 (data가 배열이고 pagination 객체가 있다고 가정)
+      if (response.data && response.data.success && Array.isArray(response.data.data)) {
+        const recommendationData = response.data.data;
+
         // 서버 응답을 컴포넌트에서 사용하는 형식으로 변환
         const transformedRecommendations = recommendationData.map((item: any) => {
           // 각 게임의 제목 추출 - 서로 다른 구조 처리
@@ -150,16 +162,40 @@ const CasinoRecommendationManagement = () => {
         );
 
         setRecommendations(sortedRecommendations);
+
+        // 페이지네이션 정보 업데이트 (API 응답에 pagination 객체가 있다고 가정)
+        if (response.data.pagination) {
+          setTotalItems(response.data.pagination.totalItems || 0);
+          setTotalPages(response.data.pagination.totalPages || 1);
+          setCurrentPage(response.data.pagination.currentPage || 1);
+          setPageSize(response.data.pagination.pageSize || limit);
+        } else {
+          // 페이지네이션 정보 없을 경우, 현재 데이터 기준으로 처리 (권장하지 않음)
+          setTotalItems(sortedRecommendations.length);
+          setTotalPages(1);
+          setCurrentPage(1);
+          setPageSize(limit);
+        }
       } else {
+        // API 실패 또는 data 형식이 잘못된 경우
         setRecommendations([]);
+        setError(response.data?.message || "게임 추천 목록 형식이 올바르지 않습니다.");
+        setTotalItems(0);
+        setTotalPages(0);
+        setCurrentPage(1);
+        setPageSize(limit);
       }
     } catch (err: any) {
       setError("게임 추천 목록을 불러오는데 실패했습니다.");
       setRecommendations([]);
+      setTotalItems(0);
+      setTotalPages(0);
+      setCurrentPage(1);
+      setPageSize(limit);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   // 가능한 게임 목록 가져오기
   const fetchAvailableGames = async () => {
@@ -191,9 +227,9 @@ const CasinoRecommendationManagement = () => {
   };
 
   useEffect(() => {
-    fetchRecommendations();
+    fetchRecommendations(); // 컴포넌트 마운트 시 첫 페이지 로드
     fetchAvailableGames();
-  }, []);
+  }, []); // 빈 의존성 배열로 변경
 
   // 검색어로 게임 필터링
   useEffect(() => {
@@ -463,6 +499,13 @@ const CasinoRecommendationManagement = () => {
     }
   };
 
+  // 페이지 변경 핸들러 추가
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchRecommendations(page, pageSize);
+    }
+  };
+
   // 테이블 컬럼 정의
   const columns = useMemo(
     () => [
@@ -633,8 +676,13 @@ const CasinoRecommendationManagement = () => {
           columns={columns}
           data={recommendations}
           loading={loading}
-          emptyMessage="등록된 추천 목록이 없습니다."
-          // Add pagination props if needed
+          emptyMessage="등록된 카지노 추천이 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
         />
       </div>
 
@@ -644,7 +692,7 @@ const CasinoRecommendationManagement = () => {
           isOpen={showModal}
           onClose={handleCloseModal}
           title={isEditing ? "추천 수정" : "새 추천 추가"}
-          size="2xl"
+          size="xl"
         >
           {/* Modal Error Alert (below title, above controls) */}
           {error && (

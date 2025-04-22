@@ -609,6 +609,12 @@ const BottomBannerPage: React.FC = () => {
           data={banners}
           loading={loading}
           emptyMessage="등록된 배너가 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
         />
       </div>
 

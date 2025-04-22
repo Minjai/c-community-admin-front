@@ -43,24 +43,59 @@ function FooterManagementPage() {
   const [footerToEdit, setFooterToEdit] = useState<Footer | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
 
-  async function fetchFooters() {
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(0); // 초기값 0
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [totalItems, setTotalItems] = useState<number>(0);
+
+  async function fetchFooters(page: number = 1, limit: number = 10) {
+    // page, limit 파라미터 추가
     setLoading(true);
     setError(null);
     try {
+      // 전체 데이터 요청 (API가 페이지네이션 지원 안 함 가정)
       const response = await axios.get<{ data: Footer[] }>("/footer/all");
-      setFooters(response.data?.data || response.data || []);
+      const allFooters = response.data?.data || response.data || [];
+
+      // 클라이언트 측 페이지네이션 로직 추가
+      const total = allFooters.length;
+      const pages = Math.ceil(total / limit);
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedData = allFooters.slice(startIndex, endIndex);
+
+      setFooters(paginatedData);
+      setTotalItems(total);
+      setTotalPages(pages);
+      setCurrentPage(page);
+      setPageSize(limit);
+      // 페이지 변경 시 선택 상태 초기화 (필요에 따라 조정)
+      setSelectedIds(new Set());
     } catch (err) {
       console.error("Error fetching footers:", err);
       setError("푸터 목록을 불러오는데 실패했습니다.");
       setFooters([]);
+      setTotalItems(0);
+      setTotalPages(0);
+      setCurrentPage(1);
+      setPageSize(limit);
+      setSelectedIds(new Set());
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    fetchFooters();
+    fetchFooters(); // 첫 페이지 로드
   }, []);
+
+  // 페이지 변경 핸들러 추가
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchFooters(page, pageSize);
+    }
+  };
 
   const isAllSelected = footers.length > 0 && selectedIds.size === footers.length;
 
@@ -279,12 +314,21 @@ function FooterManagementPage() {
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
-      <DataTable
-        columns={columns}
-        data={footers}
-        loading={loading || deleting}
-        emptyMessage="등록된 푸터 항목이 없습니다."
-      />
+      {/* Footer Table */}
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={footers}
+          loading={loading} // Pass loading state
+          emptyMessage="등록된 푸터 항목이 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
+        />
+      </div>
 
       <FooterFormModal
         isOpen={showFormModal}

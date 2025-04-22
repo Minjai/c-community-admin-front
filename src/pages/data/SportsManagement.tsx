@@ -81,6 +81,12 @@ export default function SportsManagement() {
   // 선택된 카테고리 ID 상태 추가
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
 
+  // 페이지네이션 상태 추가
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(0); // 초기값 0
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [totalItems, setTotalItems] = useState<number>(0);
+
   // 모달 상태
   const [showModal, setShowModal] = useState(false);
   const [modalType, setModalType] = useState<"add" | "edit">("add");
@@ -130,35 +136,61 @@ export default function SportsManagement() {
     fetchSportCategories();
   }, []);
 
-  const fetchSportCategories = useCallback(async () => {
+  const fetchSportCategories = useCallback(async (page: number = 1, limit: number = 10) => {
     setLoading(true);
     setError(null);
-    const currentSelected = [...selectedCategoryIds]; // Keep track of selected IDs
+    // const currentSelected = [...selectedCategoryIds]; // 페이지 변경 시 선택 초기화되므로 주석 처리
 
     try {
-      const data = await getAllSportCategoriesAdmin();
-      const processedData = data.map((category) => ({
+      // 페이지네이션 없이 전체 데이터 요청
+      const allCategories: SportCategory[] = await getAllSportCategoriesAdmin(); // API가 배열을 반환한다고 가정
+
+      const processedData = allCategories.map((category: SportCategory) => ({
         ...category,
         displayName: category.displayName || getKoreanSportName(category.sportName),
       }));
       const sortedData = processedData.sort(
-        (a, b) => (b.displayOrder || 0) - (a.displayOrder || 0)
+        (a: SportCategory, b: SportCategory) => (a.displayOrder || 0) - (b.displayOrder || 0) // 타입 명시
       );
-      setCategories(sortedData);
-      // Restore selection state after fetch
-      setSelectedCategoryIds(
-        currentSelected.filter((id) => sortedData.some((cat) => cat.id === id))
-      );
+
+      // 클라이언트 측 페이지네이션 처리
+      const total = sortedData.length;
+      const pages = Math.ceil(total / limit);
+      const startIndex = (page - 1) * limit;
+      const endIndex = startIndex + limit;
+      const paginatedData = sortedData.slice(startIndex, endIndex);
+
+      setCategories(paginatedData);
+      setTotalItems(total);
+      setTotalPages(pages);
+      setCurrentPage(page);
+      setPageSize(limit);
+      setSelectedCategoryIds([]); // 페이지 변경 시 선택 상태 초기화
     } catch (err: any) {
       console.error("Error fetching sport categories:", err);
       setError("스포츠 카테고리를 불러오는 중 오류가 발생했습니다.");
       setSuccess(null);
-      setCategories([]); // Clear data on error
-      setSelectedCategoryIds([]); // Clear selection on error
+      setCategories([]);
+      setTotalItems(0);
+      setTotalPages(0);
+      setCurrentPage(1);
+      setPageSize(limit);
+      setSelectedCategoryIds([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedCategoryIds]); // Add selectedCategoryIds as dependency
+  }, []); // pageSize는 변경될 수 있으므로 의존성 배열에서 제거 (또는 필요시 추가)
+
+  useEffect(() => {
+    fetchSportCategories(); // 첫 페이지 로드
+  }, []);
+
+  // 페이지 변경 핸들러 추가
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchSportCategories(page, pageSize);
+    }
+  };
 
   const handleAddCategory = () => {
     setModalType("add");
@@ -598,6 +630,12 @@ export default function SportsManagement() {
           data={categories}
           loading={false} // Disable DataTable's internal loading, using Overlay instead
           emptyMessage="등록된 스포츠 종목이 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
         />
       </div>
 
