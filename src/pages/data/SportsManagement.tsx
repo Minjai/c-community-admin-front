@@ -95,7 +95,6 @@ export default function SportsManagement() {
   const [formData, setFormData] = useState({
     sportName: "",
     displayName: "",
-    icon: "",
     isPublic: 1, // 기본값 공개
   });
 
@@ -199,7 +198,6 @@ export default function SportsManagement() {
     setFormData({
       sportName: "",
       displayName: "",
-      icon: "",
       isPublic: 1,
     });
     setSelectedSport("");
@@ -212,7 +210,6 @@ export default function SportsManagement() {
     setFormData({
       sportName: category.displayName || getKoreanSportName(category.sportName),
       displayName: category.displayName || getKoreanSportName(category.sportName),
-      icon: category.icon || "",
       isPublic: category.isPublic,
     });
     setSelectedSport(getKoreanSportName(category.sportName));
@@ -269,18 +266,21 @@ export default function SportsManagement() {
       return;
     }
 
-    const payload: Omit<SportCategory, "id" | "createdAt" | "updatedAt"> = {
+    // payload 생성 시 icon 제거
+    const payload = {
       sportName: getEnglishSportCode(selectedSport),
       displayName: formData.displayName.trim(),
-      icon: formData.icon,
       isPublic: formData.isPublic,
       displayOrder:
-        modalType === "edit" && currentCategory
+        modalType === "edit" && currentCategory?.displayOrder !== undefined
           ? currentCategory.displayOrder
           : allCategories.length > 0
           ? Math.max(...allCategories.map((c) => c.displayOrder || 0)) + 1
           : 0,
     };
+
+    // finalPayload 타입 정의에서 icon 관련 내용 제거됨 (Omit에 icon 추가 불필요)
+    const finalPayload: Omit<SportCategory, "id" | "createdAt" | "updatedAt" | "icon"> = payload;
 
     setLoading(true);
     setError(null);
@@ -288,12 +288,17 @@ export default function SportsManagement() {
 
     try {
       if (modalType === "edit" && currentCategory) {
-        await updateSportCategory(currentCategory.id, payload);
-        setSuccess("스포츠 카테고리가 업데이트되었습니다.");
+        // update 시 payload 타입에 icon 없으므로 Omit 불필요
+        await updateSportCategory(currentCategory.id, finalPayload);
       } else {
-        await createSportCategory(payload);
-        setSuccess("스포츠 카테고리가 추가되었습니다.");
+        // create 시에도 payload 타입에 icon 없음
+        await createSportCategory(finalPayload as SportCategory);
       }
+      setSuccess(
+        modalType === "edit"
+          ? "스포츠 카테고리가 업데이트되었습니다."
+          : "스포츠 카테고리가 추가되었습니다."
+      );
       setShowModal(false);
       fetchSportCategories();
     } catch (err) {
@@ -320,7 +325,6 @@ export default function SportsManagement() {
 
   const handleSportSelect = (sport: string) => {
     setSelectedSport(sport);
-    setFormData((prev) => ({ ...prev, displayName: sport }));
   };
 
   const handleMoveUp = async (index: number) => {
@@ -510,14 +514,38 @@ export default function SportsManagement() {
         ),
         className: "w-px px-4",
       },
-      { header: "종목명", accessor: "displayName" as keyof SportCategory },
+      {
+        header: "표시 이름",
+        accessor: "displayName" as keyof SportCategory,
+        cell: (displayName: string, row: SportCategory) => (
+          <button
+            type="button"
+            className="text-blue-600 hover:text-blue-800 hover:underline focus:outline-none"
+            onClick={() => handleEditCategory(row)}
+          >
+            {displayName}
+          </button>
+        ),
+      },
+      {
+        header: "종목 명",
+        accessor: "sportName" as keyof SportCategory,
+        cell: (sportName: string) => getKoreanSportName(sportName),
+      },
       {
         header: "공개 여부",
         accessor: "isPublic" as keyof SportCategory,
-        cell: (isPublic: number) => (isPublic === 1 ? "공개" : "비공개"),
+        cell: (isPublic: number) => (
+          <span
+            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+              isPublic === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            }`}
+          >
+            {isPublic === 1 ? "공개" : "비공개"}
+          </span>
+        ),
         className: "text-center",
       },
-      { header: "아이콘 URL", accessor: "icon" as keyof SportCategory },
       {
         header: "생성일",
         accessor: "createdAt" as keyof SportCategory,
@@ -613,36 +641,42 @@ export default function SportsManagement() {
         onClose={() => setShowModal(false)}
         title={modalType === "add" ? "새 카테고리 추가" : "카테고리 수정"}
       >
-        <div className="space-y-4">
-          {/* 종목 경기 선택 */}
-          <div>
-            <label htmlFor="sportSelect" className="block text-sm font-medium text-gray-700">
-              종목 경기
-            </label>
-            <select
-              id="sportSelect"
-              name="sportSelect"
-              value={selectedSport}
-              onChange={(e) => handleSportSelect(e.target.value)}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-              required
-              disabled={modalType === "edit"}
-            >
-              <option value="" disabled>
-                종목을 선택하세요
-              </option>
-              {sportOptions.map((sport) => (
-                <option key={sport} value={sport}>
-                  {sport}
-                </option>
-              ))}
-            </select>
+        <div>
+          {/* 1. 최상단 라인: 버튼(좌) + 공개여부 체크박스(우) */}
+          <div className="flex justify-between items-center border-b pb-4 mb-4">
+            {/* 왼쪽: 저장/취소 버튼 */}
+            <div className="flex space-x-2">
+              <Button onClick={handleSaveCategory} disabled={loading}>
+                {loading ? "저장 중..." : "저장"}
+              </Button>
+              <Button variant="secondary" onClick={() => setShowModal(false)} disabled={loading}>
+                취소
+              </Button>
+            </div>
+            {/* 오른쪽: 공개 여부 체크박스 */}
+            <div className="flex items-center">
+              <input
+                id="isPublicCheckbox"
+                type="checkbox"
+                name="isPublic"
+                checked={formData.isPublic === 1}
+                onChange={handleChange}
+                className="form-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                disabled={loading}
+              />
+              <label
+                htmlFor="isPublicCheckbox"
+                className="ml-2 block text-sm font-medium text-gray-700"
+              >
+                공개
+              </label>
+            </div>
           </div>
 
-          {/* 노출 명칭 */}
-          <div>
+          {/* 2. 표시 이름 (기존 필드 순서 유지) */}
+          <div className="mt-4">
             <label htmlFor="displayName" className="block text-sm font-medium text-gray-700">
-              노출 명칭
+              표시 이름
             </label>
             <input
               type="text"
@@ -655,47 +689,30 @@ export default function SportsManagement() {
             />
           </div>
 
-          {/* 아이콘 URL */}
-          <div>
-            <label htmlFor="icon" className="block text-sm font-medium text-gray-700">
-              아이콘 URL (선택 사항)
-            </label>
-            <input
-              type="text"
-              name="icon"
-              id="icon"
-              value={formData.icon}
-              onChange={handleChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            />
+          {/* 3. 종목 경기 선택 (기존 필드 순서 유지) */}
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-gray-700 mb-1">종목 경기</label>
+            <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-60 overflow-y-auto p-2 border rounded-md">
+              {sportOptions.map((sport) => (
+                <label key={sport} className="inline-flex items-center">
+                  <input
+                    type="checkbox"
+                    value={sport}
+                    checked={selectedSport === sport}
+                    onChange={(e) => handleSportSelect(e.target.value)}
+                    className="form-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    disabled={loading}
+                  />
+                  <span className="ml-2 text-sm text-gray-700">{sport}</span>
+                </label>
+              ))}
+            </div>
+            {/* 에러 메시지 */}
+            {!selectedSport && modalType === "add" && (
+              <p className="mt-1 text-xs text-red-600">종목을 선택해주세요.</p>
+            )}
           </div>
 
-          {/* 공개 여부 */}
-          <div>
-            <label htmlFor="isPublic" className="block text-sm font-medium text-gray-700">
-              공개 여부
-            </label>
-            <select
-              id="isPublic"
-              name="isPublic"
-              value={formData.isPublic}
-              onChange={handleChange}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-            >
-              <option value={1}>공개</option>
-              <option value={0}>비공개</option>
-            </select>
-          </div>
-
-          {/* 저장/취소 버튼 */}
-          <div className="flex justify-end space-x-2 pt-4">
-            <Button variant="secondary" onClick={() => setShowModal(false)} disabled={loading}>
-              취소
-            </Button>
-            <Button onClick={handleSaveCategory} disabled={loading}>
-              {loading ? "저장 중..." : "저장"}
-            </Button>
-          </div>
           {/* 모달 내 에러 메시지 */}
           {error && (
             <Alert type="error" message={error} onClose={() => setError(null)} className="mt-4" />
