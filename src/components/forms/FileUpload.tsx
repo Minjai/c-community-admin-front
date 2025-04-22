@@ -28,7 +28,7 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
       required = false,
       disabled = false,
       className = "",
-      accept = "image/png, image/jpeg, image/gif, image/webp",
+      accept = ".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp",
       preview = true,
       value,
     },
@@ -47,6 +47,35 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFile = e.target.files?.[0] || null;
+
+      if (selectedFile && accept) {
+        const acceptedTypes = accept.split(",").map((type) => type.trim().toLowerCase());
+        const fileType = selectedFile.type.toLowerCase();
+        const fileName = selectedFile.name.toLowerCase();
+        const fileExtension = "." + fileName.split(".").pop();
+
+        const isAccepted = acceptedTypes.some((type) => {
+          if (type.startsWith(".")) {
+            return fileName.endsWith(type);
+          } else if (type.includes("/*")) {
+            return fileType.startsWith(type.replace("/*", ""));
+          } else {
+            return fileType === type;
+          }
+        });
+
+        if (!isAccepted) {
+          alert(`지원하지 않는 파일 형식입니다. (${accept} 형식만 지원)`);
+          setFile(null);
+          setPreviewUrl(value || null);
+          onChange(null);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
+          return;
+        }
+      }
+
       setFile(selectedFile);
       onChange(selectedFile);
 
@@ -56,8 +85,10 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
           setPreviewUrl(reader.result as string);
         };
         reader.readAsDataURL(selectedFile);
-      } else {
+      } else if (!value) {
         setPreviewUrl(null);
+      } else {
+        setPreviewUrl(value);
       }
     };
 

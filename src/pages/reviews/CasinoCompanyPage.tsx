@@ -30,9 +30,6 @@ const CasinoCompanyPage: React.FC = () => {
     message: string;
   } | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [dragActive, setDragActive] = useState<boolean>(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isMoving, setIsMoving] = useState<boolean>(false);
 
@@ -159,47 +156,26 @@ const CasinoCompanyPage: React.FC = () => {
     }
   };
 
-  // 이미지 파일 처리 함수
-  const handleFile = (file: File) => {
-    setImageFile(file);
-    // 이미지 미리보기 URL 생성
-    const fileUrl = URL.createObjectURL(file);
-    setPreviewUrl(fileUrl);
-  };
+  // 파일 처리 함수 (FileUpload의 onChange 콜백으로 사용)
+  // 파일 객체만 상태에 저장하고, 미리보기 관리는 FileUpload에 위임
+  const handleFileChange = (file: File | null) => {
+    if (file) {
+      // 파일 형식 검증 로직 (FileUpload 내부에서도 수행되지만, 추가 검증 필요 시 여기에 구현)
+      const acceptedTypes = ["image/png", "image/jpeg", "image/gif", "image/webp"];
+      const acceptedExtensions = [".png", ".jpg", ".jpeg", ".gif", ".webp"];
+      const fileExtension = "." + file.name.split(".").pop()?.toLowerCase();
 
-  // 파일 선택 처리
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFile(e.target.files[0]);
+      if (!acceptedTypes.includes(file.type) || !acceptedExtensions.includes(fileExtension)) {
+        // FileUpload 내부에서 alert가 이미 발생하므로 여기서는 중복 제거 가능
+        // alert(...);
+        setImageFile(null);
+        return; // 검증 실패 시 파일 상태 업데이트 안 함
+      }
+      setImageFile(file);
+    } else {
+      // 파일 선택 취소 시
+      setImageFile(null);
     }
-  };
-
-  // 드래그 이벤트 처리
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  // 드롭 이벤트 처리
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  // 버튼 클릭 시 파일 선택 열기
-  const handleButtonClick = () => {
-    fileInputRef.current?.click();
   };
 
   // 업체 추가 모달 열기
@@ -219,8 +195,7 @@ const CasinoCompanyPage: React.FC = () => {
     setImageFile(null);
     setShowModal(true);
     setIsEditing(false);
-    setPreviewUrl(null);
-    setSelectedCompanyIds([]); // Clear selection when adding
+    setSelectedCompanyIds([]);
   };
 
   // 업체 수정 모달 열기
@@ -235,14 +210,8 @@ const CasinoCompanyPage: React.FC = () => {
     setCurrentCompany(processedCompany);
     setIsEditing(true);
     setShowModal(true);
-    setSelectedCompanyIds([]); // Clear selection when editing
-
-    // 이미지 URL이 있으면 미리보기 설정
-    if (company.imageUrl) {
-      setPreviewUrl(company.imageUrl);
-    } else {
-      setPreviewUrl(null);
-    }
+    setSelectedCompanyIds([]);
+    setImageFile(null); // Reset image file on edit modal open
   };
 
   // 업체 저장 전 URL 처리 함수
@@ -778,67 +747,13 @@ const CasinoCompanyPage: React.FC = () => {
               required
             />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">업체 이미지</label>
-              <div
-                className={`mt-1 border-2 border-dashed rounded-md h-64 flex flex-col items-center justify-center cursor-pointer relative ${
-                  dragActive ? "border-indigo-500 bg-indigo-50" : "border-gray-300"
-                }`}
-                onDragEnter={handleDrag}
-                onDragOver={handleDrag}
-                onDragLeave={handleDrag}
-                onDrop={handleDrop}
-                onClick={handleButtonClick}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileChange}
-                />
-
-                {previewUrl || (isEditing && currentCompany.imageUrl) ? (
-                  <div className="w-full h-full relative">
-                    <img
-                      src={previewUrl || currentCompany.imageUrl}
-                      alt="업체 이미지 미리보기"
-                      className="object-contain w-full h-full p-2"
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black bg-opacity-50">
-                      <span className="text-white text-sm">클릭하여 이미지 변경</span>
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <svg
-                      className="mx-auto h-12 w-12 text-gray-400"
-                      stroke="currentColor"
-                      fill="none"
-                      viewBox="0 0 48 48"
-                      aria-hidden="true"
-                    >
-                      <path
-                        d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    <div className="text-center mt-4">
-                      <p className="text-sm text-gray-600">이미지를 드래그하여 업로드하거나</p>
-                      <p className="text-sm text-gray-500">클릭하여 선택하세요</p>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">PNG, JPG, GIF 형식 지원</p>
-                  </>
-                )}
-              </div>
-              {isEditing && !previewUrl && currentCompany.imageUrl && (
-                <p className="mt-1 text-xs text-gray-500">
-                  이미지를 변경하지 않으면 기존 이미지가 유지됩니다.
-                </p>
-              )}
-            </div>
+            <FileUpload
+              label="업체 이미지"
+              onChange={handleFileChange}
+              value={currentCompany?.imageUrl || undefined}
+              accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp"
+              required={!isEditing}
+            />
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">업체소개</label>
