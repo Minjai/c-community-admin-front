@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import {
   getAllSportCategoriesAdmin,
   createSportCategory,
@@ -73,6 +73,7 @@ const getKoreanSportName = (englishCode: string): string => {
 };
 
 export default function SportsManagement() {
+  const [allCategories, setAllCategories] = useState<SportCategory[]>([]);
   const [categories, setCategories] = useState<SportCategory[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,19 +134,20 @@ export default function SportsManagement() {
   const [selectedSport, setSelectedSport] = useState<string>("");
 
   useEffect(() => {
-    fetchSportCategories();
+    // 이 useEffect는 삭제하고 아래 fetchSportCategories 호출을 포함한 useEffect 하나로 통합합니다.
+    // fetchSportCategories();
   }, []);
 
-  const fetchSportCategories = useCallback(async (page: number = 1, limit: number = 10) => {
+  const fetchSportCategories = useCallback(async () => {
     setLoading(true);
     setError(null);
     // const currentSelected = [...selectedCategoryIds]; // 페이지 변경 시 선택 초기화되므로 주석 처리
 
     try {
       // 페이지네이션 없이 전체 데이터 요청
-      const allCategories: SportCategory[] = await getAllSportCategoriesAdmin(); // API가 배열을 반환한다고 가정
+      const fetchedAllCategories: SportCategory[] = await getAllSportCategoriesAdmin(); // API가 배열을 반환한다고 가정
 
-      const processedData = allCategories.map((category: SportCategory) => ({
+      const processedData = fetchedAllCategories.map((category: SportCategory) => ({
         ...category,
         displayName: category.displayName || getKoreanSportName(category.sportName),
       }));
@@ -153,42 +155,42 @@ export default function SportsManagement() {
         (a: SportCategory, b: SportCategory) => (a.displayOrder || 0) - (b.displayOrder || 0) // 타입 명시
       );
 
-      // 클라이언트 측 페이지네이션 처리
-      const total = sortedData.length;
-      const pages = Math.ceil(total / limit);
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedData = sortedData.slice(startIndex, endIndex);
-
-      setCategories(paginatedData);
-      setTotalItems(total);
-      setTotalPages(pages);
-      setCurrentPage(page);
-      setPageSize(limit);
-      setSelectedCategoryIds([]); // 페이지 변경 시 선택 상태 초기화
+      // 전체 데이터를 상태에 저장
+      setAllCategories(sortedData);
+      setTotalItems(sortedData.length);
+      setTotalPages(Math.ceil(sortedData.length / pageSize));
+      setCurrentPage(1); // 데이터 로드 시 첫 페이지로
+      setSelectedCategoryIds([]); // 데이터 로드 시 선택 초기화
     } catch (err: any) {
       console.error("Error fetching sport categories:", err);
       setError("스포츠 카테고리를 불러오는 중 오류가 발생했습니다.");
       setSuccess(null);
-      setCategories([]);
+      setAllCategories([]); // 에러 시 전체 데이터 초기화
       setTotalItems(0);
       setTotalPages(0);
       setCurrentPage(1);
-      setPageSize(limit);
       setSelectedCategoryIds([]);
     } finally {
       setLoading(false);
     }
-  }, []); // pageSize는 변경될 수 있으므로 의존성 배열에서 제거 (또는 필요시 추가)
+  }, [pageSize]); // pageSize 의존성 추가 (옵션)
+
+  // 현재 페이지 데이터 계산
+  const paginatedCategories = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return allCategories.slice(startIndex, endIndex);
+  }, [allCategories, currentPage, pageSize]);
 
   useEffect(() => {
-    fetchSportCategories(); // 첫 페이지 로드
-  }, []);
+    fetchSportCategories(); // 컴포넌트 마운트 시 데이터 로드
+  }, [fetchSportCategories]); // fetchSportCategories 의존성 추가
 
-  // 페이지 변경 핸들러 추가
+  // 페이지 변경 핸들러 수정
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      fetchSportCategories(page, pageSize);
+      setCurrentPage(page); // 현재 페이지만 업데이트
+      setSelectedCategoryIds([]); // 페이지 변경 시 선택 초기화
     }
   };
 
@@ -227,14 +229,31 @@ export default function SportsManagement() {
     try {
       await deleteSportCategory(id);
       setSuccess("스포츠 카테고리가 삭제되었습니다.");
-      // Remove deleted ID from selection state
-      setSelectedCategoryIds((prev) => prev.filter((catId) => catId !== id));
-      fetchSportCategories(); // Reload list after successful deletion
+
+      // 전체 목록에서 삭제된 항목 제거 후 상태 업데이트
+      const newAllCategories = allCategories.filter((cat) => cat.id !== id);
+      setAllCategories(newAllCategories);
+
+      // 페이지네이션 상태 재계산
+      const newTotalItems = newAllCategories.length;
+      const newTotalPages = Math.ceil(newTotalItems / pageSize);
+      setTotalItems(newTotalItems);
+      setTotalPages(newTotalPages);
+
+      // 현재 페이지 조정
+      if (currentPage > newTotalPages && newTotalPages > 0) {
+        setCurrentPage(newTotalPages);
+      } else if (newTotalItems === 0) {
+        setCurrentPage(1);
+      }
+
+      setSelectedCategoryIds((prev) => prev.filter((catId) => catId !== id)); // 선택 해제
     } catch (err) {
       const apiError =
         (err as any)?.response?.data?.message || "스포츠 카테고리 삭제 중 오류가 발생했습니다.";
       setError(apiError);
       console.error("Error deleting sport category:", err);
+      fetchSportCategories(); // 에러 시 다시 로드
     } finally {
       setLoading(false);
     }
@@ -245,52 +264,42 @@ export default function SportsManagement() {
       setError("종목 경기를 선택해주세요.");
       return;
     }
-
-    // Check if the custom display name is entered
-    if (!formData.sportName.trim()) {
-      setError("스포츠 종목명을 입력해주세요."); // Or perhaps a more specific name like "표시 이름"
+    if (!formData.displayName?.trim()) {
+      setError("노출 명칭을 입력해주세요.");
       return;
     }
 
+    const payload: Omit<SportCategory, "id" | "createdAt" | "updatedAt"> = {
+      sportName: getEnglishSportCode(selectedSport),
+      displayName: formData.displayName.trim(),
+      icon: formData.icon,
+      isPublic: formData.isPublic,
+      displayOrder:
+        modalType === "edit" && currentCategory
+          ? currentCategory.displayOrder
+          : allCategories.length > 0
+          ? Math.max(...allCategories.map((c) => c.displayOrder || 0)) + 1
+          : 0,
+    };
+
     setLoading(true);
-    setError(null); // Clear modal error before saving
-    setSuccess(null); // Clear success message before saving
+    setError(null);
+    setSuccess(null);
 
     try {
-      if (modalType === "add") {
-        await createSportCategory({
-          // sportName still uses the English code from the selection
-          sportName: getEnglishSportCode(selectedSport),
-          // displayName now uses the value from the text input
-          displayName: formData.sportName.trim(),
-          isPublic: formData.isPublic,
-          icon: formData.icon, // Assuming icon is handled if needed
-          displayOrder:
-            categories.length > 0 ? Math.max(...categories.map((c) => c.displayOrder || 0)) + 1 : 1,
-        });
-
-        setSuccess("새 스포츠 카테고리가 추가되었습니다.");
-        setShowModal(false);
-        fetchSportCategories();
-      } else if (currentCategory) {
-        await updateSportCategory(currentCategory.id, {
-          // sportName still uses the English code from the selection
-          sportName: getEnglishSportCode(selectedSport),
-          // displayName now uses the value from the text input
-          displayName: formData.sportName.trim(),
-          isPublic: formData.isPublic,
-          icon: formData.icon, // Assuming icon is handled if needed
-          // displayOrder is handled by move up/down functions, not typically in edit save
-        });
-
+      if (modalType === "edit" && currentCategory) {
+        await updateSportCategory(currentCategory.id, payload);
         setSuccess("스포츠 카테고리가 업데이트되었습니다.");
-        setShowModal(false);
-        fetchSportCategories();
+      } else {
+        await createSportCategory(payload);
+        setSuccess("스포츠 카테고리가 추가되었습니다.");
       }
+      setShowModal(false);
+      fetchSportCategories();
     } catch (err) {
-      setError(
-        modalType === "add" ? "카테고리 추가에 실패했습니다." : "카테고리 수정에 실패했습니다."
-      );
+      const apiError =
+        (err as any)?.response?.data?.message || "스포츠 카테고리 저장 중 오류가 발생했습니다.";
+      setError(apiError);
       console.error("Error saving sport category:", err);
     } finally {
       setLoading(false);
@@ -298,338 +307,297 @@ export default function SportsManagement() {
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target as HTMLInputElement;
+    const { name, value, type } = e.target;
 
-    // Special handling for radio buttons based on name
-    if (name === "isPublicModal") {
-      setFormData((prev) => ({
-        ...prev,
-        isPublic: parseInt(value),
-      }));
+    if (type === "checkbox") {
+      setFormData((prev) => ({ ...prev, [name]: (e.target as HTMLInputElement).checked ? 1 : 0 }));
+    } else if (name === "isPublic") {
+      setFormData((prev) => ({ ...prev, isPublic: parseInt(value, 10) }));
     } else {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: value,
-      }));
+      setFormData((prev) => ({ ...prev, [name]: value }));
     }
   };
 
   const handleSportSelect = (sport: string) => {
     setSelectedSport(sport);
+    setFormData((prev) => ({ ...prev, displayName: sport }));
   };
 
-  // 순서 변경 - 위로 이동
   const handleMoveUp = async (index: number) => {
-    if (index <= 0) return;
+    const actualIndex = (currentPage - 1) * pageSize + index;
+    if (actualIndex <= 0) return;
 
-    const newCategories = [...categories];
+    // 순서 바꿀 대상 카테고리
+    const currentCategory = allCategories[actualIndex];
+    const targetCategory = allCategories[actualIndex - 1];
 
-    // 현재 카테고리와 위의 카테고리
-    const currentCategory = newCategories[index];
-    const targetCategory = newCategories[index - 1];
-
-    // displayOrder 값 교환
+    // 교환될 displayOrder 값
     const currentDisplayOrder = currentCategory.displayOrder;
     const targetDisplayOrder = targetCategory.displayOrder;
 
-    // displayOrder 값 교환
-    currentCategory.displayOrder = targetDisplayOrder;
-    targetCategory.displayOrder = currentDisplayOrder;
-
-    // 배열 내 위치 교환
-    newCategories[index] = targetCategory;
-    newCategories[index - 1] = currentCategory;
-
+    setLoading(true);
     try {
-      // 로컬 상태 먼저 업데이트
-      setCategories(newCategories);
+      // 개별 updateSportCategory API 호출 (Promise.all로 병렬 처리)
+      await Promise.all([
+        updateSportCategory(currentCategory.id, { displayOrder: targetDisplayOrder }),
+        updateSportCategory(targetCategory.id, { displayOrder: currentDisplayOrder }),
+      ]);
 
-      // API를 통해 카테고리 업데이트
-      await updateSportCategory(currentCategory.id, {
-        displayOrder: currentCategory.displayOrder,
-      });
+      // 상태 직접 업데이트
+      const newAllCategories = [...allCategories];
+      const temp = newAllCategories[actualIndex];
+      newAllCategories[actualIndex] = newAllCategories[actualIndex - 1];
+      newAllCategories[actualIndex - 1] = temp;
+      // displayOrder 값도 실제 스왑
+      newAllCategories[actualIndex].displayOrder = targetDisplayOrder;
+      newAllCategories[actualIndex - 1].displayOrder = currentDisplayOrder;
+      // 정렬 다시 적용 (API 응답 대신 로컬에서 정렬)
+      newAllCategories.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
-      await updateSportCategory(targetCategory.id, {
-        displayOrder: targetCategory.displayOrder,
-      });
-
-      // 변경 성공 메시지
-      setSuccess("카테고리 순서가 변경되었습니다.");
-
-      // 서버에서 최신 데이터 다시 불러오기
-      fetchSportCategories();
+      setAllCategories(newAllCategories);
+      setSuccess("순서가 변경되었습니다.");
+      setError(null);
     } catch (err) {
-      console.error("Error updating category order:", err);
-      setError("카테고리 순서 변경 중 오류가 발생했습니다.");
-      // 오류 발생 시 원래 순서로 복구
-      fetchSportCategories();
+      console.error("Error moving category up:", err);
+      setError("순서 변경 중 오류가 발생했습니다.");
+      fetchSportCategories(); // 에러 시 다시 로드
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 순서 변경 - 아래로 이동
   const handleMoveDown = async (index: number) => {
-    if (index >= categories.length - 1) return;
+    const actualIndex = (currentPage - 1) * pageSize + index;
+    if (actualIndex >= allCategories.length - 1) return;
 
-    const newCategories = [...categories];
+    // 순서 바꿀 대상 카테고리
+    const currentCategory = allCategories[actualIndex];
+    const targetCategory = allCategories[actualIndex + 1];
 
-    // 현재 카테고리와 아래 카테고리
-    const currentCategory = newCategories[index];
-    const targetCategory = newCategories[index + 1];
-
-    // displayOrder 값 교환
+    // 교환될 displayOrder 값
     const currentDisplayOrder = currentCategory.displayOrder;
     const targetDisplayOrder = targetCategory.displayOrder;
 
-    // displayOrder 값 교환
-    currentCategory.displayOrder = targetDisplayOrder;
-    targetCategory.displayOrder = currentDisplayOrder;
-
-    // 배열 내 위치 교환
-    newCategories[index] = targetCategory;
-    newCategories[index + 1] = currentCategory;
-
+    setLoading(true);
     try {
-      // 로컬 상태 먼저 업데이트
-      setCategories(newCategories);
+      // 개별 updateSportCategory API 호출 (Promise.all로 병렬 처리)
+      await Promise.all([
+        updateSportCategory(currentCategory.id, { displayOrder: targetDisplayOrder }),
+        updateSportCategory(targetCategory.id, { displayOrder: currentDisplayOrder }),
+      ]);
 
-      // API를 통해 카테고리 업데이트
-      await updateSportCategory(currentCategory.id, {
-        displayOrder: currentCategory.displayOrder,
-      });
+      // 상태 직접 업데이트
+      const newAllCategories = [...allCategories];
+      const temp = newAllCategories[actualIndex];
+      newAllCategories[actualIndex] = newAllCategories[actualIndex + 1];
+      newAllCategories[actualIndex + 1] = temp;
+      // displayOrder 값도 실제 스왑
+      newAllCategories[actualIndex].displayOrder = targetDisplayOrder;
+      newAllCategories[actualIndex + 1].displayOrder = currentDisplayOrder;
+      // 정렬 다시 적용 (API 응답 대신 로컬에서 정렬)
+      newAllCategories.sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
 
-      await updateSportCategory(targetCategory.id, {
-        displayOrder: targetCategory.displayOrder,
-      });
-
-      // 변경 성공 메시지
-      setSuccess("카테고리 순서가 변경되었습니다.");
-
-      // 서버에서 최신 데이터 다시 불러오기
-      fetchSportCategories();
+      setAllCategories(newAllCategories);
+      setSuccess("순서가 변경되었습니다.");
+      setError(null);
     } catch (err) {
-      console.error("Error updating category order:", err);
-      setError("카테고리 순서 변경 중 오류가 발생했습니다.");
-      // 오류 발생 시 원래 순서로 복구
-      fetchSportCategories();
+      console.error("Error moving category down:", err);
+      setError("순서 변경 중 오류가 발생했습니다.");
+      fetchSportCategories(); // 에러 시 다시 로드
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 일괄 삭제 핸들러 추가
   const handleBulkDelete = async () => {
     if (selectedCategoryIds.length === 0) {
-      setError("삭제할 종목을 선택해주세요."); // Use setError for user feedback
+      setError("삭제할 카테고리를 선택해주세요.");
       return;
     }
-    if (!confirm(`선택된 ${selectedCategoryIds.length}개의 종목을 정말 삭제하시겠습니까?`)) {
+    if (!confirm(`선택된 ${selectedCategoryIds.length}개의 카테고리를 정말 삭제하시겠습니까?`))
       return;
-    }
 
     setLoading(true);
     setError(null);
     setSuccess(null);
 
     try {
-      const deletePromises = selectedCategoryIds.map((id) => deleteSportCategory(id));
-      const results = await Promise.allSettled(deletePromises);
-
-      const failedDeletes = results.filter((result) => result.status === "rejected");
-
-      if (failedDeletes.length > 0) {
-        console.error("일부 종목 삭제 실패:", failedDeletes);
-        setError(`일부 종목 삭제에 실패했습니다. (${failedDeletes.length}개)`);
-        setSuccess(null);
-      } else {
-        setSuccess(`${selectedCategoryIds.length}개의 종목이 삭제되었습니다.`);
-        setError(null);
+      for (const id of selectedCategoryIds) {
+        await deleteSportCategory(id);
       }
-      setSelectedCategoryIds([]); // Clear selection regardless of partial failure
-      fetchSportCategories(); // Reload list
-    } catch (err) {
-      console.error("Error during bulk delete:", err);
-      setError("일괄 삭제 중 오류가 발생했습니다.");
-      setSuccess(null);
-      // Attempt to refresh and clear selection even on general error
+
+      setSuccess(`${selectedCategoryIds.length}개의 카테고리가 삭제되었습니다.`);
+
+      const newAllCategories = allCategories.filter((cat) => !selectedCategoryIds.includes(cat.id));
+      setAllCategories(newAllCategories);
+
+      const newTotalItems = newAllCategories.length;
+      const newTotalPages = Math.ceil(newTotalItems / pageSize);
+      setTotalItems(newTotalItems);
+      setTotalPages(newTotalPages);
+
+      if (currentPage > newTotalPages && newTotalPages > 0) {
+        setCurrentPage(newTotalPages);
+      } else if (newTotalItems === 0) {
+        setCurrentPage(1);
+      }
+
       setSelectedCategoryIds([]);
+    } catch (err) {
+      const apiError =
+        (err as any)?.response?.data?.message || "카테고리 일괄 삭제 중 오류가 발생했습니다.";
+      setError(apiError);
+      console.error("Error bulk deleting categories:", err);
       fetchSportCategories();
     } finally {
       setLoading(false);
     }
   };
 
-  // 개별 선택 핸들러 추가
   const handleSelectCategory = (id: number) => {
-    setSelectedCategoryIds((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((catId) => catId !== id);
+    setSelectedCategoryIds((prevSelected) => {
+      if (prevSelected.includes(id)) {
+        return prevSelected.filter((catId) => catId !== id);
       } else {
-        return [...prev, id];
+        return [...prevSelected, id];
       }
     });
   };
 
-  // 전체 선택 핸들러 추가
   const handleSelectAllCategories = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      setSelectedCategoryIds(categories.map((cat) => cat.id));
+      const currentPageCategoryIds = paginatedCategories.map((cat) => cat.id);
+      setSelectedCategoryIds(currentPageCategoryIds);
     } else {
       setSelectedCategoryIds([]);
     }
   };
 
-  // 데이터 테이블 컬럼 정의
-  const columns = [
-    // 체크박스 컬럼 추가
-    {
-      header: (
-        <input
-          type="checkbox"
-          className="form-checkbox h-4 w-4 text-blue-600"
-          onChange={handleSelectAllCategories}
-          checked={categories.length > 0 && selectedCategoryIds.length === categories.length}
-          ref={(input) => {
-            if (input) {
-              input.indeterminate =
-                selectedCategoryIds.length > 0 && selectedCategoryIds.length < categories.length;
+  // 테이블 컬럼 정의 (useMemo 사용)
+  const columns = useMemo(
+    () => [
+      {
+        header: (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            onChange={handleSelectAllCategories}
+            checked={
+              paginatedCategories.length > 0 &&
+              selectedCategoryIds.length === paginatedCategories.length &&
+              paginatedCategories.every((cat) => selectedCategoryIds.includes(cat.id))
             }
-          }}
-          disabled={loading || categories.length === 0}
-        />
-      ),
-      accessor: "id" as keyof SportCategory,
-      cell: (id: number) => (
-        <input
-          type="checkbox"
-          className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedCategoryIds.includes(id)}
-          onChange={() => handleSelectCategory(id)}
-          disabled={loading}
-        />
-      ),
-      className: "w-px px-4",
-    },
-    {
-      header: "종목명", // Original sport name (mapped to Korean)
-      accessor: "sportName" as keyof SportCategory,
-      cell: (value: string, row: SportCategory) => {
-        const koreanSportName = getKoreanSportName(value);
-        return (
-          <span
-            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
-            onClick={() => handleEditCategory(row)}
-            title={koreanSportName}
-          >
-            {koreanSportName}
-          </span>
-        );
+            ref={(input) => {
+              if (input) {
+                const someSelected =
+                  selectedCategoryIds.length > 0 &&
+                  selectedCategoryIds.length < paginatedCategories.length &&
+                  paginatedCategories.some((cat) => selectedCategoryIds.includes(cat.id));
+                input.indeterminate = someSelected;
+              }
+            }}
+            disabled={loading || paginatedCategories.length === 0}
+          />
+        ),
+        accessor: "id" as keyof SportCategory,
+        cell: (id: number) => (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            checked={selectedCategoryIds.includes(id)}
+            onChange={() => handleSelectCategory(id)}
+          />
+        ),
+        className: "w-px px-4",
       },
-    },
-    {
-      header: "표시 이름", // User-defined display name
-      accessor: "displayName" as keyof SportCategory,
-      // Display the value directly, fallback handled in fetch
-      cell: (value: string, row: SportCategory) => value || getKoreanSportName(row.sportName),
-    },
-    {
-      header: "공개 여부", // Consistent header name
-      accessor: "isPublic" as keyof SportCategory,
-      cell: (value: number) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}
-        >
-          {value === 1 ? "공개" : "비공개"}
-        </span>
-      ),
-    },
-    {
-      header: "등록일자", // Consistent header name
-      accessor: "createdAt" as keyof SportCategory,
-      cell: (value: string) => formatDate(value),
-    },
-    {
-      header: "관리",
-      accessor: "id" as keyof SportCategory,
-      cell: (id: number, row: SportCategory, index: number) => (
-        <div className="flex items-center space-x-1">
-          <ActionButton
-            label="위"
-            action="up"
-            size="sm"
-            onClick={() => handleMoveUp(index)}
-            disabled={index === 0 || loading}
-          />
-          <ActionButton
-            label="아래"
-            action="down"
-            size="sm"
-            onClick={() => handleMoveDown(index)}
-            disabled={index === categories.length - 1 || loading}
-          />
-          <ActionButton
-            label="수정"
-            action="edit"
-            size="sm"
-            color="blue"
-            onClick={() => handleEditCategory(row)}
-            disabled={loading}
-          />
-          <ActionButton
-            label="삭제"
-            action="delete"
-            size="sm"
-            color="red"
-            onClick={() => handleDeleteCategory(id)}
-            disabled={loading}
-          />
-        </div>
-      ),
-    },
-  ];
+      { header: "종목명", accessor: "displayName" as keyof SportCategory },
+      {
+        header: "공개 여부",
+        accessor: "isPublic" as keyof SportCategory,
+        cell: (isPublic: number) => (isPublic === 1 ? "공개" : "비공개"),
+        className: "text-center",
+      },
+      { header: "아이콘 URL", accessor: "icon" as keyof SportCategory },
+      {
+        header: "생성일",
+        accessor: "createdAt" as keyof SportCategory,
+        cell: (date: string) => formatDate(date),
+      },
+      {
+        header: "수정일",
+        accessor: "updatedAt" as keyof SportCategory,
+        cell: (date: string) => formatDate(date),
+      },
+      {
+        header: "관리",
+        accessor: "id" as keyof SportCategory,
+        cell: (id: number, row: SportCategory, index: number) => (
+          <div className="flex space-x-1 justify-center">
+            <ActionButton
+              label="위로"
+              action="up"
+              size="sm"
+              onClick={() => handleMoveUp(index)}
+              disabled={(currentPage - 1) * pageSize + index <= 0}
+            />
+            <ActionButton
+              label="아래로"
+              action="down"
+              size="sm"
+              onClick={() => handleMoveDown(index)}
+              disabled={(currentPage - 1) * pageSize + index >= allCategories.length - 1}
+            />
+            <ActionButton
+              label="수정"
+              action="edit"
+              size="sm"
+              onClick={() => handleEditCategory(row)}
+            />
+            <ActionButton
+              label="삭제"
+              action="delete"
+              size="sm"
+              onClick={() => handleDeleteCategory(id)}
+            />
+          </div>
+        ),
+        className: "text-center",
+      },
+    ],
+    [loading, paginatedCategories, selectedCategoryIds, currentPage, pageSize, allCategories.length]
+  );
 
   return (
-    // Use padding for overall spacing
-    <div className="p-4">
-      <h1 className="text-xl font-semibold mb-4">스포츠 종목 관리</h1>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-2xl font-semibold mb-6">스포츠 종목 관리</h1>
 
-      <div className="flex justify-between items-center mb-4">
-        {/* Title placeholder to push buttons right */}
-        <div></div>
-        <div className="flex space-x-2">
-          {" "}
-          {/* Button group on the right */}
-          {/* 선택 삭제 버튼 추가 */}
-          <Button
-            variant="danger"
-            onClick={handleBulkDelete}
-            disabled={selectedCategoryIds.length === 0 || loading}
-          >
-            {`선택 삭제 (${selectedCategoryIds.length})`}
-          </Button>
-          <Button variant="primary" onClick={handleAddCategory} disabled={loading}>
-            종목 추가
-          </Button>
-        </div>
-      </div>
+      {/* 알림 메시지 */}
+      {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
+      {success && <Alert type="success" message={success} onClose={() => setSuccess(null)} />}
 
-      {/* Alerts */}
-      {error && (
-        <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
-      )}
-      {success && (
-        <Alert type="success" message={success} onClose={() => setSuccess(null)} className="mb-4" />
-      )}
-
-      {/* Loading Overlay */}
       <LoadingOverlay isLoading={loading} />
 
-      {/* DataTable */}
+      {/* 상단 버튼 영역 */}
+      <div className="flex justify-end space-x-2 mb-4">
+        <Button
+          onClick={handleBulkDelete}
+          variant="danger"
+          disabled={selectedCategoryIds.length === 0 || loading}
+        >
+          {`선택 삭제 (${selectedCategoryIds.length})`}
+        </Button>
+        <Button onClick={handleAddCategory} disabled={loading}>
+          카테고리 추가
+        </Button>
+      </div>
+
+      {/* 데이터 테이블 */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <DataTable
           columns={columns}
-          data={categories}
-          loading={false} // Disable DataTable's internal loading, using Overlay instead
-          emptyMessage="등록된 스포츠 종목이 없습니다."
+          data={paginatedCategories}
+          loading={loading}
+          emptyMessage="등록된 스포츠 카테고리가 없습니다."
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,
@@ -639,31 +607,29 @@ export default function SportsManagement() {
         />
       </div>
 
-      {/* Modal for Add/Edit */}
+      {/* 모달 */}
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        title={modalType === "add" ? "새 스포츠 종목 추가" : "스포츠 종목 수정"}
+        title={modalType === "add" ? "새 카테고리 추가" : "카테고리 수정"}
       >
-        {/* Modal Content */}
         <div className="space-y-4">
-          {/* Modal Error Alert */}
-          {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
-
-          {/* Form fields ... */}
+          {/* 종목 경기 선택 */}
           <div>
-            <label htmlFor="sportSelect" className="label">
-              종목 경기 선택
+            <label htmlFor="sportSelect" className="block text-sm font-medium text-gray-700">
+              종목 경기
             </label>
             <select
               id="sportSelect"
+              name="sportSelect"
               value={selectedSport}
               onChange={(e) => handleSportSelect(e.target.value)}
-              className="input"
-              disabled={loading}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+              required
+              disabled={modalType === "edit"}
             >
               <option value="" disabled>
-                -- 종목 선택 --
+                종목을 선택하세요
               </option>
               {sportOptions.map((sport) => (
                 <option key={sport} value={sport}>
@@ -673,78 +639,67 @@ export default function SportsManagement() {
             </select>
           </div>
 
+          {/* 노출 명칭 */}
           <div>
-            <label htmlFor="sportName" className="label">
-              스포츠 종목명 (표시 이름)
+            <label htmlFor="displayName" className="block text-sm font-medium text-gray-700">
+              노출 명칭
             </label>
             <input
               type="text"
-              id="sportName"
-              name="sportName"
-              value={formData.sportName}
+              name="displayName"
+              id="displayName"
+              value={formData.displayName}
               onChange={handleChange}
-              className="input"
-              placeholder="예: 축구, 농구"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
               required
-              disabled={loading}
             />
           </div>
 
+          {/* 아이콘 URL */}
           <div>
-            <label htmlFor="iconUrl" className="label">
+            <label htmlFor="icon" className="block text-sm font-medium text-gray-700">
               아이콘 URL (선택 사항)
             </label>
             <input
               type="text"
-              id="iconUrl"
               name="icon"
+              id="icon"
               value={formData.icon}
               onChange={handleChange}
-              className="input"
-              placeholder="http://example.com/icon.png"
-              disabled={loading}
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
             />
           </div>
 
+          {/* 공개 여부 */}
           <div>
-            <label className="label">공개 여부</label>
-            <div className="flex space-x-4">
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  name="isPublic" // Corrected name to match state/handler
-                  value={1}
-                  checked={formData.isPublic === 1}
-                  onChange={handleChange}
-                  className="form-radio"
-                  disabled={loading}
-                />
-                <span className="ml-2">공개</span>
-              </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  name="isPublic" // Corrected name to match state/handler
-                  value={0}
-                  checked={formData.isPublic === 0}
-                  onChange={handleChange}
-                  className="form-radio"
-                  disabled={loading}
-                />
-                <span className="ml-2">비공개</span>
-              </label>
-            </div>
+            <label htmlFor="isPublic" className="block text-sm font-medium text-gray-700">
+              공개 여부
+            </label>
+            <select
+              id="isPublic"
+              name="isPublic"
+              value={formData.isPublic}
+              onChange={handleChange}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+            >
+              <option value={1}>공개</option>
+              <option value={0}>비공개</option>
+            </select>
           </div>
 
-          {/* Modal Actions */}
-          <div className="flex justify-end space-x-2 mt-6">
+          {/* 저장/취소 버튼 */}
+          <div className="flex justify-end space-x-2 pt-4">
             <Button variant="secondary" onClick={() => setShowModal(false)} disabled={loading}>
               취소
             </Button>
-            <Button variant="primary" onClick={handleSaveCategory} disabled={loading}>
-              {loading ? "저장 중..." : modalType === "add" ? "추가" : "저장"}
+            <Button onClick={handleSaveCategory} disabled={loading}>
+              {loading ? "저장 중..." : "저장"}
             </Button>
           </div>
+          {/* 모달 내 에러 메시지 */}
+          {error && (
+            <Alert type="error" message={error} onClose={() => setError(null)} className="mt-4" />
+          )}
         </div>
       </Modal>
     </div>

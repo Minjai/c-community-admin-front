@@ -48,7 +48,8 @@ interface UpsertCasinoRecommendationPayload {
 }
 
 const CasinoRecommendationManagement = () => {
-  const [recommendations, setRecommendations] = useState<CasinoRecommendation[]>([]);
+  const [allRecommendations, setAllRecommendations] = useState<CasinoRecommendation[]>([]); // 전체 데이터 상태 추가
+  const [recommendations, setRecommendations] = useState<CasinoRecommendation[]>([]); // 현재 페이지 데이터 (이제 사용 안함, paginatedRecommendations 사용)
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [alertMessage, setAlertMessage] = useState<{
@@ -94,17 +95,16 @@ const CasinoRecommendationManagement = () => {
     setIsPublic(publicSettings === "public" ? 1 : 0);
   }, [publicSettings]);
 
-  // 게임 추천 목록 조회 (페이지네이션 적용)
-  const fetchRecommendations = useCallback(async (page: number = 1, limit: number = 10) => {
+  // 게임 추천 목록 조회 (클라이언트 측 페이지네이션 로직 수정)
+  const fetchRecommendations = useCallback(async () => {
+    // page, limit 제거
     setLoading(true);
     setError(null);
     try {
-      // 페이지네이션 파라미터 추가
-      const response = await axios.get("/casino-recommends", {
-        params: { page, limit },
-      });
+      // 페이지네이션 없이 전체 데이터 요청
+      const response = await axios.get("/casino-recommends");
 
-      // API 응답 구조 확인 및 처리 (data가 배열이고 pagination 객체가 있다고 가정)
+      // API 응답 구조 확인 및 처리 (data가 배열이라고 가정)
       if (response.data && response.data.success && Array.isArray(response.data.data)) {
         const recommendationData = response.data.data;
 
@@ -161,41 +161,39 @@ const CasinoRecommendationManagement = () => {
           (a, b) => (b.position || 0) - (a.position || 0)
         );
 
-        setRecommendations(sortedRecommendations);
-
-        // 페이지네이션 정보 업데이트 (API 응답에 pagination 객체가 있다고 가정)
-        if (response.data.pagination) {
-          setTotalItems(response.data.pagination.totalItems || 0);
-          setTotalPages(response.data.pagination.totalPages || 1);
-          setCurrentPage(response.data.pagination.currentPage || 1);
-          setPageSize(response.data.pagination.pageSize || limit);
-        } else {
-          // 페이지네이션 정보 없을 경우, 현재 데이터 기준으로 처리 (권장하지 않음)
-          setTotalItems(sortedRecommendations.length);
-          setTotalPages(1);
-          setCurrentPage(1);
-          setPageSize(limit);
-        }
+        // 전체 데이터를 상태에 저장
+        setAllRecommendations(sortedRecommendations);
+        setTotalItems(sortedRecommendations.length);
+        setTotalPages(Math.ceil(sortedRecommendations.length / pageSize)); // pageSize 사용
+        setCurrentPage(1); // 데이터 로드 시 항상 첫 페이지로
+        setSelectedRecommendationIds([]); // 데이터 로드 시 선택 초기화
       } else {
         // API 실패 또는 data 형식이 잘못된 경우
-        setRecommendations([]);
+        setAllRecommendations([]); // 전체 데이터 초기화
         setError(response.data?.message || "게임 추천 목록 형식이 올바르지 않습니다.");
         setTotalItems(0);
         setTotalPages(0);
         setCurrentPage(1);
-        setPageSize(limit);
+        setSelectedRecommendationIds([]);
       }
     } catch (err: any) {
       setError("게임 추천 목록을 불러오는데 실패했습니다.");
-      setRecommendations([]);
+      setAllRecommendations([]); // 전체 데이터 초기화
       setTotalItems(0);
       setTotalPages(0);
       setCurrentPage(1);
-      setPageSize(limit);
+      setSelectedRecommendationIds([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [pageSize]); // pageSize가 변경될 때 다시 fetch (옵션) 또는 빈 배열 []
+
+  // 현재 페이지에 표시될 데이터 계산
+  const paginatedRecommendations = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return allRecommendations.slice(startIndex, endIndex);
+  }, [allRecommendations, currentPage, pageSize]);
 
   // 가능한 게임 목록 가져오기
   const fetchAvailableGames = async () => {
@@ -227,9 +225,9 @@ const CasinoRecommendationManagement = () => {
   };
 
   useEffect(() => {
-    fetchRecommendations(); // 컴포넌트 마운트 시 첫 페이지 로드
+    fetchRecommendations(); // 컴포넌트 마운트 시 데이터 로드
     fetchAvailableGames();
-  }, []); // 빈 의존성 배열로 변경
+  }, [fetchRecommendations]); // fetchRecommendations 의존성 추가 (내부 pageSize 의존성 때문에)
 
   // 검색어로 게임 필터링
   useEffect(() => {
@@ -293,11 +291,24 @@ const CasinoRecommendationManagement = () => {
         setLoading(true);
         await axios.delete(`/casino-recommends/${id}`);
         setAlertMessage({ type: "success", message: "추천 목록이 삭제되었습니다." });
-        fetchRecommendations(); // 목록 새로고침
+        // 전체 목록에서 삭제된 항목 제거 후 상태 업데이트 (API 재호출 대신)
+        setAllRecommendations((prev) => prev.filter((rec) => rec.id !== id));
+        // 페이지네이션 상태 재계산 (삭제 후 페이지 수가 줄어들 수 있음)
+        const newTotalItems = totalItems - 1;
+        const newTotalPages = Math.ceil(newTotalItems / pageSize);
+        setTotalItems(newTotalItems);
+        setTotalPages(newTotalPages);
+        // 현재 페이지가 마지막 페이지였고, 해당 페이지의 마지막 항목이 삭제되어 페이지가 없어졌다면 이전 페이지로 이동
+        if (currentPage > newTotalPages && newTotalPages > 0) {
+          setCurrentPage(newTotalPages);
+        } else if (newTotalItems === 0) {
+          setCurrentPage(1); // 항목이 없으면 1페이지로
+        }
         setSelectedRecommendationIds((prev) => prev.filter((recId) => recId !== id)); // 선택 해제
       } catch (err) {
         setError("추천 목록 삭제 중 오류가 발생했습니다.");
         console.error("Delete error:", err);
+        fetchRecommendations(); // 에러 발생 시에는 다시 불러오기
       } finally {
         setLoading(false);
       }
@@ -328,14 +339,29 @@ const CasinoRecommendationManagement = () => {
         type: "success",
         message: `${selectedRecommendationIds.length}개의 추천 목록이 삭제되었습니다.`,
       });
-      fetchRecommendations(); // 목록 새로고침
+
+      // 전체 목록에서 삭제된 항목들 제거 후 상태 업데이트
+      const deletedCount = selectedRecommendationIds.length;
+      setAllRecommendations((prev) =>
+        prev.filter((rec) => !selectedRecommendationIds.includes(rec.id))
+      );
+      // 페이지네이션 상태 재계산
+      const newTotalItems = totalItems - deletedCount;
+      const newTotalPages = Math.ceil(newTotalItems / pageSize);
+      setTotalItems(newTotalItems);
+      setTotalPages(newTotalPages);
+      // 현재 페이지 조정
+      if (currentPage > newTotalPages && newTotalPages > 0) {
+        setCurrentPage(newTotalPages);
+      } else if (newTotalItems === 0) {
+        setCurrentPage(1);
+      }
+
       setSelectedRecommendationIds([]); // 선택 초기화
     } catch (error: any) {
       console.error("추천 목록 일괄 삭제 중 오류 발생:", error);
       setError("추천 목록 삭제 중 일부 오류가 발생했습니다. 목록을 확인해주세요.");
-      // 오류 발생 시에도 목록 새로고침 및 선택 초기화 (선택적)
-      fetchRecommendations();
-      setSelectedRecommendationIds([]);
+      fetchRecommendations(); // 에러 시 전체 다시 로드
     } finally {
       setLoading(false);
     }
@@ -355,7 +381,8 @@ const CasinoRecommendationManagement = () => {
   // 현재 페이지의 모든 추천 선택/해제
   const handleSelectAllRecommendations = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
-      const currentPageRecommendationIds = recommendations.map((rec) => rec.id);
+      // 현재 페이지에 보이는 항목들의 ID만 선택
+      const currentPageRecommendationIds = paginatedRecommendations.map((rec) => rec.id);
       setSelectedRecommendationIds(currentPageRecommendationIds);
     } else {
       setSelectedRecommendationIds([]);
@@ -364,25 +391,33 @@ const CasinoRecommendationManagement = () => {
 
   // 순서 변경 (위로)
   const handleMoveUp = async (index: number) => {
-    if (index <= 0) return;
-    const currentItem = recommendations[index];
-    const targetItem = recommendations[index - 1];
+    // 실제 데이터 인덱스 계산 (페이지네이션 고려)
+    const actualIndex = (currentPage - 1) * pageSize + index;
+    if (actualIndex <= 0) return;
+
+    const currentItem = allRecommendations[actualIndex];
+    const targetItem = allRecommendations[actualIndex - 1];
     const currentPosition = currentItem.position || 0;
     const targetPosition = targetItem.position || 0;
 
     try {
       setLoading(true);
-      // Use the batch update endpoint
       await axios.patch(`/casino-recommends/display-order`, {
         updates: [
           { id: currentItem.id, displayOrder: targetPosition },
           { id: targetItem.id, displayOrder: currentPosition },
         ],
       });
-      fetchRecommendations(); // Refresh list
+      // 순서 변경 후 전체 목록 상태 업데이트 (API 재호출 대신)
+      const newAllRecommendations = [...allRecommendations];
+      newAllRecommendations[actualIndex] = { ...currentItem, position: targetPosition };
+      newAllRecommendations[actualIndex - 1] = { ...targetItem, position: currentPosition };
+      // 정렬 다시 적용
+      newAllRecommendations.sort((a, b) => (b.position || 0) - (a.position || 0));
+      setAllRecommendations(newAllRecommendations);
     } catch (err) {
       setError("순서 변경 중 오류가 발생했습니다.");
-      fetchRecommendations(); // Refresh list even on error to revert optimistic update
+      fetchRecommendations(); // 에러 시 전체 다시 로드
     } finally {
       setLoading(false);
     }
@@ -390,9 +425,12 @@ const CasinoRecommendationManagement = () => {
 
   // 순서 변경 (아래로)
   const handleMoveDown = async (index: number) => {
-    if (index >= recommendations.length - 1) return;
-    const currentItem = recommendations[index];
-    const targetItem = recommendations[index + 1];
+    // 실제 데이터 인덱스 계산 (페이지네이션 고려)
+    const actualIndex = (currentPage - 1) * pageSize + index;
+    if (actualIndex >= allRecommendations.length - 1) return;
+
+    const currentItem = allRecommendations[actualIndex];
+    const targetItem = allRecommendations[actualIndex + 1];
     const currentPosition = currentItem.position || 0;
     const targetPosition = targetItem.position || 0;
 
@@ -404,10 +442,16 @@ const CasinoRecommendationManagement = () => {
           { id: targetItem.id, displayOrder: currentPosition },
         ],
       });
-      fetchRecommendations(); // Refresh list
+      // 순서 변경 후 전체 목록 상태 업데이트 (API 재호출 대신)
+      const newAllRecommendations = [...allRecommendations];
+      newAllRecommendations[actualIndex] = { ...currentItem, position: targetPosition };
+      newAllRecommendations[actualIndex + 1] = { ...targetItem, position: currentPosition };
+      // 정렬 다시 적용
+      newAllRecommendations.sort((a, b) => (b.position || 0) - (a.position || 0));
+      setAllRecommendations(newAllRecommendations);
     } catch (err) {
       setError("순서 변경 중 오류가 발생했습니다.");
-      fetchRecommendations(); // Refresh list even on error
+      fetchRecommendations(); // 에러 시 전체 다시 로드
     } finally {
       setLoading(false);
     }
@@ -465,11 +509,11 @@ const CasinoRecommendationManagement = () => {
     setError(null);
 
     try {
-      // 새 항목의 displayOrder 계산 (기존 항목들의 position 값 기반)
+      // 새 항목의 displayOrder 계산 (allRecommendations 기준)
       const newDisplayOrder = isEditing
-        ? recommendations.find((rec) => rec.id === currentRecommendationId)?.position // 수정 시 기존 position 유지 또는 필요시 업데이트 로직 추가
-        : recommendations.length > 0
-        ? Math.max(...recommendations.map((rec) => rec.position || 0)) + 1
+        ? allRecommendations.find((rec) => rec.id === currentRecommendationId)?.position
+        : allRecommendations.length > 0
+        ? Math.max(...allRecommendations.map((rec) => rec.position || 0)) + 1
         : 1;
 
       // Convert local datetime-local input strings to UTC ISO strings for saving
@@ -490,7 +534,7 @@ const CasinoRecommendationManagement = () => {
         await axios.post("/casino-recommends", payload);
         setAlertMessage({ type: "success", message: "새 게임 추천이 성공적으로 등록되었습니다." });
       }
-      fetchRecommendations();
+      fetchRecommendations(); // 저장 후 데이터 다시 로드
       handleCloseModal();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
@@ -499,10 +543,11 @@ const CasinoRecommendationManagement = () => {
     }
   };
 
-  // 페이지 변경 핸들러 추가
+  // 페이지 변경 핸들러 수정
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      fetchRecommendations(page, pageSize);
+      setCurrentPage(page); // 현재 페이지 상태만 업데이트
+      setSelectedRecommendationIds([]); // 페이지 변경 시 선택 초기화
     }
   };
 
@@ -517,20 +562,22 @@ const CasinoRecommendationManagement = () => {
             className="form-checkbox h-4 w-4 text-blue-600"
             onChange={handleSelectAllRecommendations}
             checked={
-              recommendations.length > 0 &&
-              selectedRecommendationIds.length === recommendations.length &&
-              recommendations.every((rec) => selectedRecommendationIds.includes(rec.id))
+              paginatedRecommendations.length > 0 && // paginatedRecommendations 사용
+              selectedRecommendationIds.length === paginatedRecommendations.length && // paginatedRecommendations 사용
+              paginatedRecommendations.every((rec) => selectedRecommendationIds.includes(rec.id)) // paginatedRecommendations 사용
             }
             ref={(input) => {
               if (input) {
                 const someSelected =
                   selectedRecommendationIds.length > 0 &&
-                  selectedRecommendationIds.length < recommendations.length &&
-                  recommendations.some((rec) => selectedRecommendationIds.includes(rec.id));
+                  selectedRecommendationIds.length < paginatedRecommendations.length && // paginatedRecommendations 사용
+                  paginatedRecommendations.some((rec) =>
+                    selectedRecommendationIds.includes(rec.id)
+                  ); // paginatedRecommendations 사용
                 input.indeterminate = someSelected;
               }
             }}
-            disabled={loading || recommendations.length === 0}
+            disabled={loading || paginatedRecommendations.length === 0} // paginatedRecommendations 사용
           />
         ),
         accessor: "id" as keyof CasinoRecommendation,
@@ -603,21 +650,25 @@ const CasinoRecommendationManagement = () => {
       {
         header: "관리",
         accessor: "id" as keyof CasinoRecommendation,
-        cell: (id: number, row: CasinoRecommendation, index: number) => (
+        cell: (
+          id: number,
+          row: CasinoRecommendation,
+          index: number // index는 현재 페이지 기준
+        ) => (
           <div className="flex space-x-1 justify-center">
             <ActionButton
               label="위로"
               action="up"
               size="sm"
-              onClick={() => handleMoveUp(index)}
-              disabled={index === 0}
+              onClick={() => handleMoveUp(index)} // index 전달 (페이지 기준)
+              disabled={(currentPage - 1) * pageSize + index <= 0} // 전체 목록 기준 첫 항목인지 확인
             />
             <ActionButton
               label="아래로"
               action="down"
               size="sm"
-              onClick={() => handleMoveDown(index)}
-              disabled={index === recommendations.length - 1}
+              onClick={() => handleMoveDown(index)} // index 전달 (페이지 기준)
+              disabled={(currentPage - 1) * pageSize + index >= allRecommendations.length - 1} // 전체 목록 기준 마지막 항목인지 확인
             />
             <ActionButton
               label="수정"
@@ -636,7 +687,14 @@ const CasinoRecommendationManagement = () => {
         className: "text-center",
       },
     ],
-    [loading, recommendations, selectedRecommendationIds] // Add dependencies
+    [
+      loading,
+      paginatedRecommendations,
+      selectedRecommendationIds,
+      currentPage,
+      pageSize,
+      allRecommendations.length,
+    ] // 의존성 배열 업데이트
   );
 
   return (
@@ -674,7 +732,7 @@ const CasinoRecommendationManagement = () => {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <DataTable
           columns={columns}
-          data={recommendations}
+          data={paginatedRecommendations} // paginatedRecommendations 사용
           loading={loading}
           emptyMessage="등록된 카지노 추천이 없습니다."
           pagination={{
