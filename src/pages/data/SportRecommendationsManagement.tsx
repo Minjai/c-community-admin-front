@@ -93,8 +93,92 @@ export default function SportRecommendationsManagement() {
 
   // 스포츠 게임 선택 관련 상태
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
   const [filteredGames, setFilteredGames] = useState<SportGame[]>([]);
   const [selectedGames, setSelectedGames] = useState<SportGame[]>([]);
+
+  // 스포츠 종목 매핑 자동 생성 (먼저 정의)
+  const updateSportMappings = useCallback(
+    (games: SportGame[]) => {
+      // 새로운 매핑 객체 생성 (기존 매핑 유지)
+      const newMapping = { ...sportMapping };
+
+      // 게임 데이터에서 모든 종목 수집
+      games.forEach((game) => {
+        if (!game || !game.sport) return;
+
+        const sportName = game.sport.toLowerCase();
+        if (!newMapping[sportName]) {
+          newMapping[sportName] = [];
+        }
+      });
+
+      // 매핑 업데이트
+      setSportMapping(newMapping);
+
+      // 한글-영문 매핑 업데이트
+      const newKorToEngMapping: Record<string, string[]> = {};
+      Object.entries(newMapping).forEach(([eng, korArr]) => {
+        korArr.forEach((kor) => {
+          if (!newKorToEngMapping[kor]) newKorToEngMapping[kor] = [];
+          newKorToEngMapping[kor].push(eng);
+        });
+      });
+
+      setKorToEngMapping(newKorToEngMapping);
+    },
+    [sportMapping]
+  );
+
+  // 검색어에 따른 게임 필터링 및 정렬 함수 (먼저 정의)
+  const filterAndSortGames = useCallback(
+    (games: SportGame[], query: string) => {
+      const normalizedQuery = query.toLowerCase().trim();
+      let gamesToFilter = [...games];
+
+      if (!normalizedQuery) {
+        // 검색어가 없을 때: dateTime 기준 내림차순 정렬 (안전하게 복원)
+        const sortedGames = gamesToFilter.sort((a, b) => {
+          // 유효하지 않은 날짜는 0 (또는 음수)으로 처리하여 뒤로 보내기
+          const dateA = a.dateTime ? new Date(a.dateTime).getTime() : 0;
+          const dateB = b.dateTime ? new Date(b.dateTime).getTime() : 0;
+          // NaN 체크 추가: getTime()이 NaN을 반환할 수 있음
+          const timeA = !isNaN(dateA) ? dateA : 0;
+          const timeB = !isNaN(dateB) ? dateB : 0;
+          return timeB - timeA; // 내림차순
+        });
+        setFilteredGames(sortedGames);
+        return;
+      }
+
+      // 검색어가 있을 때: 필터링 후 customGameSort 적용 (기존 로직 유지)
+      let alternativeTerms: string[] = [];
+      if (sportMapping[normalizedQuery]) {
+        alternativeTerms = sportMapping[normalizedQuery];
+      } else if (korToEngMapping[normalizedQuery]) {
+        alternativeTerms = korToEngMapping[normalizedQuery];
+      }
+      const allSearchTerms = [normalizedQuery, ...alternativeTerms];
+
+      const filtered = gamesToFilter.filter((game) => {
+        if (!game) return false;
+        const searchableFields = [
+          game.matchName,
+          game.homeTeam,
+          game.awayTeam,
+          game.league,
+          game.sport,
+        ].map((field) => (field || "").toLowerCase());
+        return allSearchTerms.some((term) =>
+          searchableFields.some((field) => field.includes(term))
+        );
+      });
+
+      const sortedFilteredGames = filtered.sort(customGameSort);
+      setFilteredGames(sortedFilteredGames);
+    },
+    [sportMapping, korToEngMapping]
+  );
 
   // 추천 목록 조회
   const fetchRecommendations = useCallback(async () => {
@@ -122,135 +206,46 @@ export default function SportRecommendationsManagement() {
     }
   }, [page, limit]);
 
-  // 스포츠 게임 목록 조회
+  // 스포츠 게임 목록 조회 (updateSportMappings 호출 제거 및 의존성 제거)
   const fetchSportGames = useCallback(async () => {
     try {
-      // 서버에서 모든 데이터를 가져옴 (검색어는 클라이언트에서만 처리)
       const result = await getSportGames({});
-      setSportGames(result.data);
-
-      // 스포츠 종목 목록 자동 수집 (동적 매핑 생성)
-      updateSportMappings(result.data);
-
-      // 검색어가 있을 경우에만 클라이언트 측에서 필터링
-      if (searchQuery.trim()) {
-        filterGamesBySearchTerm(result.data, searchQuery.trim());
-      } else {
-        setFilteredGames(result.data);
-      }
+      setSportGames(result.data || []);
     } catch (err) {
       console.error("Error fetching sport games:", err);
+      setSportGames([]);
     }
-  }, [searchQuery]);
-
-  // 스포츠 종목 매핑 자동 생성
-  const updateSportMappings = (games: SportGame[]) => {
-    // 새로운 매핑 객체 생성 (기존 매핑 유지)
-    const newMapping = { ...sportMapping };
-
-    // 게임 데이터에서 모든 종목 수집
-    games.forEach((game) => {
-      if (!game || !game.sport) return;
-
-      const sportName = game.sport.toLowerCase();
-      if (!newMapping[sportName]) {
-        newMapping[sportName] = [];
-      }
-    });
-
-    // 매핑 업데이트
-    setSportMapping(newMapping);
-
-    // 한글-영문 매핑 업데이트
-    const newKorToEngMapping: Record<string, string[]> = {};
-    Object.entries(newMapping).forEach(([eng, korArr]) => {
-      korArr.forEach((kor) => {
-        if (!newKorToEngMapping[kor]) newKorToEngMapping[kor] = [];
-        newKorToEngMapping[kor].push(eng);
-      });
-    });
-
-    setKorToEngMapping(newKorToEngMapping);
-  };
-
-  // 검색어에 따른 게임 필터링 함수
-  const filterGamesBySearchTerm = (games: SportGame[], query: string) => {
-    console.log("Filtering games with query:", query);
-    console.log("Total games before filter:", games.length);
-
-    const normalizedQuery = query.toLowerCase().trim();
-
-    // 검색어가 비어있으면 모든 게임을 커스텀 정렬하여 반환
-    if (!normalizedQuery) {
-      const sortedGames = [...games].sort(customGameSort);
-      setFilteredGames(sortedGames);
-      return;
-    }
-
-    // 검색어가 비어있으면 모든 게임 반환
-    if (!normalizedQuery) {
-      setFilteredGames(games);
-      return;
-    }
-
-    // 검색어에 해당하는 다른 언어 키워드 가져오기
-    let alternativeTerms: string[] = [];
-
-    // 영문 검색어인 경우 한글 동의어 추가
-    if (sportMapping[normalizedQuery]) {
-      alternativeTerms = sportMapping[normalizedQuery];
-    }
-    // 한글 검색어인 경우 영문 동의어 추가
-    else if (korToEngMapping[normalizedQuery]) {
-      alternativeTerms = korToEngMapping[normalizedQuery];
-    }
-
-    // 모든 검색어 (원본 + 동의어)
-    const allSearchTerms = [normalizedQuery, ...alternativeTerms];
-    console.log("Searching for terms:", allSearchTerms);
-
-    // 게임 필터링 - 여러 필드에서 검색
-    const filtered = games.filter((game) => {
-      if (!game) return false;
-
-      // 검색 대상 필드들
-      const searchableFields = [
-        game.matchName,
-        game.homeTeam,
-        game.awayTeam,
-        game.league,
-        game.sport,
-      ].map((field) => (field || "").toLowerCase());
-
-      // 검색어가 어떤 필드에도 포함되어 있는지 확인
-      return allSearchTerms.some((term) => searchableFields.some((field) => field.includes(term)));
-    });
-
-    // 필터링된 결과를 커스텀 정렬
-    const sortedFilteredGames = [...filtered].sort(customGameSort);
-
-    console.log("Filtered games count:", sortedFilteredGames.length);
-    setFilteredGames(sortedFilteredGames);
-  };
+  }, []);
 
   // 컴포넌트 마운트 시 데이터 로드
   useEffect(() => {
     fetchRecommendations();
-    fetchSportGames(); // 초기 로드 시 전체 데이터 가져오기
+    fetchSportGames();
   }, [fetchRecommendations, fetchSportGames]);
 
-  // 검색어 변경 시 게임 데이터 필터링
+  // Debounce search query 업데이트 로직 추가
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300); // 300ms 지연
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [searchQuery]);
+
+  // sportGames 또는 debouncedSearchQuery 변경 시 게임 목록 필터링/정렬 및 매핑 업데이트
   useEffect(() => {
     if (sportGames.length > 0) {
-      if (searchQuery.trim()) {
-        filterGamesBySearchTerm(sportGames, searchQuery.trim());
-      } else {
-        // 검색어가 없을 때도 커스텀 정렬하여 설정
-        const sortedGames = [...sportGames].sort(customGameSort);
-        setFilteredGames(sortedGames);
-      }
+      console.log("sportGames updated, running post-processing.");
+      // 매핑 업데이트는 여기서 수행
+      updateSportMappings(sportGames);
+      // 필터링 및 정렬 수행
+      filterAndSortGames(sportGames, debouncedSearchQuery);
+    } else {
+      setFilteredGames([]);
     }
-  }, [searchQuery, sportGames]);
+  }, [sportGames, debouncedSearchQuery, updateSportMappings, filterAndSortGames]);
 
   // 추천 추가 모달 열기
   const handleAddRecommendation = () => {
