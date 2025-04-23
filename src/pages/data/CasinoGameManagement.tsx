@@ -47,6 +47,7 @@ const CasinoGameManagement = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10); // 페이지당 항목 수
+  const [totalItems, setTotalItems] = useState<number>(0); // totalItems 상태 추가
 
   // 게임 데이터 상태
   const [title, setTitle] = useState<string>("");
@@ -110,6 +111,7 @@ const CasinoGameManagement = () => {
         setCurrentPage(paginationData.currentPage || 1);
         setTotalPages(paginationData.totalPages || 1);
         setPageSize(paginationData.pageSize || limit);
+        setTotalItems(paginationData.totalItems || 0); // totalItems 상태 업데이트
       } else {
         setGames([]);
         setAlertMessage({
@@ -130,10 +132,10 @@ const CasinoGameManagement = () => {
     }
   };
 
-  // 페이지 변경 핸들러
+  // 페이지 변경 핸들러 (CompanyBannerPage 기준)
   const handlePageChange = (page: number) => {
-    if (page !== currentPage) {
-      fetchGames(page);
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      fetchGames(page, pageSize); // pageSize 전달 추가
     }
   };
 
@@ -763,57 +765,18 @@ const CasinoGameManagement = () => {
 
       <LoadingOverlay isLoading={loading || saving} />
 
-      {/* Add container div with white background */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <DataTable
-          columns={columns}
-          data={games}
-          loading={loading}
-          emptyMessage="등록된 게임이 없습니다."
-        />
-      </div>
-
-      {games && games.length > 0 && totalPages > 1 && (
-        <div className="flex justify-center my-6">
-          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-            <button
-              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
-                currentPage === 1
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              이전
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium ${
-                  currentPage === page
-                    ? "bg-indigo-50 text-indigo-600 z-10"
-                    : "bg-white text-gray-500 hover:bg-gray-50"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
-                currentPage === totalPages
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              다음
-            </button>
-          </nav>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        data={games}
+        loading={loading}
+        emptyMessage="등록된 게임이 없습니다."
+        pagination={{
+          currentPage: currentPage,
+          pageSize: pageSize,
+          totalItems: totalItems,
+          onPageChange: handlePageChange,
+        }}
+      />
 
       <Modal
         isOpen={showModal}

@@ -37,6 +37,7 @@ export default function SportRecommendationsManagement() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   // 모달 상태
   const [showModal, setShowModal] = useState(false);
@@ -198,6 +199,9 @@ export default function SportRecommendationsManagement() {
       const sortedData = result.data.sort((a, b) => b.id - a.id);
       setRecommendations(sortedData);
       setTotal(result.meta.total || 0);
+      // totalPages 상태 업데이트 추가
+      setTotalPages(Math.ceil((result.meta.total || 0) / limit) || 1);
+
       // Restore selection after fetch
       setSelectedRecommendationIds(
         currentSelected.filter((id) => sortedData.some((rec) => rec.id === id))
@@ -792,6 +796,13 @@ export default function SportRecommendationsManagement() {
     },
   ];
 
+  // 페이지 변경 핸들러 추가 (CompanyBannerPage 기준, setPage 래핑)
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages && newPage !== page) {
+      setPage(newPage);
+    }
+  };
+
   return (
     <div className="p-4">
       <h1 className="text-xl font-semibold mb-4">스포츠 종목 추천 관리</h1>
@@ -831,7 +842,7 @@ export default function SportRecommendationsManagement() {
         <DataTable
           columns={columns}
           data={recommendations}
-          loading={false} // Use LoadingOverlay instead
+          loading={loading}
           emptyMessage="등록된 추천이 없습니다."
         />
       </div>

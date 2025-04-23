@@ -184,11 +184,11 @@ export default function SportsManagement() {
     fetchSportCategories(currentPage, pageSize);
   }, [fetchSportCategories, currentPage, pageSize]); // currentPage, pageSize 의존성 추가
 
-  // handlePageChange: setCurrentPage 호출 -> useEffect 트리거
+  // handlePageChange: setCurrentPage 호출 -> useEffect 트리거 (CompanyBannerPage 기준 로직으로 직접 fetch 호출)
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      setCurrentPage(page); // 상태 변경 -> useEffect가 fetch 호출
-      // setSelectedCategoryIds([]); // fetch 완료 후 초기화됨
+      // setCurrentPage(page); // 상태 변경 -> useEffect가 fetch 호출 (이전 방식)
+      fetchSportCategories(page, pageSize); // 직접 fetch 호출 (CompanyBannerPage 방식)
     }
   };
 
