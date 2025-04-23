@@ -596,8 +596,9 @@ const CasinoRecommendationManagement = () => {
         accessor: "title" as keyof CasinoRecommendation,
         cell: (value: string, row: CasinoRecommendation) => (
           <span
-            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block truncate"
             onClick={() => handleOpenEditModal(row)}
+            title={value}
           >
             {value}
           </span>

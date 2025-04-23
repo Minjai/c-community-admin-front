@@ -130,31 +130,26 @@ const DataTable = <T extends Record<string, any>>({
 
       {pagination && totalPages > 1 && (
         <div className="px-6 py-3 flex items-center justify-between border-t border-gray-200">
-          <div className="flex-1 flex justify-between sm:hidden">
+          {/* REMOVE Small screen pagination block */}
+          {/* <div className="flex-1 flex justify-between sm:hidden">
             <button
               onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
               disabled={pagination.currentPage === 1}
-              className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                pagination.currentPage === 1
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-white text-gray-700 hover:bg-gray-50"
-              }`}
+              className={`...`}
             >
               이전
             </button>
             <button
               onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
               disabled={pagination.currentPage === totalPages}
-              className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
-                pagination.currentPage === totalPages
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-white text-gray-700 hover:bg-gray-50"
-              }`}
+              className={`...`}
             >
               다음
             </button>
-          </div>
-          <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+          </div> */}
+
+          {/* Always show larger screen pagination block - remove 'hidden' class */}
+          <div className="sm:flex-1 sm:flex sm:items-center sm:justify-between w-full">
             <div>
               <p className="text-sm text-gray-700">
                 전체 <span className="font-medium">{pagination.totalItems}</span> 개 중{" "}
