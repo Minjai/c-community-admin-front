@@ -826,8 +826,8 @@ export default function SportRecommendationsManagement() {
       {/* Loading Overlay */}
       <LoadingOverlay isLoading={loading} />
 
-      {/* DataTable */}
-      <div className="bg-white shadow rounded-lg overflow-hidden">
+      {/* Standardize container div classes */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
         <DataTable
           columns={columns}
           data={recommendations}

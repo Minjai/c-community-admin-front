@@ -763,12 +763,15 @@ const CasinoGameManagement = () => {
 
       <LoadingOverlay isLoading={loading || saving} />
 
-      <DataTable
-        columns={columns}
-        data={games}
-        loading={loading}
-        emptyMessage="등록된 게임이 없습니다."
-      />
+      {/* Add container div with white background */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={games}
+          loading={loading}
+          emptyMessage="등록된 게임이 없습니다."
+        />
+      </div>
 
       {games && games.length > 0 && totalPages > 1 && (
         <div className="flex justify-center my-6">

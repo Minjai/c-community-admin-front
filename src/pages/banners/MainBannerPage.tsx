@@ -663,55 +663,23 @@ const MainBannerPage: React.FC = () => {
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
-      <DataTable
-        columns={columns}
-        data={banners}
-        loading={loading}
-        emptyMessage="등록된 배너가 없습니다."
-      />
+      <LoadingOverlay isLoading={loading} />
 
-      {/* 페이지네이션 UI 추가 (CasinoGameManagement.tsx 복사) */}
-      {banners && banners.length > 0 && totalPages > 1 && (
-        <div className="flex justify-center my-6">
-          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-            <button
-              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
-                currentPage === 1
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              이전
-            </button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium ${
-                  currentPage === page
-                    ? "bg-indigo-50 text-indigo-600 z-10"
-                    : "bg-white text-gray-500 hover:bg-gray-50"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
-                currentPage === totalPages
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              다음
-            </button>
-          </nav>
-        </div>
-      )}
+      {/* Re-add the DataTable with correct wrapper and pagination prop */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={banners}
+          loading={loading}
+          emptyMessage="등록된 배너가 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
+        />
+      </div>
 
       {/* 배너 추가/수정 모달 */}
       {currentBanner && (
@@ -845,9 +813,6 @@ const MainBannerPage: React.FC = () => {
           </div>
         </Modal>
       )}
-
-      {/* 로딩 오버레이 */}
-      <LoadingOverlay isLoading={isSaving} />
     </div>
   );
 };
