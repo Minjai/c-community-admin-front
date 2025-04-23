@@ -641,7 +641,7 @@ export default function SportsManagement() {
           {/* 3. 종목 경기 선택 (기존 필드 순서 유지) */}
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">종목 선택</label>
-            <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-60 overflow-y-auto p-2 border rounded-md">
+            <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 gap-2 p-2 border rounded-md">
               {sportOptions.map((sport) => (
                 <label key={sport} className="inline-flex items-center">
                   <input
