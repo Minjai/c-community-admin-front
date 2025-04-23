@@ -242,16 +242,16 @@ export default function SportRecommendationsManagement() {
 
   // sportGames 또는 debouncedSearchQuery 변경 시 게임 목록 필터링/정렬 및 매핑 업데이트
   useEffect(() => {
-    // [임시 비움] 라우팅 문제 진단을 위해 내부 로직 비활성화
-    // if (sportGames.length > 0) {
-    //   console.log("sportGames updated, running post-processing.");
-    //   // 매핑 업데이트는 여기서 수행
-    //   updateSportMappings(sportGames);
-    //   // 필터링 및 정렬 수행
-    //   filterAndSortGames(sportGames, debouncedSearchQuery);
-    // } else {
-    //   setFilteredGames([]);
-    // }
+    // [임시 비움] 라우팅 문제 진단을 위해 내부 로직 비활성화 -> 주석 해제
+    if (sportGames.length > 0) {
+      console.log("sportGames updated, running post-processing.");
+      // 매핑 업데이트는 여기서 수행
+      updateSportMappings(sportGames);
+      // 필터링 및 정렬 수행
+      filterAndSortGames(sportGames, debouncedSearchQuery);
+    } else {
+      setFilteredGames([]);
+    }
   }, [sportGames, debouncedSearchQuery, updateSportMappings, filterAndSortGames]);
 
   // 추천 추가 모달 열기
@@ -322,6 +322,8 @@ export default function SportRecommendationsManagement() {
     } finally {
       setLoading(false);
     }
+    // Reset search query before showing modal
+    setSearchQuery("");
     setShowModal(true);
   };
 
