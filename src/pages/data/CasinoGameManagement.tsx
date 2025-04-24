@@ -765,19 +765,20 @@ const CasinoGameManagement = () => {
 
       <LoadingOverlay isLoading={loading || saving} />
 
-      <DataTable
-        columns={columns}
-        data={games}
-        loading={loading}
-        emptyMessage="등록된 게임이 없습니다."
-        pagination={{
-          currentPage: currentPage,
-          pageSize: pageSize,
-          totalItems: totalItems,
-          onPageChange: handlePageChange,
-        }}
-      />
-
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={games}
+          loading={loading}
+          emptyMessage="등록된 게임이 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
+        />
+      </div>
       <Modal
         isOpen={showModal}
         onClose={handleCloseModal}

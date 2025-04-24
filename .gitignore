@@ -4,3 +4,4 @@ aws_configure_dev_minjai.sh
 aws_configure_prod.sh
 aws_configure_lpgg.sh
 dist/
+.cursor

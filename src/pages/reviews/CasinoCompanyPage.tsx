@@ -100,7 +100,10 @@ const CasinoCompanyPage: React.FC = () => {
 
           // 페이지네이션 정보 업데이트
           setTotalItems(total);
-          setCurrentPage(currentPageFromApi);
+          // 명시적으로 호출된 경우 페이지 번호를 다시 설정하지 않음
+          if (page === currentPage) {
+            setCurrentPage(currentPageFromApi);
+          }
           setPageSize(pageSizeFromApi);
           setTotalPages(totalPagesFromApi);
 
@@ -147,11 +150,12 @@ const CasinoCompanyPage: React.FC = () => {
 
   useEffect(() => {
     fetchCompanies(currentPage, pageSize); // 컴포넌트 마운트 시 첫 페이지 데이터 로드
-  }, []); // 최초 렌더링 시에만 실행
+  }, []); // 컴포넌트 마운트 시에만 실행
 
   // 페이지 변경 핸들러 추가
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
+      setCurrentPage(page); // 먼저 currentPage 상태를 업데이트
       fetchCompanies(page, pageSize); // 새 페이지 데이터 요청
     }
   };
