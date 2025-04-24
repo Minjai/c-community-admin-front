@@ -262,20 +262,35 @@ const CasinoRecommendationManagement = () => {
 
   // Open Edit Modal
   const handleOpenEditModal = (recommendation: CasinoRecommendation) => {
+    console.log("[DEBUG] Opening edit modal with data:", recommendation);
+    console.log("[DEBUG] Current available games:", availableGames);
     setIsEditing(true);
     setCurrentRecommendationId(recommendation.id);
     setTitle(recommendation.title || "");
     setIsMainDisplay(recommendation.isMainDisplay || false);
 
-    const currentSelectedGames = availableGames.filter((g) =>
-      recommendation.gameIds?.includes(g.id)
-    );
+    // 디버깅: 게임 ID 목록 확인
+    console.log("[DEBUG] recommendation.gameIds:", recommendation.gameIds);
+
+    const currentSelectedGames = availableGames.filter((g) => {
+      const included = recommendation.gameIds?.includes(g.id);
+      console.log(`[DEBUG] Game ${g.id} (${g.title}) included: ${included}`);
+      return included;
+    });
+    console.log("[DEBUG] Filtered games:", currentSelectedGames);
+
     setSelectedGames(currentSelectedGames.map((g) => g.title));
     setSelectedGameIds(currentSelectedGames.map((g) => g.id));
+    console.log(
+      "[DEBUG] Selected game IDs:",
+      currentSelectedGames.map((g) => g.id)
+    );
 
     // Convert UTC ISO from server to local datetime-local for input
     setStartDate(formatISODateToDateTimeLocal(recommendation.startDate));
     setEndDate(formatISODateToDateTimeLocal(recommendation.endDate));
+    console.log("[DEBUG] Start date:", formatISODateToDateTimeLocal(recommendation.startDate));
+    console.log("[DEBUG] End date:", formatISODateToDateTimeLocal(recommendation.endDate));
 
     setPublicSettings(recommendation.isPublic === 1 ? "public" : "private");
     setError(null);
@@ -486,6 +501,19 @@ const CasinoRecommendationManagement = () => {
 
   // 추천 저장 (추가/수정)
   const handleSaveRecommendation = async () => {
+    console.log("[DEBUG] Save recommendation triggered");
+    console.log("[DEBUG] Current state:", {
+      isEditing,
+      currentRecommendationId,
+      title,
+      isMainDisplay,
+      selectedGames,
+      selectedGameIds,
+      startDate,
+      endDate,
+      publicSettings,
+    });
+
     setError(null);
     if (!title.trim()) {
       setError("카테고리 타이틀을 입력해주세요.");
@@ -516,27 +544,46 @@ const CasinoRecommendationManagement = () => {
         ? Math.max(...allRecommendations.map((rec) => rec.position || 0)) + 1
         : 1;
 
+      // 날짜 변환 시도 (오류 처리 추가)
+      let startDateISO, endDateISO;
+      try {
+        console.log("[DEBUG] Converting dates - before:", { startDate, endDate });
+        startDateISO = convertDateTimeLocalToISOUTC(startDate);
+        endDateISO = convertDateTimeLocalToISOUTC(endDate);
+        console.log("[DEBUG] Converting dates - after:", { startDateISO, endDateISO });
+      } catch (dateError) {
+        console.error("[DEBUG] Date conversion error:", dateError);
+        setError("날짜 변환 중 오류가 발생했습니다. 날짜 형식을 확인해주세요.");
+        setSaving(false);
+        return;
+      }
+
       // Convert local datetime-local input strings to UTC ISO strings for saving
       const payload: UpsertCasinoRecommendationPayload = {
         title,
         isMainDisplay,
         gameIds: selectedGameIds,
-        startDate: convertDateTimeLocalToISOUTC(startDate),
-        endDate: convertDateTimeLocalToISOUTC(endDate),
+        startDate: startDateISO,
+        endDate: endDateISO,
         isPublic: publicSettings === "public",
         displayOrder: newDisplayOrder,
       };
 
+      console.log("[DEBUG] Payload to send:", payload);
+
       if (isEditing && currentRecommendationId !== null) {
+        console.log(`[DEBUG] Sending PUT request to /casino-recommends/${currentRecommendationId}`);
         await axios.put(`/casino-recommends/${currentRecommendationId}`, payload);
         setAlertMessage({ type: "success", message: "게임 추천이 성공적으로 수정되었습니다." });
       } else {
+        console.log("[DEBUG] Sending POST request to /casino-recommends");
         await axios.post("/casino-recommends", payload);
         setAlertMessage({ type: "success", message: "새 게임 추천이 성공적으로 등록되었습니다." });
       }
       fetchRecommendations(); // 저장 후 데이터 다시 로드
       handleCloseModal();
     } catch (err: unknown) {
+      console.error("[DEBUG] Error during save:", err);
       setError(err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.");
     } finally {
       setSaving(false);

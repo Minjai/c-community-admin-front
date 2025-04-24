@@ -287,6 +287,13 @@ export default function SportRecommendationsManagement() {
 
   // 추천 수정 모달 열기
   const handleEditRecommendation = async (recommendation: SportRecommendation) => {
+    // 가드 조건 추가
+    if (!sportGames || sportGames.length === 0) {
+      console.log("사용 가능한 게임이 로드되지 않았습니다");
+      setError("사용 가능한 게임이 로드되지 않았습니다. 잠시 후 다시 시도해주세요.");
+      return;
+    }
+
     setModalType("edit");
     setCurrentRecommendation(recommendation);
 
