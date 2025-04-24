@@ -744,7 +744,26 @@ export default function SportRecommendationsManagement() {
     {
       header: "게임 수",
       accessor: "sportGameIds" as keyof SportRecommendation,
-      cell: (gameIds: number[]) => renderGameCount(gameIds),
+      cell: (gameIds: number[] | undefined, row: SportRecommendation) => {
+        // 1. sportGames 배열 확인 (API 응답에서 가장 정확한 데이터)
+        if ((row as any).sportGames && (row as any).sportGames.length > 0) {
+          return `${(row as any).sportGames.length}개`;
+        }
+        // 2. games 배열 확인
+        else if (row.games && row.games.length > 0) {
+          return `${row.games.length}개`;
+        }
+        // 3. sportGameIds 배열 확인 (이전 코드 호환성)
+        else if (gameIds && gameIds.length > 0) {
+          return `${gameIds.length}개`;
+        }
+        // 4. sportGameId 단일 값 확인 (이전 코드 호환성)
+        else if (row.sportGameId) {
+          return "1개";
+        }
+        // 데이터가 없는 경우
+        return "0개";
+      },
     },
     {
       header: "시작 시간",
