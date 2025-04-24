@@ -661,25 +661,27 @@ const CasinoCompanyPage: React.FC = () => {
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
-      {loading ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-        </div>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={companies}
-          loading={loading}
-          emptyMessage="등록된 카지노 업체가 없습니다."
-          pagination={{
-            // DataTable에 pagination props 전달
-            currentPage,
-            pageSize,
-            totalItems,
-            onPageChange: handlePageChange,
-          }}
-        />
-      )}
+      {/* Wrap the loading indicator and DataTable inside the styled div */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={companies}
+            loading={loading} // Pass loading state to DataTable as well if needed internally
+            emptyMessage="등록된 카지노 업체가 없습니다."
+            pagination={{
+              currentPage,
+              pageSize,
+              totalItems,
+              onPageChange: handlePageChange,
+            }}
+          />
+        )}
+      </div>
 
       {/* 로딩 오버레이 */}
       <LoadingOverlay isLoading={loading || isSaving || isMoving} />

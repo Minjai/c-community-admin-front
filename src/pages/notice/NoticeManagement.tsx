@@ -5,6 +5,9 @@ import { useNavigate } from "react-router-dom";
 import ActionButton from "@/components/ActionButton";
 import Button from "@/components/Button";
 import Alert from "@/components/Alert";
+import DataTable from "@/components/DataTable";
+import { formatDate } from "@/utils/dateUtils";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 const NoticeManagement = () => {
   const [loading, setLoading] = useState<boolean>(false);
@@ -28,8 +31,8 @@ const NoticeManagement = () => {
   };
 
   // 페이지 변경 처리
-  const handlePageChange = (page: number) => {
-    getAllNotices(page);
+  const handlePageChange = (newPage: number) => {
+    getAllNotices(newPage);
   };
 
   // 전체 공지사항 목록 가져오기
@@ -163,6 +166,80 @@ const NoticeManagement = () => {
     navigate("/notice/new");
   };
 
+  // DataTable 컬럼 정의
+  const columns = [
+    {
+      header: (
+        <input
+          type="checkbox"
+          checked={isAllSelected}
+          onChange={(e) => handleSelectAll(e.target.checked)}
+          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          disabled={loading || notices.length === 0 || deleting}
+        />
+      ),
+      accessor: "id" as keyof Post,
+      cell: (id: number) => (
+        <input
+          type="checkbox"
+          checked={selectedIds.has(id)}
+          onChange={(e) => handleSelect(id, e.target.checked)}
+          className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+          onClick={(e) => e.stopPropagation()} // Prevent row click
+          disabled={loading || deleting}
+        />
+      ),
+      className: "w-16 px-6", // Adjusted padding
+    },
+    {
+      header: "제목",
+      accessor: "title" as keyof Post,
+      cell: (title: string, row: Post) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent default row click if any
+            handleClick(row.id);
+          }}
+        >
+          {title}
+        </span>
+      ),
+    },
+    {
+      header: "작성일",
+      accessor: "createdAt" as keyof Post,
+      cell: (value: string) => formatDate(value),
+    },
+    {
+      header: "공개 여부",
+      accessor: "isPublic" as keyof Post,
+      cell: (isPublic: number) => (isPublic === 1 ? "공개" : "비공개"),
+    },
+    {
+      header: "관리",
+      accessor: "id" as keyof Post,
+      cell: (id: number, row: Post) => (
+        <div className="flex space-x-1">
+          <ActionButton
+            label="수정"
+            action="edit"
+            size="sm"
+            onClick={(e) => handleEdit(id, e)}
+            disabled={deleting}
+          />
+          <ActionButton
+            label="삭제"
+            action="delete"
+            size="sm"
+            onClick={(e) => handleDelete(id, e)}
+            disabled={deleting}
+          />
+        </div>
+      ),
+    },
+  ];
+
   useEffect(() => {
     getAllNotices();
   }, []);
@@ -194,167 +271,22 @@ const NoticeManagement = () => {
         />
       )}
 
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16"
-              >
-                <input
-                  type="checkbox"
-                  checked={isAllSelected}
-                  onChange={(e) => handleSelectAll(e.target.checked)}
-                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                />
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
-                제목
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
-                작성일
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
-                공개 여부
-              </th>
-              <th
-                scope="col"
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
-                관리
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {loading ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-4 text-center">
-                  <div className="flex justify-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
-                  </div>
-                </td>
-              </tr>
-            ) : notices && notices.length > 0 ? (
-              notices.map((notice) => (
-                <tr
-                  key={notice.id}
-                  className={`hover:bg-gray-50 ${selectedIds.has(notice.id) ? "bg-indigo-50" : ""}`}
-                >
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(notice.id)}
-                      onChange={(e) => handleSelect(notice.id, e.target.checked)}
-                      className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    />
-                  </td>
-                  <td
-                    className="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600 cursor-pointer"
-                    onClick={() => handleClick(notice.id)}
-                  >
-                    {notice.title}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(notice.createdAt).toLocaleDateString()}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <span
-                      className={`px-2 py-1 rounded text-xs ${
-                        notice.isPublic === 1
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {notice.isPublic === 1 ? "공개" : "비공개"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div className="flex space-x-1">
-                      <ActionButton
-                        label="수정"
-                        action="edit"
-                        size="sm"
-                        onClick={(e: React.MouseEvent) => handleEdit(notice.id, e)}
-                      />
-                      <ActionButton
-                        label="삭제"
-                        action="delete"
-                        size="sm"
-                        onClick={(e: React.MouseEvent) => handleDelete(notice.id, e)}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                  등록된 공지사항이 없습니다.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <LoadingOverlay isLoading={loading || deleting} />
 
-      {notices && notices.length > 0 && (
-        <div className="flex justify-center my-6">
-          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-            <button
-              onClick={() => handlePageChange(Math.max(1, pagination.page - 1))}
-              disabled={pagination.page === 1}
-              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
-                pagination.page === 1
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              이전
-            </button>
-            {Array.from(
-              { length: Math.ceil(pagination.total / pagination.limit) },
-              (_, i) => i + 1
-            ).map((page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium ${
-                  pagination.page === page
-                    ? "bg-indigo-50 text-indigo-600 z-10"
-                    : "bg-white text-gray-500 hover:bg-gray-50"
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              onClick={() =>
-                handlePageChange(
-                  Math.min(Math.ceil(pagination.total / pagination.limit), pagination.page + 1)
-                )
-              }
-              disabled={pagination.page === Math.ceil(pagination.total / pagination.limit)}
-              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
-                pagination.page === Math.ceil(pagination.total / pagination.limit)
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              다음
-            </button>
-          </nav>
-        </div>
-      )}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={notices}
+          loading={loading || deleting}
+          emptyMessage="등록된 공지사항이 없습니다."
+          pagination={{
+            currentPage: pagination.page,
+            pageSize: pagination.limit,
+            totalItems: pagination.total,
+            onPageChange: handlePageChange,
+          }}
+        />
+      </div>
     </div>
   );
 };

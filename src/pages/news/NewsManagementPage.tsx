@@ -581,22 +581,24 @@ const NewsManagementPage = () => {
         </Button>
       </div>
 
-      {/* DataTable */}
-      <DataTable
-        columns={columns}
-        data={news}
-        loading={loading}
-        emptyMessage="등록된 뉴스가 없습니다."
-        pagination={{
-          currentPage,
-          pageSize,
-          totalItems,
-          onPageChange: handlePageChange,
-        }}
-      />
-
       {/* Loading Overlay */}
       <LoadingOverlay isLoading={loading || saving} />
+
+      {/* Wrap DataTable in the styled div */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={news}
+          loading={loading}
+          emptyMessage="등록된 뉴스가 없습니다."
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
+        />
+      </div>
 
       {/* Modal */}
       {showModal && currentNews && (
