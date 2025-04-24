@@ -246,12 +246,9 @@ export default function SportRecommendationsManagement() {
 
   // sportGames 또는 debouncedSearchQuery 변경 시 게임 목록 필터링/정렬 및 매핑 업데이트
   useEffect(() => {
-    // [임시 비움] 라우팅 문제 진단을 위해 내부 로직 비활성화 -> 주석 해제
+    // 주석 제거 및 로직 활성화
     if (sportGames.length > 0) {
-      console.log("sportGames updated, running post-processing.");
-      // 매핑 업데이트는 여기서 수행
       updateSportMappings(sportGames);
-      // 필터링 및 정렬 수행
       filterAndSortGames(sportGames, debouncedSearchQuery);
     } else {
       setFilteredGames([]);
@@ -844,55 +841,14 @@ export default function SportRecommendationsManagement() {
           data={recommendations}
           loading={loading}
           emptyMessage="등록된 추천이 없습니다."
+          pagination={{
+            currentPage: page,
+            pageSize: limit,
+            totalItems: total,
+            onPageChange: handlePageChange,
+          }}
         />
       </div>
-
-      {/* Pagination Controls (Add separately if needed, or handle server-side pagination differently) */}
-      {total > limit && (
-        <div className="flex justify-center my-6">
-          {/* Standard Pagination UI can be added here */}
-          {/* Example: */}
-          <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-            <button
-              onClick={() => setPage(Math.max(1, page - 1))}
-              disabled={page === 1 || loading}
-              className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
-                page === 1 || loading
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              이전
-            </button>
-            {/* Render page numbers - Consider limiting the number shown for many pages */}
-            {Array.from({ length: Math.ceil(total / limit) }, (_, i) => i + 1).map((pageNum) => (
-              <button
-                key={pageNum}
-                onClick={() => setPage(pageNum)}
-                disabled={loading}
-                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium ${
-                  page === pageNum
-                    ? "bg-indigo-50 text-indigo-600 z-10"
-                    : "bg-white text-gray-500 hover:bg-gray-50"
-                } ${loading ? "cursor-not-allowed" : ""}`}
-              >
-                {pageNum}
-              </button>
-            ))}
-            <button
-              onClick={() => setPage(Math.min(Math.ceil(total / limit), page + 1))}
-              disabled={page === Math.ceil(total / limit) || loading}
-              className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
-                page === Math.ceil(total / limit) || loading
-                  ? "text-gray-300 cursor-not-allowed"
-                  : "text-gray-500 hover:bg-gray-50"
-              }`}
-            >
-              다음
-            </button>
-          </nav>
-        </div>
-      )}
 
       {/* Modal for Add/Edit */}
       <Modal
