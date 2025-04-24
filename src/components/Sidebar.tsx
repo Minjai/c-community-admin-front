@@ -185,7 +185,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
                               ? "bg-gray-700 text-white"
                               : "text-gray-300 hover:bg-gray-700 hover:text-white"
                           }`}
-                          onClick={toggleSidebar}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            toggleSidebar();
+
+                            if (location.pathname !== subItem.path) {
+                              window.location.href = subItem.path;
+                            }
+                          }}
                         >
                           {subItem.name}
                         </Link>
