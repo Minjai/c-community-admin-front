@@ -589,6 +589,7 @@ export default function SportsManagement() {
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={modalType === "add" ? "새 카테고리 추가" : "카테고리 수정"}
+        size="xl"
       >
         <div>
           {/* 1. 최상단 라인: 버튼(좌) + 공개여부 체크박스(우) */}
