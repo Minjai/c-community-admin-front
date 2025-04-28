@@ -18,43 +18,38 @@ import Select from "@/components/forms/Select";
 
 // 스포츠 이름 매핑 객체 추가
 const sportNameMapping: Record<string, string> = {
-  // 기본 매핑 (이미 우리가 사용하는 것)
-  축구: "FOOTBALL",
-  테니스: "TENNIS",
-  농구: "BASKETBALL",
-  "미식 축구": "AMERICAN_FOOTBALL",
-  하키: "HOCKEY",
-  배구: "VOLLEYBALL",
-  크리켓: "CRICKET",
-
-  // 추가 매핑
-  e스포츠: "ESPORTS",
-  겨울스포츠: "WINTER_SPORTS",
-  경마: "HORSE_RACING",
-  골프: "GOLF",
-  권투: "BOXING",
-  넷볼: "NETBALL",
-  다트: "DARTS",
-  럭비: "RUGBY",
+  "e스포츠": "ESPORTS",
+  "겨울스포츠": "WINTER_SPORTS",
+  "경마": "HORSE_RACING",
+  "골프": "GOLF",
+  "권투": "BOXING",
+  "넷볼": "NETBALL",
+  "농구": "BASKETBALL",
+  "다트": "DARTS",
+  "럭비": "RUGBY",
   "럭비 리그": "RUGBY_LEAGUE",
-  모터스포츠: "MOTORSPORTS",
-  배드민턴: "BADMINTON",
-  밴디: "BANDY",
+  "모터스포츠": "MOTORSPORTS",
+  "배드민턴": "BADMINTON",
+  "밴디": "BANDY",
   "비치 발리볼": "BEACH_VOLLEYBALL",
   "비치 사커": "BEACH_SOCCER",
-  빼시발로: "PESAPALLO",
-  사이클: "CYCLING",
-  수구: "WATER_POLO",
-  스누커: "SNOOKER",
-  야구: "BASEBALL",
+  "뻬사발로": "PESAPALLO",
+  "사이클": "CYCLING",
+  "수구": "WATER_POLO",
+  "스누커": "SNOOKER",
+  "야구": "BASEBALL",
   "이종 격투기": "MMA",
-  카바디: "KABADDI",
-  탁구: "TABLE_TENNIS",
-  풋살: "FUTSAL",
-  풀로어볼: "FLOORBALL",
+  "카바디": "KABADDI",
+  "탁구": "TABLE_TENNIS",
+  "풋살": "FUTSAL",
+  "플로어볼": "FLOORBALL",
   "필드 하키": "FIELD_HOCKEY",
-  핸드볼: "HANDBALL",
+  "핸드볼": "HANDBALL",
   "호주식 축구": "AUSTRALIAN_FOOTBALL",
+  "미식 축구": "AMERICAN_FOOTBALL",
+  "크리켓": "CRICKET",
+  "축구": "FOOTBALL",
+  "테니스": "TENNIS"
 };
 
 // 역방향 매핑 생성 (영문 코드 -> 한글 이름)
@@ -63,14 +58,29 @@ Object.entries(sportNameMapping).forEach(([koreanName, englishCode]) => {
   reverseSportNameMapping[englishCode] = koreanName;
 });
 
-// 한글 이름을 영문 코드로 변환하는 함수
+// 한글 이름을 영문 코드로 변환하는 함수 (공백 방지)
 const getEnglishSportCode = (koreanName: string): string => {
-  return sportNameMapping[koreanName] || koreanName;
+  const key = koreanName.trim();
+  return sportNameMapping[key] || key;
 };
 
-// 영문 코드를 한글 이름으로 변환하는 함수
+// 영문 코드를 한글 이름으로 변환하는 함수 (공백 방지)
 const getKoreanSportName = (englishCode: string): string => {
-  return reverseSportNameMapping[englishCode] || englishCode;
+  const key = englishCode.trim();
+  return reverseSportNameMapping[key] || key;
+};
+
+// displayOrder 최대값+1 계산 함수
+const getNextDisplayOrder = (allCategories: SportCategory[]) => {
+  if (!allCategories || allCategories.length === 0) return 1;
+  return Math.max(...allCategories.map((cat) => cat.displayOrder || 0)) + 1;
+};
+
+// displayOrder 교환 함수
+const swapDisplayOrder = async (catA: SportCategory, catB: SportCategory) => {
+  const tempOrder = catA.displayOrder;
+  await updateSportCategory(catA.id, { ...catA, displayOrder: catB.displayOrder });
+  await updateSportCategory(catB.id, { ...catB, displayOrder: tempOrder });
 };
 
 export default function SportsManagement() {
@@ -162,7 +172,7 @@ export default function SportsManagement() {
       }));
       // 서버 정렬이 없다면 클라이언트 정렬 유지 (필요 시 서버 정렬 파라미터 추가)
       const sortedData = processedData.sort(
-        (a: SportCategory, b: SportCategory) => (a.displayOrder || 0) - (b.displayOrder || 0)
+        (a: SportCategory, b: SportCategory) => (b.displayOrder || 0) - (a.displayOrder || 0)
       );
 
       setCategories(sortedData); // 현재 페이지 데이터 설정
@@ -266,30 +276,29 @@ export default function SportsManagement() {
       return;
     }
 
-    // payload에서 displayOrder 제거 (추가 시 서버 처리 가정)
-    const payload = {
-      sportName: getEnglishSportCode(selectedSport),
-      displayName: formData.displayName.trim(),
-      isPublic: formData.isPublic,
-      ...(modalType === "edit" &&
-        currentCategory?.displayOrder !== undefined && {
-          displayOrder: currentCategory.displayOrder, // 수정 시에만 포함
-        }),
-    };
-    // 타입 조정
-    const finalPayload: Omit<
-      SportCategory,
-      "id" | "createdAt" | "updatedAt" | "icon" | "displayOrder" // displayOrder는 선택적으로 포함될 수 있음
-    > & { displayOrder?: number } = payload;
-
     setLoading(true);
     setError(null);
     setSuccess(null);
     try {
+      let displayOrder: number;
+      if (modalType === "add") {
+        displayOrder = totalItems + 1;
+      } else {
+        displayOrder = currentCategory?.displayOrder ?? 1;
+      }
+
+      const payload = {
+        sportName: sportNameMapping[selectedSport.trim()] || selectedSport.trim(),
+        displayName: formData.displayName.trim(),
+        isPublic: formData.isPublic,
+        displayOrder,
+      };
+      // 타입 조정
+      const finalPayload: Omit<SportCategory, "id" | "createdAt" | "updatedAt" | "icon"> = payload;
+
       if (modalType === "edit" && currentCategory) {
         await updateSportCategory(currentCategory.id, finalPayload);
       } else {
-        // create 시 displayOrder 없이 전달 (서버에서 자동 할당 가정)
         await createSportCategory(finalPayload as SportCategory);
       }
       setSuccess(
@@ -298,7 +307,6 @@ export default function SportsManagement() {
           : "스포츠 카테고리가 추가되었습니다."
       );
       setShowModal(false);
-      // 저장 후 현재 페이지 리프레시
       fetchSportCategories(currentPage, pageSize);
     } catch (err) {
       const apiError =
@@ -330,15 +338,13 @@ export default function SportsManagement() {
   // 서버 페이지네이션 하에서는 순서 변경 후 현재 페이지를 리프레시해야 함
   const handleMoveUp = async (index: number) => {
     if (index <= 0 && currentPage === 1) return;
-    const currentItem = categories[index]; // 현재 페이지 기준 아이템
-    console.warn("handleMoveUp requires server-side displayOrder update API.");
+    const currentItem = categories[index];
+    const targetItem = categories[index - 1];
     setLoading(true);
     try {
-      // 실제 API 호출 필요: await updateDisplayOrderAPI(currentItem.id, 'up');
-      // 예시: 서버에서 순서 변경 처리 후, 성공하면 현재 페이지 리프레시
-      await new Promise((res) => setTimeout(res, 300)); // 임시 API 호출 흉내
-      setSuccess("순서 변경 요청됨 (서버 API 구현 필요).");
-      fetchSportCategories(currentPage, pageSize); // 현재 페이지 리프레시
+      await swapDisplayOrder(currentItem, targetItem);
+      setSuccess("순서가 변경되었습니다.");
+      fetchSportCategories(currentPage, pageSize);
     } catch (err) {
       const apiError = (err as any)?.response?.data?.message || "순서 변경 중 오류";
       setError(apiError);
@@ -348,14 +354,13 @@ export default function SportsManagement() {
   };
   const handleMoveDown = async (index: number) => {
     if (index >= categories.length - 1 && currentPage === totalPages) return;
-    const currentItem = categories[index]; // 현재 페이지 기준 아이템
-    console.warn("handleMoveDown requires server-side displayOrder update API.");
+    const currentItem = categories[index];
+    const targetItem = categories[index + 1];
     setLoading(true);
     try {
-      // 실제 API 호출 필요: await updateDisplayOrderAPI(currentItem.id, 'down');
-      await new Promise((res) => setTimeout(res, 300)); // 임시 API 호출 흉내
-      setSuccess("순서 변경 요청됨 (서버 API 구현 필요).");
-      fetchSportCategories(currentPage, pageSize); // 현재 페이지 리프레시
+      await swapDisplayOrder(currentItem, targetItem);
+      setSuccess("순서가 변경되었습니다.");
+      fetchSportCategories(currentPage, pageSize);
     } catch (err) {
       const apiError = (err as any)?.response?.data?.message || "순서 변경 중 오류";
       setError(apiError);
