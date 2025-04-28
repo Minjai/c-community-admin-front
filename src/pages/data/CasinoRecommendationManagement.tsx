@@ -272,18 +272,27 @@ const CasinoRecommendationManagement = () => {
     // 디버깅: 게임 ID 목록 확인
     console.log("[DEBUG] recommendation.gameIds:", recommendation.gameIds);
 
-    const currentSelectedGames = availableGames.filter((g) => {
-      const included = recommendation.gameIds?.includes(g.id);
-      console.log(`[DEBUG] Game ${g.id} (${g.title}) included: ${included}`);
-      return included;
-    });
-    console.log("[DEBUG] Filtered games:", currentSelectedGames);
+    let currentSelectedGames: CasinoGame[] = [];
+    let currentSelectedGameIds: number[] = [];
+
+    if (availableGames.length > 0) {
+      currentSelectedGames = availableGames.filter((g) =>
+        recommendation.gameIds?.includes(g.id)
+      );
+      currentSelectedGameIds = currentSelectedGames.map((g) => g.id);
+    } else {
+      currentSelectedGames = recommendation.games.map((title, idx) => ({
+        id: recommendation.gameIds?.[idx] || 0,
+        title: title,
+      }));
+      currentSelectedGameIds = recommendation.gameIds || [];
+    }
 
     setSelectedGames(currentSelectedGames.map((g) => g.title));
-    setSelectedGameIds(currentSelectedGames.map((g) => g.id));
+    setSelectedGameIds(currentSelectedGameIds);
     console.log(
       "[DEBUG] Selected game IDs:",
-      currentSelectedGames.map((g) => g.id)
+      currentSelectedGameIds
     );
 
     // Convert UTC ISO from server to local datetime-local for input
