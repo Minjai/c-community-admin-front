@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, ReactNode } from "react";
+import React, { useState, useEffect, useCallback, ReactNode, useRef } from "react";
 import {
   getSportRecommendations,
   createSportRecommendation,
@@ -59,6 +59,9 @@ export default function SportRecommendationsManagement() {
 
   // 한글-영문 매핑 생성
   const [korToEngMapping, setKorToEngMapping] = useState<Record<string, string[]>>({});
+
+  // Reference to track previous sportGames to prevent unnecessary re-renders
+  const prevSportGamesRef = useRef<SportGame[]>([]);
 
   // Helper function to check if a string starts with a number
   const startsWithNumber = (str: string): boolean => {
@@ -128,7 +131,7 @@ export default function SportRecommendationsManagement() {
 
       setKorToEngMapping(newKorToEngMapping);
     },
-    [sportMapping]
+    [] // Remove sportMapping from dependency array to prevent infinite loop
   );
 
   // 검색어에 따른 게임 필터링 및 정렬 함수 (먼저 정의)
@@ -248,7 +251,11 @@ export default function SportRecommendationsManagement() {
   useEffect(() => {
     // 주석 제거 및 로직 활성화
     if (sportGames.length > 0) {
-      updateSportMappings(sportGames);
+      // Only update mappings when sportGames changes, not on every render
+      if (sportGames !== prevSportGamesRef.current) {
+        updateSportMappings(sportGames);
+        prevSportGamesRef.current = sportGames;
+      }
       filterAndSortGames(sportGames, debouncedSearchQuery);
     } else {
       setFilteredGames([]);
@@ -785,15 +792,45 @@ export default function SportRecommendationsManagement() {
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof SportRecommendation,
-      cell: (value: number) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}
-        >
-          {value === 1 ? "공개" : "비공개"}
-        </span>
-      ),
+      cell: (value: number, row: SportRecommendation) => {
+        const now = new Date();
+        const startTime = row.startTime ? new Date(row.startTime) : null;
+        const endTime = row.endTime ? new Date(row.endTime) : null;
+        
+        // 비공개 상태
+        if (value !== 1) {
+          return (
+            <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">
+              비공개
+            </span>
+          );
+        }
+        
+        // 공개 상태이지만 시작 시간이 미래인 경우 (공개 전)
+        if (startTime && startTime > now) {
+          return (
+            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
+              공개 전
+            </span>
+          );
+        }
+        
+        // 공개 상태이지만 종료 시간이 과거인 경우 (공개 종료)
+        if (endTime && endTime < now) {
+          return (
+            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
+              공개 종료
+            </span>
+          );
+        }
+        
+        // 현재 공개 중인 상태
+        return (
+          <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">
+            공개
+          </span>
+        );
+      },
     },
     {
       header: "관리",
