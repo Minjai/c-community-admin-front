@@ -415,71 +415,105 @@ const CasinoCompanyPage: React.FC = () => {
 
   // 업체 순서 변경 (위로 이동)
   const handleMoveUp = async (company: CasinoCompany, index: number) => {
-    if (index <= 0 || isMoving) return;
+    if (isMoving) return;
 
-    const prevCompany = companies[index - 1];
-    if (!prevCompany) return;
-
-    const currentDisplayOrder = company.displayOrder;
-    const prevDisplayOrder = prevCompany.displayOrder;
-
-    if (currentDisplayOrder === prevDisplayOrder) {
-      console.warn("Attempted to move up, but display orders are the same.");
-      // fetchCompanies(); // No need to fetch if nothing changed
+    // cross-page: 첫 줄 & 이전 페이지가 있을 때
+    if (index === 0 && currentPage > 1) {
+      setIsMoving(true);
+      try {
+        const prevPage = currentPage - 1;
+        const response = await CasinoCompanyApiService.getCasinoCompanies(prevPage, pageSize);
+        const prevPageCompanies = response.data?.items || [];
+        if (prevPageCompanies.length === 0) return;
+        const lastPrevCompany = prevPageCompanies[prevPageCompanies.length - 1];
+        if (!lastPrevCompany) return;
+        await CasinoCompanyApiService.updateDisplayOrder(company.id, lastPrevCompany.displayOrder);
+        await CasinoCompanyApiService.updateDisplayOrder(lastPrevCompany.id, company.displayOrder);
+        await fetchCompanies(currentPage, pageSize);
+        setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
+      } catch (error) {
+        setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+        fetchCompanies(currentPage, pageSize);
+      } finally {
+        setIsMoving(false);
+      }
       return;
     }
 
-    setIsMoving(true);
-    try {
-      // Call the API to update displayOrder for both companies
-      await CasinoCompanyApiService.updateDisplayOrder(company.id, prevDisplayOrder);
-      await CasinoCompanyApiService.updateDisplayOrder(prevCompany.id, currentDisplayOrder);
-
-      // Fetch data again to get the correct order from the server
-      await fetchCompanies(currentPage, pageSize); // Refetch current page
-      setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
-    } catch (error) {
-      console.error("Error moving company up:", error);
-      setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
-      // Fetch data even on error to try and sync state
-      fetchCompanies(currentPage, pageSize);
-    } finally {
-      setIsMoving(false);
+    // 기존 페이지 내 이동
+    if (index > 0) {
+      const prevCompany = companies[index - 1];
+      if (!prevCompany) return;
+      const currentDisplayOrder = company.displayOrder;
+      const prevDisplayOrder = prevCompany.displayOrder;
+      if (currentDisplayOrder === prevDisplayOrder) {
+        console.warn("Attempted to move up, but display orders are the same.");
+        return;
+      }
+      setIsMoving(true);
+      try {
+        await CasinoCompanyApiService.updateDisplayOrder(company.id, prevDisplayOrder);
+        await CasinoCompanyApiService.updateDisplayOrder(prevCompany.id, currentDisplayOrder);
+        await fetchCompanies(currentPage, pageSize);
+        setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
+      } catch (error) {
+        setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+        fetchCompanies(currentPage, pageSize);
+      } finally {
+        setIsMoving(false);
+      }
     }
   };
 
   // 업체 순서 변경 (아래로 이동)
   const handleMoveDown = async (company: CasinoCompany, index: number) => {
-    if (index >= companies.length - 1 || isMoving) return;
+    if (isMoving) return;
 
-    const nextCompany = companies[index + 1];
-    if (!nextCompany) return;
-
-    const currentDisplayOrder = company.displayOrder;
-    const nextDisplayOrder = nextCompany.displayOrder;
-
-    if (currentDisplayOrder === nextDisplayOrder) {
-      console.warn("Attempted to move down, but display orders are the same.");
-      // fetchCompanies(); // No need to fetch if nothing changed
+    // cross-page: 마지막 줄 & 다음 페이지가 있을 때
+    if (index === companies.length - 1 && currentPage < totalPages) {
+      setIsMoving(true);
+      try {
+        const nextPage = currentPage + 1;
+        const response = await CasinoCompanyApiService.getCasinoCompanies(nextPage, pageSize);
+        const nextPageCompanies = response.data?.items || [];
+        if (nextPageCompanies.length === 0) return;
+        const firstNextCompany = nextPageCompanies[0];
+        if (!firstNextCompany) return;
+        await CasinoCompanyApiService.updateDisplayOrder(company.id, firstNextCompany.displayOrder);
+        await CasinoCompanyApiService.updateDisplayOrder(firstNextCompany.id, company.displayOrder);
+        await fetchCompanies(currentPage, pageSize);
+        setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
+      } catch (error) {
+        setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+        fetchCompanies(currentPage, pageSize);
+      } finally {
+        setIsMoving(false);
+      }
       return;
     }
 
-    setIsMoving(true);
-    try {
-      // Call the API to update displayOrder for both companies
-      await CasinoCompanyApiService.updateDisplayOrder(company.id, nextDisplayOrder);
-      await CasinoCompanyApiService.updateDisplayOrder(nextCompany.id, currentDisplayOrder);
-
-      // Fetch data again to get the correct order from the server
-      await fetchCompanies(currentPage, pageSize); // Refetch current page
-      setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
-    } catch (error) {
-      console.error("Error moving company down:", error);
-      setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
-      // Fetch data even on error to try and sync state
-      fetchCompanies(currentPage, pageSize);
-    } finally {
-      setIsMoving(false);
+    // 기존 페이지 내 이동
+    if (index < companies.length - 1) {
+      const nextCompany = companies[index + 1];
+      if (!nextCompany) return;
+      const currentDisplayOrder = company.displayOrder;
+      const nextDisplayOrder = nextCompany.displayOrder;
+      if (currentDisplayOrder === nextDisplayOrder) {
+        console.warn("Attempted to move down, but display orders are the same.");
+        return;
+      }
+      setIsMoving(true);
+      try {
+        await CasinoCompanyApiService.updateDisplayOrder(company.id, nextDisplayOrder);
+        await CasinoCompanyApiService.updateDisplayOrder(nextCompany.id, currentDisplayOrder);
+        await fetchCompanies(currentPage, pageSize);
+        setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
+      } catch (error) {
+        setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
+        fetchCompanies(currentPage, pageSize);
+      } finally {
+        setIsMoving(false);
+      }
     }
   };
 
@@ -579,7 +613,7 @@ const CasinoCompanyPage: React.FC = () => {
             action="down"
             size="sm"
             onClick={() => handleMoveDown(row, index)}
-            disabled={isMoving || index === companies.length - 1}
+            disabled={isMoving || (index === companies.length - 1 && currentPage === totalPages)}
           />
           <ActionButton
             label="수정"
