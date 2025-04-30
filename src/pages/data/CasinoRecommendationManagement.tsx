@@ -14,6 +14,26 @@ import {
 } from "@/utils/dateUtils";
 import { extractDataArray } from "../../api/util";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import { toast } from "react-toastify";
+
+// Add a utility function to determine the display status based on dates
+const getDisplayStatus = (startDateStr: string, endDateStr: string): string => {
+  const now = new Date();
+  const startDate = startDateStr ? new Date(startDateStr) : null;
+  const endDate = endDateStr ? new Date(endDateStr) : null;
+
+  if (!startDate || !endDate) {
+    return "날짜 정보 없음"; // Handle cases where dates might be missing
+  }
+
+  if (now < startDate) {
+    return "공개 전";
+  } else if (now > endDate) {
+    return "공개 종료";
+  } else {
+    return "공개";
+  }
+};
 
 // 카지노 게임 추천 타입 정의
 interface CasinoRecommendation {
@@ -716,17 +736,33 @@ const CasinoRecommendationManagement = () => {
         cell: (value: string) => formatDateForDisplay(value),
       },
       {
-        header: "공개 상태",
+        header: "공개",
         accessor: "isPublic" as keyof CasinoRecommendation,
-        cell: (value: number) => (
-          <span
-            className={`px-2 py-1 rounded-full text-xs font-medium ${
-              value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-            }`}
-          >
-            {value === 1 ? "공개" : "비공개"}
-          </span>
-        ),
+        cell: (value: number, row: CasinoRecommendation) => {
+          // 1. Check for explicit 'Private' status first
+          if (row.isPublic !== 1) {
+            return (
+              <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                비공개
+              </span>
+            );
+          }
+
+          // 2. If public, determine status based on dates
+          const status = getDisplayStatus(row.startDate, row.endDate);
+          let colorClass = "bg-gray-100 text-gray-800"; // Default: Gray for 'Before Public' and 'Public Ended'
+
+          if (status === "공개") {
+            colorClass = "bg-green-100 text-green-800"; // Green for 'Public'
+          }
+
+          // Apply the calculated text color using the banner style
+          return (
+            <span className={`px-2 py-1 rounded-full text-xs font-medium ${colorClass}`}>
+              {status}
+            </span>
+          );
+        },
         className: "text-center",
       },
       {
