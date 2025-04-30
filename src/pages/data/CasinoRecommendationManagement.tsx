@@ -276,9 +276,7 @@ const CasinoRecommendationManagement = () => {
     let currentSelectedGameIds: number[] = [];
 
     if (availableGames.length > 0) {
-      currentSelectedGames = availableGames.filter((g) =>
-        recommendation.gameIds?.includes(g.id)
-      );
+      currentSelectedGames = availableGames.filter((g) => recommendation.gameIds?.includes(g.id));
       currentSelectedGameIds = currentSelectedGames.map((g) => g.id);
     } else {
       currentSelectedGames = recommendation.games.map((title, idx) => ({
@@ -290,10 +288,7 @@ const CasinoRecommendationManagement = () => {
 
     setSelectedGames(currentSelectedGames.map((g) => g.title));
     setSelectedGameIds(currentSelectedGameIds);
-    console.log(
-      "[DEBUG] Selected game IDs:",
-      currentSelectedGameIds
-    );
+    console.log("[DEBUG] Selected game IDs:", currentSelectedGameIds);
 
     // Convert UTC ISO from server to local datetime-local for input
     setStartDate(formatISODateToDateTimeLocal(recommendation.startDate));
@@ -424,24 +419,39 @@ const CasinoRecommendationManagement = () => {
     const currentPosition = currentItem.position || 0;
     const targetPosition = targetItem.position || 0;
 
+    // Prepare payloads for PUT requests, ensuring only expected fields are sent
+    const currentItemPayload: UpsertCasinoRecommendationPayload = {
+      title: currentItem.title,
+      isMainDisplay: !!currentItem.isMainDisplay,
+      gameIds: currentItem.gameIds || [],
+      startDate: currentItem.startDate,
+      endDate: currentItem.endDate,
+      isPublic: currentItem.isPublic === 1,
+      displayOrder: targetPosition,
+    };
+
+    const targetItemPayload: UpsertCasinoRecommendationPayload = {
+      title: targetItem.title,
+      isMainDisplay: !!targetItem.isMainDisplay,
+      gameIds: targetItem.gameIds || [],
+      startDate: targetItem.startDate,
+      endDate: targetItem.endDate,
+      isPublic: targetItem.isPublic === 1,
+      displayOrder: currentPosition,
+    };
+
     try {
       setLoading(true);
-      await axios.patch(`/casino-recommends/display-order`, {
-        updates: [
-          { id: currentItem.id, displayOrder: targetPosition },
-          { id: targetItem.id, displayOrder: currentPosition },
-        ],
-      });
-      // 순서 변경 후 전체 목록 상태 업데이트 (API 재호출 대신)
-      const newAllRecommendations = [...allRecommendations];
-      newAllRecommendations[actualIndex] = { ...currentItem, position: targetPosition };
-      newAllRecommendations[actualIndex - 1] = { ...targetItem, position: currentPosition };
-      // 정렬 다시 적용
-      newAllRecommendations.sort((a, b) => (b.position || 0) - (a.position || 0));
-      setAllRecommendations(newAllRecommendations);
+      // Send two separate PUT requests
+      await axios.put(`/casino-recommends/${currentItem.id}`, currentItemPayload);
+      await axios.put(`/casino-recommends/${targetItem.id}`, targetItemPayload);
+
+      // Fetch updated data from server after successful updates
+      fetchRecommendations();
     } catch (err) {
       setError("순서 변경 중 오류가 발생했습니다.");
-      fetchRecommendations(); // 에러 시 전체 다시 로드
+      // Fetch recommendations even on error to try and get consistent state
+      fetchRecommendations();
     } finally {
       setLoading(false);
     }
@@ -458,24 +468,39 @@ const CasinoRecommendationManagement = () => {
     const currentPosition = currentItem.position || 0;
     const targetPosition = targetItem.position || 0;
 
+    // Prepare payloads for PUT requests, ensuring only expected fields are sent
+    const currentItemPayload: UpsertCasinoRecommendationPayload = {
+      title: currentItem.title,
+      isMainDisplay: !!currentItem.isMainDisplay,
+      gameIds: currentItem.gameIds || [],
+      startDate: currentItem.startDate,
+      endDate: currentItem.endDate,
+      isPublic: currentItem.isPublic === 1,
+      displayOrder: targetPosition,
+    };
+
+    const targetItemPayload: UpsertCasinoRecommendationPayload = {
+      title: targetItem.title,
+      isMainDisplay: !!targetItem.isMainDisplay,
+      gameIds: targetItem.gameIds || [],
+      startDate: targetItem.startDate,
+      endDate: targetItem.endDate,
+      isPublic: targetItem.isPublic === 1,
+      displayOrder: currentPosition,
+    };
+
     try {
       setLoading(true);
-      await axios.patch(`/casino-recommends/display-order`, {
-        updates: [
-          { id: currentItem.id, displayOrder: targetPosition },
-          { id: targetItem.id, displayOrder: currentPosition },
-        ],
-      });
-      // 순서 변경 후 전체 목록 상태 업데이트 (API 재호출 대신)
-      const newAllRecommendations = [...allRecommendations];
-      newAllRecommendations[actualIndex] = { ...currentItem, position: targetPosition };
-      newAllRecommendations[actualIndex + 1] = { ...targetItem, position: currentPosition };
-      // 정렬 다시 적용
-      newAllRecommendations.sort((a, b) => (b.position || 0) - (a.position || 0));
-      setAllRecommendations(newAllRecommendations);
+      // Send two separate PUT requests
+      await axios.put(`/casino-recommends/${currentItem.id}`, currentItemPayload);
+      await axios.put(`/casino-recommends/${targetItem.id}`, targetItemPayload);
+
+      // Fetch updated data from server after successful updates
+      fetchRecommendations();
     } catch (err) {
       setError("순서 변경 중 오류가 발생했습니다.");
-      fetchRecommendations(); // 에러 시 전체 다시 로드
+      // Fetch recommendations even on error to try and get consistent state
+      fetchRecommendations();
     } finally {
       setLoading(false);
     }
