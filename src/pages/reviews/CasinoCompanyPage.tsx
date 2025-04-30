@@ -780,13 +780,7 @@ const CasinoCompanyPage: React.FC = () => {
               required
             />
 
-            <FileUpload
-              label="업체 이미지"
-              onChange={handleFileChange}
-              value={currentCompany?.imageUrl || undefined}
-              accept=".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp"
-              required={!isEditing}
-            />
+            <FileUpload label="업로드" onChange={handleFileChange} />
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">업체소개</label>
