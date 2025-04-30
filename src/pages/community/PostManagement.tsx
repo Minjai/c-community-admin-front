@@ -247,7 +247,7 @@ const PostManagement = () => {
                   <td className="px-4 py-3">{post.author?.nickname || "알 수 없음"}</td>
                   <td className="px-4 py-3">{new Date(post.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3 text-center">
-                    {post.viewCount || 0}/{post.comments?.length || 0}/{post.likes?.length || 0}
+                    {post.viewCount || 0}/{post._count?.comments || 0}/{post._count?.likes || 0}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex space-x-1 justify-end">
