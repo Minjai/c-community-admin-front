@@ -612,13 +612,7 @@ const RemittanceBannerPage: React.FC = () => {
             required
             placeholder="https://example.com"
           />
-          <FileUpload
-            label="로고 이미지"
-            value={currentBanner?.imageUrl}
-            onChange={handleFileChange}
-            accept="image/*"
-            required={!isEditing}
-          />
+          <FileUpload label="로고 이미지" onChange={handleFileChange} />
           <div>
             <label htmlFor="isPublic" className="block text-sm font-medium text-gray-700">
               공개여부

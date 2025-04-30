@@ -35,7 +35,7 @@ const SUPPORTED_IMAGE_TYPES = [
   "image/png",
   "image/gif",
   "image/webp",
-  "image/svg+xml",
+  // "image/svg+xml", // SVG 제거
 ];
 
 // 이미지 크기 제한 설정
@@ -233,7 +233,7 @@ const isImageTypeSupported = (file: File): boolean => {
   const isValidExt = isValidImageExtension(file.name);
 
   if (!isValidMime && !isValidExt) {
-    alert(`지원하지 않는 이미지 형식입니다. 지원 형식: JPG, PNG, GIF, WebP, SVG`);
+    alert(`지원하지 않는 이미지 형식입니다. 지원 형식: JPG, PNG, GIF, WebP`);
     return false;
   }
 
@@ -243,14 +243,7 @@ const isImageTypeSupported = (file: File): boolean => {
 // 파일 확장자 확인 함수
 const isValidImageExtension = (filename: string): boolean => {
   const ext = filename.split(".").pop()?.toLowerCase();
-  return (
-    ext === "jpg" ||
-    ext === "jpeg" ||
-    ext === "png" ||
-    ext === "gif" ||
-    ext === "webp" ||
-    ext === "svg"
-  );
+  return ext === "jpg" || ext === "jpeg" || ext === "png" || ext === "gif" || ext === "webp";
 };
 
 // MutationObserver 설정
@@ -617,7 +610,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
         const isValidExt = isValidImageExtension(file.name);
 
         if (!isValidMime && !isValidExt) {
-          alert(`지원하지 않는 이미지 형식입니다. 지원 형식: JPG, PNG, GIF, WebP, SVG`);
+          alert(`지원하지 않는 이미지 형식입니다. 지원 형식: JPG, PNG, GIF, WebP`);
           return;
         }
 
@@ -850,7 +843,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
             // --- END: Check if pasted text is iframe ---
 
             // --- Image URL Check (Use insertEmbed) ---
-            const isImageUrl = /\.(jpg|jpeg|png|gif|webp|svg)(\?.*)?$/i.test(pastedText);
+            const isImageUrl = /\.(jpg|jpeg|png|gif|webp)(\?.*)?$/i.test(pastedText);
             if (isImageUrl && isValidURL(pastedText)) {
               e.preventDefault();
               processed = true;
