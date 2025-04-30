@@ -35,13 +35,24 @@ const getDisplayStatus = (startDateStr: string, endDateStr: string): string => {
   }
 };
 
+// 개별 게임 링크 정보 타입 정의 (API 응답 기준)
+interface GameLink {
+  id: number; // 연결 테이블 ID
+  casinoRecommendId: number;
+  casinoGameId: number;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  casinoGame: CasinoGame; // 중첩된 게임 정보
+}
+
 // 카지노 게임 추천 타입 정의
 interface CasinoRecommendation {
   id: number;
   title: string;
   isMainDisplay: boolean;
-  games: string[];
-  gameIds?: number[];
+  games: GameLink[]; // 타입을 GameLink[] 로 수정
+  gameIds?: number[]; // 이건 필요에 따라 유지하거나 제거 가능
   startDate: string;
   endDate: string;
   isPublic: number;
@@ -130,42 +141,35 @@ const CasinoRecommendationManagement = () => {
 
         // 서버 응답을 컴포넌트에서 사용하는 형식으로 변환
         const transformedRecommendations = recommendationData.map((item: any) => {
-          // 각 게임의 제목 추출 - 서로 다른 구조 처리
-          let gameTitles: string[] = [];
-          let gameIds: number[] = [];
-
-          // 1. 기존 구조: item.games 배열이 있고 각 요소에 casinoGame 객체가 있는 경우
+          // API 응답의 games 배열을 직접 사용하고, gameIds는 여기서 추출
+          let gamesData: GameLink[] = [];
           if (item.games && Array.isArray(item.games)) {
-            gameTitles = item.games.map((game: any) => {
-              if (game.casinoGame) {
-                return game.casinoGame.title || "제목 없음";
-              } else if (game.title) {
-                return game.title;
-              }
-              return "제목 없음";
-            });
+            // API 응답 구조를 GameLink 타입으로 매핑 (필요시 유효성 검사 추가)
+            gamesData = item.games.map((game: any) => ({
+              id: game.id,
+              casinoRecommendId: game.casinoRecommendId,
+              casinoGameId: game.casinoGameId,
+              displayOrder: game.displayOrder || 0,
+              createdAt: game.createdAt || new Date().toISOString(),
+              updatedAt: game.updatedAt || new Date().toISOString(),
+              casinoGame: {
+                id: game.casinoGame?.id || 0,
+                title: game.casinoGame?.title || "제목 없음",
+                // CasinoGame 인터페이스에 맞는 다른 필드 추가
+              },
+            }));
+          }
+          // 다른 게임 목록 구조(gameList, gameIds/gameTitles)는 GameLink[] 타입과 호환되지 않으므로 제거하거나 별도 처리 필요
+          // 우선 games 필드만 사용하도록 단순화
 
-            gameIds = item.games.map((game: any) => {
-              return game.casinoGameId || game.id || 0;
-            });
-          }
-          // 2. item.gameList 배열이 있는 경우
-          else if (item.gameList && Array.isArray(item.gameList)) {
-            gameTitles = item.gameList.map((game: any) => game.title || "제목 없음");
-            gameIds = item.gameList.map((game: any) => game.id || 0);
-          }
-          // 3. item.gameIds와 item.gameTitles가 직접 있는 경우
-          else if (item.gameIds && Array.isArray(item.gameIds)) {
-            gameIds = item.gameIds;
-            gameTitles = item.gameTitles || item.gameIds.map(() => "제목 없음");
-          }
+          const gameIds = gamesData.map((game) => game.casinoGameId);
 
           return {
             id: item.id,
             title: item.title,
             isMainDisplay: item.isMainDisplay === 1 || item.isMainDisplay === true,
-            games: gameTitles,
-            gameIds: gameIds,
+            games: gamesData, // GameLink[] 타입으로 설정
+            gameIds: gameIds, // 추출한 ID 목록
             startDate: item.startDate || item.start_date || "",
             endDate: item.endDate || item.end_date || "",
             isPublic: item.isPublic === 1 || item.isPublic === true ? 1 : 0,
@@ -289,26 +293,28 @@ const CasinoRecommendationManagement = () => {
     setTitle(recommendation.title || "");
     setIsMainDisplay(recommendation.isMainDisplay || false);
 
-    // 디버깅: 게임 ID 목록 확인
     console.log("[DEBUG] recommendation.gameIds:", recommendation.gameIds);
 
     let currentSelectedGames: CasinoGame[] = [];
     let currentSelectedGameIds: number[] = [];
 
-    if (availableGames.length > 0) {
-      currentSelectedGames = availableGames.filter((g) => recommendation.gameIds?.includes(g.id));
-      currentSelectedGameIds = currentSelectedGames.map((g) => g.id);
-    } else {
-      currentSelectedGames = recommendation.games.map((title, idx) => ({
-        id: recommendation.gameIds?.[idx] || 0,
-        title: title,
-      }));
-      currentSelectedGameIds = recommendation.gameIds || [];
-    }
+    // 추천 데이터에 포함된 games 배열 사용 (displayOrder 포함)
+    // displayOrder 기준으로 오름차순 정렬
+    const sortedGames = (recommendation.games || [])
+      .filter((game) => game.casinoGame) // 유효한 casinoGame 데이터만 필터링
+      .sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0));
+
+    // 정렬된 게임 목록에서 ID와 제목 추출
+    currentSelectedGameIds = sortedGames.map((game) => game.casinoGameId);
+    currentSelectedGames = sortedGames.map((game) => ({
+      id: game.casinoGameId,
+      title: game.casinoGame.title || "제목 없음",
+      // 필요하다면 casinoGame의 다른 필드도 여기에 추가
+    }));
 
     setSelectedGames(currentSelectedGames.map((g) => g.title));
     setSelectedGameIds(currentSelectedGameIds);
-    console.log("[DEBUG] Selected game IDs:", currentSelectedGameIds);
+    console.log("[DEBUG] Sorted and Selected game IDs:", currentSelectedGameIds);
 
     // Convert UTC ISO from server to local datetime-local for input
     setStartDate(formatISODateToDateTimeLocal(recommendation.startDate));
@@ -722,7 +728,7 @@ const CasinoRecommendationManagement = () => {
       {
         header: "게임 목록",
         accessor: "games" as keyof CasinoRecommendation,
-        cell: (games: string[]) => games?.join(", ") || "-", // Use optional chaining
+        cell: (games: GameLink[]) => games?.map((game) => game.casinoGame.title).join(", ") || "-", // Use optional chaining
         className: "max-w-xs truncate", // Prevent long list overflow
       },
       {
