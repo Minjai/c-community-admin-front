@@ -18,10 +18,6 @@ interface CasinoGame {
   title: string;
   description: string;
   thumbnailUrl: string;
-  rating: number;
-  returnRate: number;
-  isDirectLinkEnabled: boolean;
-  directLinkUrl: string;
   isPublic: number;
   position: number;
   createdAt: string;
@@ -52,10 +48,6 @@ const CasinoGameManagement = () => {
   // 게임 데이터 상태
   const [title, setTitle] = useState<string>("");
   const [description, setDescription] = useState<string>("");
-  const [rating, setRating] = useState<number>(5.0);
-  const [returnRate, setReturnRate] = useState<number>(95);
-  const [isDirectLinkEnabled, setIsDirectLinkEnabled] = useState<boolean>(false);
-  const [directLinkUrl, setDirectLinkUrl] = useState<string>("");
   const [isPublic, setIsPublic] = useState<number>(1);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
@@ -87,10 +79,6 @@ const CasinoGameManagement = () => {
             title: game.title,
             description: game.content || game.description || "",
             thumbnailUrl: game.imageUrl || game.thumbnailUrl || "",
-            rating: Number(game.rating) || 0,
-            returnRate: Number(game.payoutRate || game.returnRate) || 0,
-            isDirectLinkEnabled: game.isShortcut === 1 || game.isShortcut === true,
-            directLinkUrl: game.shortcutUrl || game.directLinkUrl || "",
             isPublic: game.isPublic === 1 || game.isPublic === true ? 1 : 0,
             position: game.displayOrder || game.position || 0,
             createdAt: game.createdAt || new Date().toISOString(),
@@ -153,10 +141,6 @@ const CasinoGameManagement = () => {
       );
       setTitle(currentGame.title || "");
       setDescription(currentGame.description || "");
-      setRating(currentGame.rating || 5.0);
-      setReturnRate(currentGame.returnRate || 95);
-      setIsDirectLinkEnabled(currentGame.isDirectLinkEnabled || false);
-      setDirectLinkUrl(currentGame.directLinkUrl || "");
       setIsPublic(currentGame.isPublic === 1 ? 1 : 0);
       setThumbnailFile(null);
       setThumbnailPreview(currentGame.thumbnailUrl || null);
@@ -184,10 +168,6 @@ const CasinoGameManagement = () => {
     // Reset form fields
     setTitle("");
     setDescription("");
-    setRating(5.0);
-    setReturnRate(95);
-    setIsDirectLinkEnabled(false);
-    setDirectLinkUrl("");
     setIsPublic(1);
     setThumbnailFile(null);
     setThumbnailPreview(null);
@@ -277,18 +257,6 @@ const CasinoGameManagement = () => {
     }
   };
 
-  // 별점 입력 처리
-  const handleRatingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
-    setRating(Math.min(5, Math.max(0, value))); // 0~5 범위로 제한
-  };
-
-  // 환수율 입력 처리
-  const handleReturnRateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value);
-    setReturnRate(Math.min(100, Math.max(0, value))); // 0~100 범위로 제한
-  };
-
   // 썸네일 업로드 처리
   const handleThumbnailUpload = (file: File | null) => {
     if (!file) {
@@ -317,14 +285,6 @@ const CasinoGameManagement = () => {
     reader.readAsDataURL(file);
   };
 
-  // 바로가기 노출 토글
-  const handleDirectLinkToggle = (enabled: boolean) => {
-    setIsDirectLinkEnabled(enabled);
-    if (!enabled) {
-      setDirectLinkUrl("");
-    }
-  };
-
   // 게임 저장 처리
   const handleSaveGame = async () => {
     setModalError(null);
@@ -341,10 +301,6 @@ const CasinoGameManagement = () => {
       setModalError("게임 썸네일 이미지를 업로드해주세요.");
       return;
     }
-    if (isDirectLinkEnabled && !directLinkUrl.trim()) {
-      setModalError("바로가기 URL을 입력해주세요.");
-      return;
-    }
 
     setAlertMessage(null);
 
@@ -354,14 +310,6 @@ const CasinoGameManagement = () => {
       const formData = new FormData();
       formData.append("title", title.trim());
       formData.append("content", description);
-
-      formData.append("rating", rating.toString());
-      formData.append("payoutRate", returnRate.toString());
-      formData.append("isShortcut", isDirectLinkEnabled ? "1" : "0");
-
-      if (isDirectLinkEnabled && directLinkUrl) {
-        formData.append("shortcutUrl", directLinkUrl.trim());
-      }
 
       formData.append("isPublic", isPublic.toString());
 
@@ -448,30 +396,6 @@ const CasinoGameManagement = () => {
     }
   };
 
-  // 별점 표시 컴포넌트
-  const RatingStars = ({ rating }: { rating: number }) => {
-    const fullStars = Math.floor(rating);
-    const halfStar = rating % 1 >= 0.5;
-    const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
-
-    return (
-      <div className="flex items-center">
-        {[...Array(fullStars)].map((_, i) => (
-          <span key={`full-${i}`} className="text-yellow-400">
-            ★
-          </span>
-        ))}
-        {halfStar && <span className="text-yellow-400">★</span>}
-        {[...Array(emptyStars)].map((_, i) => (
-          <span key={`empty-${i}`} className="text-gray-300">
-            ★
-          </span>
-        ))}
-        <span className="ml-1 text-sm text-gray-600">{rating.toFixed(1)}</span>
-      </div>
-    );
-  };
-
   // DataTable 컬럼 정의
   const columns = [
     // 체크박스 컬럼 추가
@@ -534,16 +458,6 @@ const CasinoGameManagement = () => {
           )}
         </div>
       ),
-    },
-    {
-      header: "별점",
-      accessor: "rating" as keyof CasinoGame,
-      cell: (value: number) => <RatingStars rating={value} />,
-    },
-    {
-      header: "환수율",
-      accessor: "returnRate" as keyof CasinoGame,
-      cell: (value: number) => `${value}%`,
     },
     {
       header: "등록일자",
@@ -654,84 +568,6 @@ const CasinoGameManagement = () => {
           <label className="label">게임 설명</label>
           <TextEditor content={description} setContent={setDescription} height="200px" />
         </div>
-
-        <div>
-          <label className="label">별점 (0-5)</label>
-          <div className="flex items-center">
-            <input
-              type="number"
-              value={rating}
-              onChange={handleRatingChange}
-              min={0}
-              max={5}
-              step={0.1}
-              disabled={saving}
-              className="input w-20 mr-3"
-            />
-            <div className="flex text-xl">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <span
-                  key={star}
-                  className={star <= Math.round(rating) ? "text-yellow-400" : "text-gray-300"}
-                >
-                  ★
-                </span>
-              ))}
-            </div>
-            <span className="ml-2 text-sm text-gray-500">{rating.toFixed(1)}</span>
-          </div>
-        </div>
-
-        <Input
-          label="환수율 (%)"
-          type="number"
-          value={returnRate.toString()}
-          onChange={handleReturnRateChange}
-          min={0}
-          max={100}
-          step={0.01}
-          disabled={saving}
-        />
-
-        <div>
-          <label className="label">바로가기 설정</label>
-          <div className="flex space-x-4 mt-1">
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                name="directLinkEnabled"
-                checked={!isDirectLinkEnabled}
-                onChange={() => handleDirectLinkToggle(false)}
-                disabled={saving}
-                className="form-radio h-4 w-4 text-blue-600"
-              />
-              <span className="ml-2 text-sm">미노출</span>
-            </label>
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                name="directLinkEnabled"
-                checked={isDirectLinkEnabled}
-                onChange={() => handleDirectLinkToggle(true)}
-                disabled={saving}
-                className="form-radio h-4 w-4 text-blue-600"
-              />
-              <span className="ml-2 text-sm">노출</span>
-            </label>
-          </div>
-        </div>
-
-        {isDirectLinkEnabled && (
-          <Input
-            label="바로가기 URL"
-            type="url"
-            value={directLinkUrl}
-            onChange={(e) => setDirectLinkUrl(e.target.value)}
-            required={isDirectLinkEnabled}
-            disabled={saving}
-            placeholder="https://..."
-          />
-        )}
       </div>
     );
   };
