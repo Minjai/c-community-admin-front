@@ -728,8 +728,8 @@ const CasinoRecommendationManagement = () => {
       {
         header: "게임 목록",
         accessor: "games" as keyof CasinoRecommendation,
-        cell: (games: GameLink[]) => games?.map((game) => game.casinoGame.title).join(", ") || "-", // Use optional chaining
-        className: "max-w-xs truncate", // Prevent long list overflow
+        cell: (games: GameLink[]) => `${games?.length ?? 0}개`,
+        className: "max-w-xs truncate",
       },
       {
         header: "시작일",

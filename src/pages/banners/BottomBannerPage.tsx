@@ -47,10 +47,12 @@ const BottomBannerPage: React.FC = () => {
     try {
       const response = await BannerApiService.getBottomBanners(page, limit);
       if (response && response.success && Array.isArray(response.data)) {
+        // position 기준 오름차순 정렬 (작은 값이 위로)
         const sortedBanners = [...response.data].sort(
-          (a, b) => (b.position || 0) - (a.position || 0)
+          (a, b) => (a.position || 0) - (b.position || 0)
         );
         setBanners(sortedBanners);
+        originalBannersRef.current = sortedBanners; // fetchBanners에서만 원본 저장
 
         if (response.pagination) {
           setTotalPages(response.pagination.totalPages);
@@ -103,7 +105,7 @@ const BottomBannerPage: React.FC = () => {
       startDate: "",
       endDate: "",
       isPublic: 1,
-      position: totalItems + 1, // totalItems 사용
+      position: 1, // 새 배너는 항상 1번 순서
       bannerType: "bottom",
       linkUrl: "",
     });
@@ -192,25 +194,27 @@ const BottomBannerPage: React.FC = () => {
         }
 
         try {
-          // 날짜 형식 변환 - 로컬 시간 -> UTC ISO 문자열
+          // 기존 배너들의 position을 모두 +1로 서버에 반영
+          await Promise.all(
+            banners.map((banner) =>
+              BannerApiService.updateBottomBanner(banner.id, {
+                id: banner.id,
+                position: (banner.position || 0) + 1,
+              })
+            )
+          );
+
+          // 새 배너는 position 1로 생성
           const startDate = new Date(currentBanner.startDate).toISOString();
           const endDate = new Date(currentBanner.endDate).toISOString();
 
-          console.log("하단 배너 생성 날짜 변환:", {
-            원래_시작일: currentBanner.startDate,
-            변환된_시작일: startDate,
-            원래_종료일: currentBanner.endDate,
-            변환된_종료일: endDate,
-          });
-
-          const newPosition = totalItems + 1; // totalItems 사용
           await BannerApiService.createBottomBanner(
             {
               title: currentBanner.title,
               startDate: startDate,
               endDate: endDate,
               isPublic: currentBanner.isPublic,
-              position: newPosition,
+              position: 1, // 새 배너는 항상 1번 순서
               bannerType: "bottom",
               linkUrl: currentBanner.linkUrl,
             },
@@ -254,126 +258,47 @@ const BottomBannerPage: React.FC = () => {
     }
   };
 
-  // 배너 순서 변경
-  const handleMoveUp = async (index: number) => {
-    if (index <= 0) return;
+  // position 입력값 변경 핸들러 (공통 함수)
+  const handlePositionInputChange = (index: number, newPosition: number) => {
+    setBanners((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], position: newPosition };
+      return updated;
+    });
+  };
 
-    const newBanners = [...banners];
-
-    // 실제 배너 객체
-    const currentBanner = newBanners[index]; // 현재 선택된 배너
-    const targetBanner = newBanners[index - 1]; // 위의 배너
-
-    // position 값 교환
-    const currentPosition = currentBanner.position;
-    const targetPosition = targetBanner.position;
-
-    // position 값 교환
-    currentBanner.position = targetPosition;
-    targetBanner.position = currentPosition;
-
-    // 배열 내 위치 교환
-    newBanners[index] = targetBanner;
-    newBanners[index - 1] = currentBanner;
-
+  // position 일괄 저장 핸들러 (공통 함수)
+  const handleBulkPositionSave = async () => {
+    setLoading(true);
     try {
-      // 로컬 상태 먼저 업데이트
-      setBanners(newBanners);
-
-      // API를 통해 각 배너 개별적으로 업데이트
-      await BannerApiService.updateBottomBanner(
-        currentBanner.id,
-        {
-          id: currentBanner.id,
-          position: currentBanner.position,
-        },
-        undefined,
-        undefined
+      // 변경된 배너만 추출
+      const changed = banners.filter(
+        (b, i) => b.position !== originalBannersRef.current[i]?.position
       );
-
-      await BannerApiService.updateBottomBanner(
-        targetBanner.id,
-        {
-          id: targetBanner.id,
-          position: targetBanner.position,
-        },
-        undefined,
-        undefined
+      if (changed.length === 0) {
+        toast.info("변경된 순서가 없습니다.");
+        setLoading(false);
+        return;
+      }
+      await Promise.all(
+        changed.map((banner) =>
+          BannerApiService.updateBottomBanner(banner.id, {
+            id: banner.id,
+            position: banner.position,
+          })
+        )
       );
-
-      // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
+      toast.success("순서가 저장되었습니다.");
       fetchBanners(currentPage, pageSize);
     } catch (err) {
-      // 에러 발생 시 원래 순서로 되돌림
-      fetchBanners(currentPage, pageSize);
-      toast.error("배너 순서 변경 중 오류가 발생했습니다.");
-      console.error("Error updating banner order:", err);
+      toast.error("순서 저장 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleMoveDown = async (index: number) => {
-    if (index >= banners.length - 1) return;
-
-    const newBanners = [...banners];
-
-    // 실제 배너 객체
-    const currentBanner = newBanners[index]; // 현재 선택된 배너
-    const targetBanner = newBanners[index + 1]; // 아래 배너
-
-    // position 값 교환
-    const currentPosition = currentBanner.position;
-    const targetPosition = targetBanner.position;
-
-    // position 값 교환
-    currentBanner.position = targetPosition;
-    targetBanner.position = currentPosition;
-
-    // 배열 내 위치 교환
-    newBanners[index] = targetBanner;
-    newBanners[index + 1] = currentBanner;
-
-    try {
-      // 로컬 상태 먼저 업데이트
-      setBanners(newBanners);
-
-      // API를 통해 각 배너 개별적으로 업데이트
-      await BannerApiService.updateBottomBanner(
-        currentBanner.id,
-        {
-          id: currentBanner.id,
-          position: currentBanner.position,
-        },
-        undefined,
-        undefined
-      );
-
-      await BannerApiService.updateBottomBanner(
-        targetBanner.id,
-        {
-          id: targetBanner.id,
-          position: targetBanner.position,
-        },
-        undefined,
-        undefined
-      );
-
-      // API 호출이 성공한 후에만 서버에서 최신 데이터를 가져옴
-      fetchBanners(currentPage, pageSize);
-    } catch (err) {
-      // 에러 발생 시 원래 순서로 되돌림
-      fetchBanners(currentPage, pageSize);
-      toast.error("배너 순서 변경 중 오류가 발생했습니다.");
-      console.error("Error updating banner order:", err);
-    }
-  };
-
-  // 모달 닫기 핸들러 추가
-  const handleCloseModal = () => {
-    setModalError(null);
-    setShowModal(false);
-    setPcImageFile(null);
-    setMobileImageFile(null);
-  };
+  // 원본 position 값 저장용 ref
+  const originalBannersRef = React.useRef<Banner[]>([]);
 
   // 선택된 배너 일괄 삭제
   const handleBulkDelete = async () => {
@@ -542,24 +467,25 @@ const BottomBannerPage: React.FC = () => {
       },
     },
     {
+      header: "순서",
+      accessor: "position" as keyof Banner,
+      cell: (value: number, row: Banner, index: number) => (
+        <input
+          type="number"
+          min={1}
+          className="w-16 border rounded px-2 py-1 text-center"
+          value={value}
+          onChange={(e) => handlePositionInputChange(index, Number(e.target.value))}
+          style={{ background: "#fff" }}
+        />
+      ),
+      className: "w-20 text-center",
+    },
+    {
       header: "관리",
       accessor: "id" as keyof Banner,
       cell: (value: number, row: Banner, index: number) => (
         <div className="flex space-x-1">
-          <ActionButton
-            label="위로"
-            action="up"
-            size="sm"
-            onClick={() => handleMoveUp(index)}
-            disabled={index === 0}
-          />
-          <ActionButton
-            label="아래로"
-            action="down"
-            size="sm"
-            onClick={() => handleMoveDown(index)}
-            disabled={index === banners.length - 1}
-          />
           <ActionButton
             label="수정"
             action="edit"
@@ -582,6 +508,10 @@ const BottomBannerPage: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">하단 배너 관리</h1>
         <div className="flex space-x-2">
+          {/* 순서 저장 버튼 */}
+          <Button onClick={handleBulkPositionSave} variant="primary" disabled={loading}>
+            순서 저장
+          </Button>
           {/* 선택 삭제 버튼 추가 */}
           <Button
             onClick={handleBulkDelete}
@@ -622,7 +552,12 @@ const BottomBannerPage: React.FC = () => {
       {currentBanner && (
         <Modal
           isOpen={showModal}
-          onClose={handleCloseModal}
+          onClose={() => {
+            setModalError(null);
+            setShowModal(false);
+            setPcImageFile(null);
+            setMobileImageFile(null);
+          }}
           title={isEditing ? "배너 수정" : "새 배너 추가"}
           size="lg"
         >
@@ -640,7 +575,16 @@ const BottomBannerPage: React.FC = () => {
               <Button onClick={handleSaveBanner} disabled={isSaving}>
                 {isSaving ? "저장 중..." : isEditing ? "저장" : "추가"}
               </Button>
-              <Button variant="outline" onClick={handleCloseModal} disabled={isSaving}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setModalError(null);
+                  setShowModal(false);
+                  setPcImageFile(null);
+                  setMobileImageFile(null);
+                }}
+                disabled={isSaving}
+              >
                 취소
               </Button>
             </div>
