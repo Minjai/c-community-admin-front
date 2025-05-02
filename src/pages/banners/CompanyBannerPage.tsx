@@ -59,10 +59,14 @@ const CompanyBannerPage: React.FC = () => {
     try {
       const response = await BannerApiService.getCompanyBanners(page, limit);
       if (response && response.success && Array.isArray(response.data)) {
-        // position 기준 오름차순 정렬 (작은 값이 위로)
-        const sortedBanners = [...response.data].sort(
-          (a, b) => (a.position || 0) - (b.position || 0)
-        );
+        // position 기준 오름차순 정렬 (작은 값이 위로), position이 같으면 createdAt 내림차순(최신이 위)
+        const sortedBanners = [...response.data].sort((a, b) => {
+          if ((a.position || 0) !== (b.position || 0)) {
+            return (a.position || 0) - (b.position || 0);
+          }
+          // position이 같으면 createdAt 내림차순(최신이 위)
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
         setBanners(sortedBanners);
         originalBannersRef.current = sortedBanners; // fetchBanners에서만 원본 저장
 

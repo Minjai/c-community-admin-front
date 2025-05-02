@@ -51,12 +51,12 @@ interface CasinoRecommendation {
   id: number;
   title: string;
   isMainDisplay: boolean;
-  games: GameLink[]; // 타입을 GameLink[] 로 수정
-  gameIds?: number[]; // 이건 필요에 따라 유지하거나 제거 가능
+  games: GameLink[];
+  gameIds?: number[];
   startDate: string;
   endDate: string;
   isPublic: number;
-  position: number;
+  displayOrder: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -118,8 +118,11 @@ const CasinoRecommendationManagement = () => {
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(0); // 초기값 0으로 설정
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(30);
   const [totalItems, setTotalItems] = useState<number>(0);
+
+  // 원본 displayOrder 값 저장용 ref
+  const originalRecommendationsRef = useRef<CasinoRecommendation[]>([]);
 
   // 공개 설정 상태 관리
   useEffect(() => {
@@ -168,25 +171,30 @@ const CasinoRecommendationManagement = () => {
             id: item.id,
             title: item.title,
             isMainDisplay: item.isMainDisplay === 1 || item.isMainDisplay === true,
-            games: gamesData, // GameLink[] 타입으로 설정
-            gameIds: gameIds, // 추출한 ID 목록
+            games: gamesData,
+            gameIds: gameIds,
             startDate: item.startDate || item.start_date || "",
             endDate: item.endDate || item.end_date || "",
             isPublic: item.isPublic === 1 || item.isPublic === true ? 1 : 0,
-            position: item.displayOrder || item.position || 0,
+            displayOrder: item.displayOrder || item.position || 0,
             createdAt: item.createdAt || item.created_at || new Date().toISOString(),
             updatedAt:
               item.updatedAt || item.updated_at || item.createdAt || new Date().toISOString(),
           };
         });
 
-        // displayOrder(position) 기준으로 내림차순 정렬 (높은 값이 위로)
-        const sortedRecommendations = [...transformedRecommendations].sort(
-          (a, b) => (b.position || 0) - (a.position || 0)
-        );
+        // displayOrder 기준 오름차순 정렬 (작은 값이 위로), displayOrder가 같으면 createdAt 내림차순(최신이 위)
+        const sortedRecommendations = [...transformedRecommendations].sort((a, b) => {
+          if ((a.displayOrder || 0) !== (b.displayOrder || 0)) {
+            return (a.displayOrder || 0) - (b.displayOrder || 0);
+          }
+          // displayOrder가 같으면 createdAt 내림차순(최신이 위)
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
 
         // 전체 데이터를 상태에 저장
         setAllRecommendations(sortedRecommendations);
+        originalRecommendationsRef.current = sortedRecommendations; // fetchRecommendations에서만 원본 저장
         setTotalItems(sortedRecommendations.length);
         setTotalPages(Math.ceil(sortedRecommendations.length / pageSize)); // pageSize 사용
         setCurrentPage(1); // 데이터 로드 시 항상 첫 페이지로
@@ -442,8 +450,8 @@ const CasinoRecommendationManagement = () => {
 
     const currentItem = allRecommendations[actualIndex];
     const targetItem = allRecommendations[actualIndex - 1];
-    const currentPosition = currentItem.position || 0;
-    const targetPosition = targetItem.position || 0;
+    const currentDisplayOrder = currentItem.displayOrder || 0;
+    const targetDisplayOrder = targetItem.displayOrder || 0;
 
     // Prepare payloads for PUT requests, ensuring only expected fields are sent
     const currentItemPayload: UpsertCasinoRecommendationPayload = {
@@ -453,7 +461,7 @@ const CasinoRecommendationManagement = () => {
       startDate: currentItem.startDate,
       endDate: currentItem.endDate,
       isPublic: currentItem.isPublic === 1,
-      displayOrder: targetPosition,
+      displayOrder: targetDisplayOrder,
     };
 
     const targetItemPayload: UpsertCasinoRecommendationPayload = {
@@ -463,7 +471,7 @@ const CasinoRecommendationManagement = () => {
       startDate: targetItem.startDate,
       endDate: targetItem.endDate,
       isPublic: targetItem.isPublic === 1,
-      displayOrder: currentPosition,
+      displayOrder: currentDisplayOrder,
     };
 
     try {
@@ -491,8 +499,8 @@ const CasinoRecommendationManagement = () => {
 
     const currentItem = allRecommendations[actualIndex];
     const targetItem = allRecommendations[actualIndex + 1];
-    const currentPosition = currentItem.position || 0;
-    const targetPosition = targetItem.position || 0;
+    const currentDisplayOrder = currentItem.displayOrder || 0;
+    const targetDisplayOrder = targetItem.displayOrder || 0;
 
     // Prepare payloads for PUT requests, ensuring only expected fields are sent
     const currentItemPayload: UpsertCasinoRecommendationPayload = {
@@ -502,7 +510,7 @@ const CasinoRecommendationManagement = () => {
       startDate: currentItem.startDate,
       endDate: currentItem.endDate,
       isPublic: currentItem.isPublic === 1,
-      displayOrder: targetPosition,
+      displayOrder: targetDisplayOrder,
     };
 
     const targetItemPayload: UpsertCasinoRecommendationPayload = {
@@ -512,7 +520,7 @@ const CasinoRecommendationManagement = () => {
       startDate: targetItem.startDate,
       endDate: targetItem.endDate,
       isPublic: targetItem.isPublic === 1,
-      displayOrder: currentPosition,
+      displayOrder: currentDisplayOrder,
     };
 
     try {
@@ -599,9 +607,9 @@ const CasinoRecommendationManagement = () => {
     try {
       // 새 항목의 displayOrder 계산 (allRecommendations 기준)
       const newDisplayOrder = isEditing
-        ? allRecommendations.find((rec) => rec.id === currentRecommendationId)?.position
+        ? allRecommendations.find((rec) => rec.id === currentRecommendationId)?.displayOrder
         : allRecommendations.length > 0
-        ? Math.max(...allRecommendations.map((rec) => rec.position || 0)) + 1
+        ? Math.max(...allRecommendations.map((rec) => rec.displayOrder || 0)) + 1
         : 1;
 
       // 날짜 변환 시도 (오류 처리 추가)
@@ -772,28 +780,25 @@ const CasinoRecommendationManagement = () => {
         className: "text-center",
       },
       {
+        header: "순서",
+        accessor: "displayOrder" as keyof CasinoRecommendation,
+        cell: (value: number, row: CasinoRecommendation, index: number) => (
+          <input
+            type="number"
+            min={1}
+            className="w-16 border rounded px-2 py-1 text-center"
+            value={value}
+            onChange={(e) => handleDisplayOrderInputChange(index, Number(e.target.value))}
+            style={{ background: "#fff" }}
+          />
+        ),
+        className: "w-20 text-center",
+      },
+      {
         header: "관리",
         accessor: "id" as keyof CasinoRecommendation,
-        cell: (
-          id: number,
-          row: CasinoRecommendation,
-          index: number // index는 현재 페이지 기준
-        ) => (
+        cell: (id: number, row: CasinoRecommendation, index: number) => (
           <div className="flex space-x-1 justify-center">
-            <ActionButton
-              label="위로"
-              action="up"
-              size="sm"
-              onClick={() => handleMoveUp(index)} // index 전달 (페이지 기준)
-              disabled={(currentPage - 1) * pageSize + index <= 0} // 전체 목록 기준 첫 항목인지 확인
-            />
-            <ActionButton
-              label="아래로"
-              action="down"
-              size="sm"
-              onClick={() => handleMoveDown(index)} // index 전달 (페이지 기준)
-              disabled={(currentPage - 1) * pageSize + index >= allRecommendations.length - 1} // 전체 목록 기준 마지막 항목인지 확인
-            />
             <ActionButton
               label="수정"
               action="edit"
@@ -821,11 +826,57 @@ const CasinoRecommendationManagement = () => {
     ] // 의존성 배열 업데이트
   );
 
+  // displayOrder 입력값 변경 핸들러 (공통 함수)
+  const handleDisplayOrderInputChange = (index: number, newOrder: number) => {
+    setAllRecommendations((prev) => {
+      const updated = [...prev];
+      const actualIndex = (currentPage - 1) * pageSize + index;
+      updated[actualIndex] = { ...updated[actualIndex], displayOrder: newOrder };
+      return updated;
+    });
+  };
+
+  // displayOrder 일괄 저장 핸들러 (공통 함수)
+  const handleBulkDisplayOrderSave = async () => {
+    setLoading(true);
+    try {
+      // 변경된 추천만 추출 (id 기준으로 원본과 비교)
+      const changed = allRecommendations.filter((rec) => {
+        const original = originalRecommendationsRef.current.find((o) => o.id === rec.id);
+        return original && rec.displayOrder !== original.displayOrder;
+      });
+      if (changed.length === 0) {
+        toast.info("변경된 순서가 없습니다.");
+        setLoading(false);
+        return;
+      }
+      await Promise.all(
+        changed.map((rec) =>
+          axios.put(`/casino-recommends/${rec.id}`, { displayOrder: rec.displayOrder })
+        )
+      );
+      toast.success("순서가 저장되었습니다.");
+      fetchRecommendations();
+    } catch (err) {
+      toast.error("순서 저장 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">카지노 게임 추천 관리</h1>
         <div className="flex space-x-2">
+          {/* 순서 저장 버튼 */}
+          <Button
+            onClick={handleBulkDisplayOrderSave}
+            variant="primary"
+            disabled={loading || saving}
+          >
+            순서 저장
+          </Button>
           {/* 선택 삭제 버튼 추가 */}
           <Button
             onClick={handleBulkDelete}

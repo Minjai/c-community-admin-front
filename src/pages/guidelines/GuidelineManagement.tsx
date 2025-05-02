@@ -44,7 +44,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
 
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(30);
   const [totalItems, setTotalItems] = useState<number>(0);
 
   const [selectedGuidelineIds, setSelectedGuidelineIds] = useState<number[]>([]);
@@ -98,8 +98,16 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
                   .filter((tag: string) => tag !== "")
               : guideline.tags || [], // Handle null/undefined or already array
         }));
-
-        setGuidelines(processedGuidelines); // Use processed data (복원)
+        // position 기준 오름차순 정렬 (작은 값이 위로), position이 같으면 createdAt 내림차순(최신이 위)
+        const sortedGuidelines = [...processedGuidelines].sort((a, b) => {
+          if ((a.position || 0) !== (b.position || 0)) {
+            return (a.position || 0) - (b.position || 0);
+          }
+          // position이 같으면 createdAt 내림차순(최신이 위)
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        setGuidelines(sortedGuidelines);
+        originalGuidelinesRef.current = sortedGuidelines; // fetchGuidelines에서만 원본 저장
 
         if (response.pagination) {
           setTotalPages(response.pagination.totalPages);
@@ -169,7 +177,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
       content: "",
       boardId: boardId,
       isPublic: 1,
-      position: totalItems + 1, // 복원
+      position: 1, // 새 가이드라인은 항상 1번 순서
       imageUrl: "",
       tags: [], // 복원
     });
@@ -223,7 +231,16 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
         await GuidelineApiService.updateGuideline(currentGuideline.id, dataToSend);
         toast.success("가이드라인이 수정되었습니다.");
       } else {
-        await GuidelineApiService.createGuideline(dataToSend);
+        // 기존 가이드라인들의 position을 모두 +1로 서버에 반영
+        await Promise.all(
+          guidelines.map((guideline) =>
+            GuidelineApiService.updateGuideline(guideline.id, {
+              position: (guideline.position || 0) + 1,
+            })
+          )
+        );
+        // 새 가이드라인은 position 1로 생성
+        await GuidelineApiService.createGuideline({ ...dataToSend, position: 1 });
         toast.success("새 가이드라인이 추가되었습니다.");
       }
 
@@ -302,38 +319,44 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     }
   };
 
-  // 순서 변경 핸들러 복원
-  const handleMoveUp = async (index: number) => {
-    if (index <= 0) return;
-    const currentGuideline = guidelines[index];
-    const targetGuideline = guidelines[index - 1];
-    const currentPosition = currentGuideline.position || currentGuideline.displayOrder || 0;
-    const targetPosition = targetGuideline.position || targetGuideline.displayOrder || 0;
+  // position 입력값 변경 핸들러 (공통 함수)
+  const handlePositionInputChange = (index: number, newPosition: number) => {
+    setGuidelines((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], position: newPosition };
+      return updated;
+    });
+  };
+
+  // position 일괄 저장 핸들러 (공통 함수)
+  const handleBulkPositionSave = async () => {
+    setLoading(true);
     try {
-      await GuidelineApiService.updateGuidelinePosition(currentGuideline.id, targetPosition);
-      await GuidelineApiService.updateGuidelinePosition(targetGuideline.id, currentPosition);
+      // 변경된 가이드라인만 추출
+      const changed = guidelines.filter(
+        (g, i) => g.position !== originalGuidelinesRef.current[i]?.position
+      );
+      if (changed.length === 0) {
+        toast.info("변경된 순서가 없습니다.");
+        setLoading(false);
+        return;
+      }
+      await Promise.all(
+        changed.map((guideline) =>
+          GuidelineApiService.updateGuideline(guideline.id, { position: guideline.position })
+        )
+      );
+      toast.success("순서가 저장되었습니다.");
       fetchGuidelines(currentPage, pageSize);
     } catch (err) {
-      toast.error("순서 변경 중 오류가 발생했습니다.");
-      fetchGuidelines(currentPage, pageSize);
+      toast.error("순서 저장 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleMoveDown = async (index: number) => {
-    if (index >= guidelines.length - 1) return;
-    const currentGuideline = guidelines[index];
-    const targetGuideline = guidelines[index + 1];
-    const currentPosition = currentGuideline.position || currentGuideline.displayOrder || 0;
-    const targetPosition = targetGuideline.position || targetGuideline.displayOrder || 0;
-    try {
-      await GuidelineApiService.updateGuidelinePosition(currentGuideline.id, targetPosition);
-      await GuidelineApiService.updateGuidelinePosition(targetGuideline.id, currentPosition);
-      fetchGuidelines(currentPage, pageSize);
-    } catch (err) {
-      toast.error("순서 변경 중 오류가 발생했습니다.");
-      fetchGuidelines(currentPage, pageSize);
-    }
-  };
+  // 원본 position 값 저장용 ref
+  const originalGuidelinesRef = useRef<GuidelineWithOrder[]>([]);
 
   const handleCloseModal = () => {
     setModalError(null);
@@ -451,24 +474,25 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
       cell: (value: string | undefined) => formatDateForDisplay(value),
     },
     {
+      header: "순서",
+      accessor: "position" as keyof GuidelineWithOrder,
+      cell: (value: number, row: GuidelineWithOrder, index: number) => (
+        <input
+          type="number"
+          min={1}
+          className="w-16 border rounded px-2 py-1 text-center"
+          value={value}
+          onChange={(e) => handlePositionInputChange(index, Number(e.target.value))}
+          style={{ background: "#fff" }}
+        />
+      ),
+      className: "w-20 text-center",
+    },
+    {
       header: "관리",
       accessor: "id" as keyof GuidelineWithOrder,
       cell: (id: number, row: GuidelineWithOrder, index: number) => (
         <div className="flex items-center space-x-1 justify-center">
-          <ActionButton
-            label="위로"
-            action="up"
-            size="sm"
-            onClick={() => handleMoveUp(index)}
-            disabled={index === 0}
-          />
-          <ActionButton
-            label="아래로"
-            action="down"
-            size="sm"
-            onClick={() => handleMoveDown(index)}
-            disabled={index === guidelines.length - 1}
-          />
           <ActionButton
             label="수정"
             action="edit"
@@ -492,6 +516,9 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">{title}</h1>
         <div className="flex space-x-2">
+          <Button onClick={handleBulkPositionSave} variant="primary" disabled={loading || isSaving}>
+            순서 저장
+          </Button>
           <Button
             onClick={handleBulkDelete}
             variant="danger"

@@ -62,10 +62,14 @@ const MainBannerPage: React.FC = () => {
 
       // API 응답 구조에 맞게 데이터와 페이지네이션 정보 추출
       if (response && response.success && Array.isArray(response.data)) {
-        // position 기준으로 오름차순 정렬 (작은 값이 위로)
-        const sortedBanners = [...response.data].sort(
-          (a, b) => (a.position || 0) - (b.position || 0)
-        );
+        // position 기준 오름차순 정렬 (작은 값이 위로), position이 같으면 createdAt 내림차순(최신이 위)
+        const sortedBanners = [...response.data].sort((a, b) => {
+          if ((a.position || 0) !== (b.position || 0)) {
+            return (a.position || 0) - (b.position || 0);
+          }
+          // position이 같으면 createdAt 내림차순(최신이 위)
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
         setBanners(sortedBanners); // 정렬된 배열을 상태에 저장
         originalBannersRef.current = sortedBanners; // fetchBanners에서만 원본 저장
 
