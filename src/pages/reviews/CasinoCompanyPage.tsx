@@ -18,8 +18,11 @@ import { ApiResponse, PaginatedData } from "../../types"; // Import ApiResponse 
 const CASINO_INFO_URL_PREFIX =
   import.meta.env.VITE_CASINO_INFO_URL_PREFIX || "www.casinoguru-en.com/";
 
+const PAGE_SIZE = 30;
+
 const CasinoCompanyPage: React.FC = () => {
   const [companies, setCompanies] = useState<CasinoCompany[]>([]);
+  const [originalCompanies, setOriginalCompanies] = useState<CasinoCompany[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -39,7 +42,7 @@ const CasinoCompanyPage: React.FC = () => {
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [pageSize, setPageSize] = useState<number>(PAGE_SIZE);
   const [totalItems, setTotalItems] = useState<number>(0);
 
   // 초기 상태 설정
@@ -58,16 +61,10 @@ const CasinoCompanyPage: React.FC = () => {
   const fetchCompanies = async (page: number = currentPage, limit: number = pageSize) => {
     setLoading(true);
     setError(null);
-    const currentSelected = [...selectedCompanyIds]; // Keep selection
-
+    const currentSelected = [...selectedCompanyIds];
     try {
-      // CasinoCompanyApiService 서비스를 사용하여 API 호출 (page, limit 전달)
-      // 응답 타입을 ApiResponse<PaginatedData<CasinoCompany>>로 수정
       const response: ApiResponse<PaginatedData<CasinoCompany>> =
         await CasinoCompanyApiService.getCasinoCompanies(page, limit);
-      console.log("카지노 업체 응답 구조:", response);
-
-      // API 응답 구조 확인 및 데이터 처리 (제공된 구조 기반)
       if (response && response.success && response.data) {
         const {
           items,
@@ -76,72 +73,51 @@ const CasinoCompanyPage: React.FC = () => {
           limit: pageSizeFromApi,
           totalPages: totalPagesFromApi,
         } = response.data;
-
-        console.log("추출된 업체 데이터:", items);
-
         if (Array.isArray(items)) {
-          // 서버 응답을 컴포넌트에서 사용하는 형식으로 변환
-          const transformedCompanies = items.map((company: any) => ({
-            id: company.id,
-            companyName: company.companyName || company.name || "",
-            description: company.description || company.content || "",
-            imageUrl: company.imageUrl || company.logoUrl || company.logo || "",
-            linkUrl1: company.linkUrl1 || company.website || "",
-            linkUrl2: company.linkUrl2 || "",
-            rating: Number(company.rating || 0),
-            isPublic: company.isPublic === 1 || company.isPublic === true ? 1 : 0,
-            displayOrder: company.displayOrder || company.position || 0,
-            createdAt: company.createdAt || new Date().toISOString(),
-            updatedAt: company.updatedAt || company.createdAt || new Date().toISOString(),
-          })) as CasinoCompany[];
-
-          // 서버에서 정렬된 순서대로 데이터를 제공한다고 가정하고, 클라이언트 측 정렬 제거
-          setCompanies(transformedCompanies);
-
-          // 페이지네이션 정보 업데이트
+          // displayOrder 오름차순, 같으면 createdAt 내림차순
+          const sortedCompanies = items.sort((a, b) => {
+            if ((a.displayOrder || 0) !== (b.displayOrder || 0)) {
+              return (a.displayOrder || 0) - (b.displayOrder || 0);
+            }
+            return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+          });
+          setCompanies(sortedCompanies);
+          setOriginalCompanies(sortedCompanies.map((c) => ({ ...c })));
           setTotalItems(total);
-          // 명시적으로 호출된 경우 페이지 번호를 다시 설정하지 않음
-          if (page === currentPage) {
-            setCurrentPage(currentPageFromApi);
-          }
+          if (page === currentPage) setCurrentPage(currentPageFromApi);
           setPageSize(pageSizeFromApi);
           setTotalPages(totalPagesFromApi);
-
-          // Restore selection
           setSelectedCompanyIds(
-            currentSelected.filter((id) => transformedCompanies.some((comp) => comp.id === id))
+            currentSelected.filter((id) => sortedCompanies.some((comp) => comp.id === id))
           );
         } else {
-          console.log("items 데이터가 배열 형식이 아닙니다.");
           setCompanies([]);
-          setSelectedCompanyIds([]); // Clear selection
+          setOriginalCompanies([]);
+          setSelectedCompanyIds([]);
           setError("카지노 업체 목록 형식이 올바르지 않습니다.");
-          // 페이지네이션 상태 초기화
           setTotalItems(0);
           setCurrentPage(1);
-          setPageSize(limit); // 요청한 limit 값으로 설정
+          setPageSize(limit);
           setTotalPages(1);
         }
       } else {
-        console.log("적절한 업체 데이터를 찾지 못했습니다.");
         setCompanies([]);
-        setSelectedCompanyIds([]); // Clear selection
+        setOriginalCompanies([]);
+        setSelectedCompanyIds([]);
         setError(response?.message || "카지노 업체 목록을 불러오는데 실패했습니다.");
-        // 페이지네이션 상태 초기화
         setTotalItems(0);
         setCurrentPage(1);
-        setPageSize(limit); // 요청한 limit 값으로 설정
+        setPageSize(limit);
         setTotalPages(1);
       }
     } catch (err) {
-      console.error("Error fetching casino companies:", err);
       setError("카지노 업체 목록을 불러오는데 실패했습니다.");
       setCompanies([]);
-      setSelectedCompanyIds([]); // Clear selection
-      // 페이지네이션 상태 초기화
+      setOriginalCompanies([]);
+      setSelectedCompanyIds([]);
       setTotalItems(0);
       setCurrentPage(1);
-      setPageSize(limit); // 요청한 limit 값으로 설정
+      setPageSize(limit);
       setTotalPages(1);
     } finally {
       setLoading(false);
@@ -149,14 +125,14 @@ const CasinoCompanyPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchCompanies(currentPage, pageSize); // 컴포넌트 마운트 시 첫 페이지 데이터 로드
+    fetchCompanies(currentPage, PAGE_SIZE); // 컴포넌트 마운트 시 첫 페이지 데이터 로드
   }, []); // 컴포넌트 마운트 시에만 실행
 
   // 페이지 변경 핸들러 추가
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
       setCurrentPage(page); // 먼저 currentPage 상태를 업데이트
-      fetchCompanies(page, pageSize); // 새 페이지 데이터 요청
+      fetchCompanies(page, PAGE_SIZE); // 새 페이지 데이터 요청
     }
   };
 
@@ -190,7 +166,7 @@ const CasinoCompanyPage: React.FC = () => {
       description: "",
       imageUrl: "",
       isPublic: 1,
-      displayOrder: totalItems + 1, // 전체 아이템 수 + 1로 displayOrder 설정
+      displayOrder: 1,
       linkUrl1: "",
       linkUrl2: "",
       rating: 0,
@@ -233,21 +209,23 @@ const CasinoCompanyPage: React.FC = () => {
   // 업체 저장 (추가 또는 수정)
   const handleSaveCompany = async () => {
     if (!currentCompany) return;
-
-    // Clear modal error first
     setError(null);
-    // Clear alert message at the beginning
     setAlertMessage(null);
-
     try {
       setIsSaving(true);
-      // 필수 필드 검증
       if (!currentCompany.companyName || !currentCompany.description) {
-        setError("업체명과 업체소개는 필수 항목입니다."); // Use setError for modal alert
-        setIsSaving(false); // Stop saving process
+        setError("업체명과 업체소개는 필수 항목입니다.");
+        setIsSaving(false);
         return;
       }
-
+      if (!isEditing) {
+        // 새 업체 추가 시 기존 업체 모두 +1
+        await Promise.all(
+          companies.map((comp) =>
+            CasinoCompanyApiService.updateDisplayOrder(comp.id, (comp.displayOrder || 0) + 1)
+          )
+        );
+      }
       // URL 처리
       const processedCompany = processUrls(currentCompany);
 
@@ -322,14 +300,14 @@ const CasinoCompanyPage: React.FC = () => {
       // Remove from selection if it was selected
       setSelectedCompanyIds((prev) => prev.filter((compId) => compId !== id));
       // Fetch current page again after delete
-      fetchCompanies(currentPage, pageSize);
+      fetchCompanies(currentPage, PAGE_SIZE);
     } catch (err: any) {
       console.error("Error deleting casino company:", err);
       const message = err.response?.data?.message || "업체 삭제 중 오류가 발생했습니다.";
       setError(message); // Set error for Alert component
       setAlertMessage({ type: "error", message });
       // Attempt to refresh anyway, might resolve inconsistent state
-      fetchCompanies(currentPage, pageSize);
+      fetchCompanies(currentPage, PAGE_SIZE);
     } finally {
       setLoading(false);
     }
@@ -390,7 +368,7 @@ const CasinoCompanyPage: React.FC = () => {
     }
 
     // 목록 새로고침 (삭제 성공/실패 여부와 관계없이 최신 상태 반영)
-    fetchCompanies(currentPage, pageSize);
+    fetchCompanies(currentPage, PAGE_SIZE);
   };
 
   // 개별 선택 핸들러 추가
@@ -413,113 +391,69 @@ const CasinoCompanyPage: React.FC = () => {
     }
   };
 
-  // 업체 순서 변경 (위로 이동)
-  const handleMoveUp = async (company: CasinoCompany, index: number) => {
-    if (isMoving) return;
+  // displayOrder 입력값 변경 핸들러
+  const handleDisplayOrderInputChange = (index: number, newOrder: number) => {
+    setCompanies((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], displayOrder: newOrder };
+      return updated;
+    });
+  };
 
-    // cross-page: 첫 줄 & 이전 페이지가 있을 때
-    if (index === 0 && currentPage > 1) {
-      setIsMoving(true);
-      try {
-        const prevPage = currentPage - 1;
-        const response = await CasinoCompanyApiService.getCasinoCompanies(prevPage, pageSize);
-        const prevPageCompanies = response.data?.items || [];
-        if (prevPageCompanies.length === 0) return;
-        const lastPrevCompany = prevPageCompanies[prevPageCompanies.length - 1];
-        if (!lastPrevCompany) return;
-        await CasinoCompanyApiService.updateDisplayOrder(company.id, lastPrevCompany.displayOrder);
-        await CasinoCompanyApiService.updateDisplayOrder(lastPrevCompany.id, company.displayOrder);
-        await fetchCompanies(currentPage, pageSize);
-        setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
-      } catch (error) {
-        setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
-        fetchCompanies(currentPage, pageSize);
-      } finally {
-        setIsMoving(false);
-      }
-      return;
-    }
-
-    // 기존 페이지 내 이동
-    if (index > 0) {
-      const prevCompany = companies[index - 1];
-      if (!prevCompany) return;
-      const currentDisplayOrder = company.displayOrder;
-      const prevDisplayOrder = prevCompany.displayOrder;
-      if (currentDisplayOrder === prevDisplayOrder) {
-        console.warn("Attempted to move up, but display orders are the same.");
+  // displayOrder 일괄 저장 핸들러
+  const handleBulkDisplayOrderSave = async () => {
+    setLoading(true);
+    try {
+      const changed = companies.filter((comp) => {
+        const original = originalCompanies.find((o) => o.id === comp.id);
+        return original && comp.displayOrder !== original.displayOrder;
+      });
+      if (changed.length === 0) {
+        setLoading(false);
         return;
       }
-      setIsMoving(true);
-      try {
-        await CasinoCompanyApiService.updateDisplayOrder(company.id, prevDisplayOrder);
-        await CasinoCompanyApiService.updateDisplayOrder(prevCompany.id, currentDisplayOrder);
-        await fetchCompanies(currentPage, pageSize);
-        setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
-      } catch (error) {
-        setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
-        fetchCompanies(currentPage, pageSize);
-      } finally {
-        setIsMoving(false);
-      }
+      await Promise.all(
+        changed.map((comp) =>
+          CasinoCompanyApiService.updateDisplayOrder(comp.id, comp.displayOrder)
+        )
+      );
+      fetchCompanies(currentPage, PAGE_SIZE);
+    } catch (err) {
+      // do nothing
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 업체 순서 변경 (아래로 이동)
-  const handleMoveDown = async (company: CasinoCompany, index: number) => {
-    if (isMoving) return;
+  // 업체 정보 필드의 UI 처리
+  const renderCasinoInfoField = () => {
+    const companyInfoPath = currentCompany?.linkUrl2 || "";
 
-    // cross-page: 마지막 줄 & 다음 페이지가 있을 때
-    if (index === companies.length - 1 && currentPage < totalPages) {
-      setIsMoving(true);
-      try {
-        const nextPage = currentPage + 1;
-        const response = await CasinoCompanyApiService.getCasinoCompanies(nextPage, pageSize);
-        const nextPageCompanies = response.data?.items || [];
-        if (nextPageCompanies.length === 0) return;
-        const firstNextCompany = nextPageCompanies[0];
-        if (!firstNextCompany) return;
-        await CasinoCompanyApiService.updateDisplayOrder(company.id, firstNextCompany.displayOrder);
-        await CasinoCompanyApiService.updateDisplayOrder(firstNextCompany.id, company.displayOrder);
-        await fetchCompanies(currentPage, pageSize);
-        setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
-      } catch (error) {
-        setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
-        fetchCompanies(currentPage, pageSize);
-      } finally {
-        setIsMoving(false);
-      }
-      return;
-    }
-
-    // 기존 페이지 내 이동
-    if (index < companies.length - 1) {
-      const nextCompany = companies[index + 1];
-      if (!nextCompany) return;
-      const currentDisplayOrder = company.displayOrder;
-      const nextDisplayOrder = nextCompany.displayOrder;
-      if (currentDisplayOrder === nextDisplayOrder) {
-        console.warn("Attempted to move down, but display orders are the same.");
-        return;
-      }
-      setIsMoving(true);
-      try {
-        await CasinoCompanyApiService.updateDisplayOrder(company.id, nextDisplayOrder);
-        await CasinoCompanyApiService.updateDisplayOrder(nextCompany.id, currentDisplayOrder);
-        await fetchCompanies(currentPage, pageSize);
-        setAlertMessage({ type: "success", message: "순서가 변경되었습니다." });
-      } catch (error) {
-        setAlertMessage({ type: "error", message: "순서 변경 중 오류가 발생했습니다." });
-        fetchCompanies(currentPage, pageSize);
-      } finally {
-        setIsMoving(false);
-      }
-    }
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">업체 정보</label>
+        <div className="flex items-center">
+          <span className="bg-gray-100 px-3 py-2 text-gray-500 border border-r-0 border-gray-300 rounded-l-md">
+            {CASINO_INFO_URL_PREFIX}
+          </span>
+          <input
+            type="text"
+            value={companyInfoPath}
+            onChange={(e) => setCurrentCompany({ ...currentCompany!, linkUrl2: e.target.value })}
+            placeholder="업체 고유 경로 입력"
+            className="flex-1 px-3 py-2 border border-gray-300 rounded-r-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        <p className="mt-1 text-xs text-gray-500">
+          전체 URL: {CASINO_INFO_URL_PREFIX}
+          {companyInfoPath}
+        </p>
+      </div>
+    );
   };
 
   // 데이터 테이블 컬럼 정의
   const columns = [
-    // 체크박스 컬럼 추가
     {
       header: (
         <input
@@ -560,7 +494,6 @@ const CasinoCompanyPage: React.FC = () => {
         </span>
       ),
     },
-    // 2. 로고 이미지 (Moved to second)
     {
       header: "로고 이미지",
       accessor: "imageUrl" as keyof CasinoCompany,
@@ -572,7 +505,6 @@ const CasinoCompanyPage: React.FC = () => {
         ),
       size: 120,
     },
-    // 3. 상태 (표시 여부)
     {
       header: "상태",
       accessor: "isPublic" as keyof CasinoCompany,
@@ -589,32 +521,32 @@ const CasinoCompanyPage: React.FC = () => {
       ),
       size: 80,
     },
-    // 4. 등록일자
     {
       header: "등록일자",
       accessor: "createdAt" as keyof CasinoCompany,
       cell: (value: string) => formatDate(value),
     },
-    // 5. 관리
+    // 순서 컬럼: 관리 컬럼 왼쪽, 등록일자 다음
+    {
+      header: "순서",
+      accessor: "displayOrder" as keyof CasinoCompany,
+      cell: (displayOrder: number, row: CasinoCompany, index: number) => (
+        <input
+          type="number"
+          min={1}
+          className="w-16 text-center border rounded"
+          value={displayOrder}
+          onChange={(e) => handleDisplayOrderInputChange(index, Number(e.target.value))}
+          disabled={loading || isMoving || isSaving}
+        />
+      ),
+      className: "w-20 text-center",
+    },
     {
       header: "관리",
-      accessor: "id" as keyof CasinoCompany, // Assuming 'id' is the accessor for actions
-      cell: (value: any, row: CasinoCompany, index: number) => (
+      accessor: "id" as keyof CasinoCompany,
+      cell: (value: any, row: CasinoCompany) => (
         <div className="flex space-x-2">
-          <ActionButton
-            label="위로"
-            action="up"
-            size="sm"
-            onClick={() => handleMoveUp(row, index)}
-            disabled={isMoving || index === 0}
-          />
-          <ActionButton
-            label="아래로"
-            action="down"
-            size="sm"
-            onClick={() => handleMoveDown(row, index)}
-            disabled={isMoving || (index === companies.length - 1 && currentPage === totalPages)}
-          />
           <ActionButton
             label="수정"
             action="edit"
@@ -629,36 +561,9 @@ const CasinoCompanyPage: React.FC = () => {
           />
         </div>
       ),
-      size: 200, // Adjust size as needed
+      size: 200,
     },
   ];
-
-  // 업체 정보 필드의 UI 처리
-  const renderCasinoInfoField = () => {
-    const companyInfoPath = currentCompany?.linkUrl2 || "";
-
-    return (
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">업체 정보</label>
-        <div className="flex items-center">
-          <span className="bg-gray-100 px-3 py-2 text-gray-500 border border-r-0 border-gray-300 rounded-l-md">
-            {CASINO_INFO_URL_PREFIX}
-          </span>
-          <input
-            type="text"
-            value={companyInfoPath}
-            onChange={(e) => setCurrentCompany({ ...currentCompany!, linkUrl2: e.target.value })}
-            placeholder="업체 고유 경로 입력"
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-r-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
-        <p className="mt-1 text-xs text-gray-500">
-          전체 URL: {CASINO_INFO_URL_PREFIX}
-          {companyInfoPath}
-        </p>
-      </div>
-    );
-  };
 
   return (
     <div className="w-full px-8 py-8">
@@ -666,15 +571,22 @@ const CasinoCompanyPage: React.FC = () => {
         <h1 className="text-2xl font-bold">카지노 업체 관리</h1>
         <div className="flex space-x-2">
           <Button
-            variant="danger"
+            onClick={handleBulkDisplayOrderSave}
+            variant="primary"
+            disabled={loading || isSaving || isMoving}
+          >
+            순서 저장
+          </Button>
+          <Button
             onClick={handleBulkDelete}
+            variant="danger"
             disabled={selectedCompanyIds.length === 0 || loading || isSaving || isMoving}
           >
             {`선택 삭제 (${selectedCompanyIds.length})`}
           </Button>
           <Button
-            variant="primary"
             onClick={handleAddCompany}
+            variant="primary"
             disabled={loading || isSaving || isMoving}
           >
             업체 추가
@@ -709,7 +621,7 @@ const CasinoCompanyPage: React.FC = () => {
             emptyMessage="등록된 카지노 업체가 없습니다."
             pagination={{
               currentPage,
-              pageSize,
+              pageSize: PAGE_SIZE,
               totalItems,
               onPageChange: handlePageChange,
             }}

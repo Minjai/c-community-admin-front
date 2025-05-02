@@ -10,8 +10,21 @@ import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
 import LoadingOverlay from "../../components/LoadingOverlay";
 
+// 날짜 포맷 변환 함수 (컴포넌트 밖으로 이동)
+function formatDate(dateStr: string) {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}.${month}.${day} ${hours}:${minutes}`;
+}
+
 const RemittanceBannerPage: React.FC = () => {
   const [banners, setBanners] = useState<RemittanceBanner[]>([]);
+  const [originalBanners, setOriginalBanners] = useState<RemittanceBanner[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -25,81 +38,56 @@ const RemittanceBannerPage: React.FC = () => {
   const [saving, setSaving] = useState<boolean>(false);
   const [moving, setMoving] = useState<boolean>(false);
   const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
-
-  // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(0); // 초기값 0
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [totalPages, setTotalPages] = useState<number>(0);
+  const [pageSize, setPageSize] = useState<number>(30);
   const [totalItems, setTotalItems] = useState<number>(0);
 
-  // 날짜 포맷 변환 함수
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "";
-
-    // ISO 형식 문자열을 Date 객체로 변환
-    const date = new Date(dateStr);
-
-    // 로컬 시간대로 변환
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-
-    return `${year}.${month}.${day} ${hours}:${minutes}`;
-  };
-
-  // 배너 목록 조회 (서버 측 페이지네이션으로 수정)
-  const fetchBanners = useCallback(async (page: number = 1, limit: number = 10) => {
+  // 배너 목록 조회 (페이지네이션 적용)
+  const fetchBanners = useCallback(async (page: number = 1, limit: number = 30) => {
     setLoading(true);
     setError(null);
-
     try {
-      // 서비스 함수가 page, limit를 받고 { data, pagination } 구조를 반환한다고 가정
       const response = await RemittanceBannerService.getRemittanceBanners(page, limit);
-      console.log("송금 배너 응답:", response); // 응답 구조 확인용
-
-      // 실제 응답 구조에 맞춰 처리 (예: response.data.data, response.data.pagination)
-      // 여기서는 사용자님이 보여주신 { success, data, pagination } 구조로 가정
       if (response && response.data && response.pagination) {
         const fetchedBanners = response.data || [];
         const pagination = response.pagination;
-
-        // 필드 매핑 (필요 시)
         const processedBanners = fetchedBanners.map((banner: any) => ({
           id: banner.id,
           name: banner.name || "",
           link: banner.link || "",
-          imageUrl: banner.imageUrl || banner.image || "", // imageUrl 또는 image 필드 사용
+          imageUrl: banner.imageUrl || banner.image || "",
           isPublic: banner.isPublic === undefined ? 1 : banner.isPublic,
           displayOrder: banner.displayOrder || 0,
           createdAt: banner.createdAt || "",
           updatedAt: banner.updatedAt || "",
         }));
-
-        // 정렬은 서버에서 지원하지 않으면 여기서 유지 가능
-        const sortedBanners = [...processedBanners].sort(
-          (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
-        );
-
+        // displayOrder 오름차순, 같으면 createdAt 내림차순
+        const sortedBanners = [...processedBanners].sort((a, b) => {
+          if ((a.displayOrder || 0) !== (b.displayOrder || 0)) {
+            return (a.displayOrder || 0) - (b.displayOrder || 0);
+          }
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
         setBanners(sortedBanners);
+        setOriginalBanners(sortedBanners);
         setTotalItems(pagination.totalItems || 0);
         setTotalPages(pagination.totalPages || 0);
         setCurrentPage(pagination.currentPage || page);
         setPageSize(pagination.pageSize || limit);
         setSelectedBannerIds([]);
       } else {
-        console.error("송금 배너 불러오기 실패: 응답 형식이 예상과 다릅니다", response);
         setBanners([]);
+        setOriginalBanners([]);
         setTotalItems(0);
         setTotalPages(0);
         setCurrentPage(1);
         setError("송금 배너 데이터 형식이 올바르지 않습니다.");
       }
     } catch (err) {
-      console.error("Error fetching remittance banners:", err);
       setError("송금 배너를 불러오는데 실패했습니다.");
       setBanners([]);
+      setOriginalBanners([]);
       setTotalItems(0);
       setTotalPages(0);
       setCurrentPage(1);
@@ -112,13 +100,6 @@ const RemittanceBannerPage: React.FC = () => {
     fetchBanners(currentPage, pageSize);
   }, [fetchBanners, currentPage, pageSize]);
 
-  // 페이지 변경 핸들러 추가
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages && page !== currentPage) {
-      setCurrentPage(page);
-    }
-  };
-
   // 배너 추가 모달 열기
   const handleAddBanner = () => {
     setCurrentBanner({
@@ -127,6 +108,7 @@ const RemittanceBannerPage: React.FC = () => {
       link: "",
       imageUrl: "",
       isPublic: 1,
+      displayOrder: 1,
       createdAt: "",
       updatedAt: "",
     });
@@ -135,6 +117,8 @@ const RemittanceBannerPage: React.FC = () => {
     setIsEditing(false);
     setAlertMessage(null);
     setSelectedBannerIds([]);
+    // 기존 배너 displayOrder +1
+    setBanners((prev) => prev.map((b) => ({ ...b, displayOrder: (b.displayOrder || 0) + 1 })));
   };
 
   // 배너 수정 모달 열기
@@ -317,7 +301,7 @@ const RemittanceBannerPage: React.FC = () => {
 
   // 배너 위로 이동
   const handleMoveUp = async (index: number) => {
-    if (index <= 0 && currentPage === 1) return;
+    if (index <= 0) return;
     setMoving(true);
     setAlertMessage(null);
     setSelectedBannerIds([]);
@@ -367,7 +351,7 @@ const RemittanceBannerPage: React.FC = () => {
 
   // 배너 아래로 이동
   const handleMoveDown = async (index: number) => {
-    if (index >= banners.length - 1 && currentPage === totalPages) return;
+    if (index >= banners.length - 1) return;
     setMoving(true);
     setAlertMessage(null);
     setSelectedBannerIds([]);
@@ -436,6 +420,49 @@ const RemittanceBannerPage: React.FC = () => {
     setLogoFile(file);
   };
 
+  // displayOrder 직접 입력 핸들러
+  const handleDisplayOrderInputChange = (index: number, newOrder: number) => {
+    setBanners((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], displayOrder: newOrder };
+      return updated;
+    });
+  };
+
+  // 순서 저장 핸들러
+  const handleBulkDisplayOrderSave = async () => {
+    setLoading(true);
+    try {
+      const changed = banners.filter((banner) => {
+        const original = originalBanners.find((o) => o.id === banner.id);
+        return original && banner.displayOrder !== original.displayOrder;
+      });
+      if (changed.length === 0) {
+        setLoading(false);
+        return;
+      }
+      await Promise.all(
+        changed.map((banner) =>
+          RemittanceBannerService.updateRemittanceBanner(banner.id, {
+            displayOrder: banner.displayOrder,
+          })
+        )
+      );
+      fetchBanners(currentPage, pageSize);
+    } catch (err) {
+      // do nothing
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 페이지 변경 핸들러 복구
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages && page !== currentPage) {
+      setCurrentPage(page);
+    }
+  };
+
   // DataTable 컬럼 정의
   const columns = useMemo(
     () => [
@@ -498,24 +525,30 @@ const RemittanceBannerPage: React.FC = () => {
       },
       { header: "생성일", accessor: "createdAt" as keyof RemittanceBanner, cell: formatDate },
       {
+        header: "수정일",
+        accessor: "updatedAt" as keyof RemittanceBanner,
+        cell: formatDate,
+      },
+      {
+        header: "순서",
+        accessor: "displayOrder" as keyof RemittanceBanner,
+        cell: (displayOrder: number, row: RemittanceBanner, index: number) => (
+          <input
+            type="number"
+            min={1}
+            className="w-16 border rounded text-center"
+            value={displayOrder}
+            onChange={(e) => handleDisplayOrderInputChange(index, Number(e.target.value))}
+            disabled={loading}
+          />
+        ),
+        className: "text-center",
+      },
+      {
         header: "관리",
         accessor: "id" as keyof RemittanceBanner,
-        cell: (id: number, row: RemittanceBanner, index: number) => (
+        cell: (id: number, row: RemittanceBanner) => (
           <div className="flex space-x-1 justify-center">
-            <ActionButton
-              label="위로"
-              action="up"
-              size="sm"
-              onClick={() => handleMoveUp(index)}
-              disabled={moving || (index <= 0 && currentPage === 1)}
-            />
-            <ActionButton
-              label="아래로"
-              action="down"
-              size="sm"
-              onClick={() => handleMoveDown(index)}
-              disabled={moving || (index >= banners.length - 1 && currentPage === totalPages)}
-            />
             <ActionButton
               label="수정"
               action="edit"
@@ -533,7 +566,7 @@ const RemittanceBannerPage: React.FC = () => {
         className: "text-center",
       },
     ],
-    [banners, selectedBannerIds, loading, moving, currentPage, totalPages]
+    [banners, selectedBannerIds, loading]
   );
 
   return (
@@ -555,6 +588,9 @@ const RemittanceBannerPage: React.FC = () => {
       <LoadingOverlay isLoading={loading || saving || moving} />
 
       <div className="flex justify-end space-x-2 mb-4">
+        <Button onClick={handleBulkDisplayOrderSave} variant="primary" disabled={loading}>
+          순서 저장
+        </Button>
         <Button
           onClick={handleBulkDelete}
           variant="danger"
