@@ -310,17 +310,22 @@ const UserManagement = () => {
           cell: (value: string) => formatDate(value),
         },
         {
-          header: "최근 접속일",
-          accessor: "lastLoginAt" as keyof User,
-          cell: (value?: string) => (value ? formatDate(value) : "-"),
-        },
-        {
           header: "관리",
           accessor: "id" as keyof User,
-          cell: (id: number) => (
-            <div className="flex space-x-1">
-              <ActionButton action="edit" size="sm" onClick={() => handleEditUser(id)} />
-              <ActionButton action="delete" size="sm" onClick={() => handleDeleteUser(id)} />
+          cell: (id: number, row: User) => (
+            <div className="flex space-x-2">
+              <ActionButton
+                label="수정"
+                action="edit"
+                onClick={() => handleEditUser(row.id)}
+                disabled={loading || saving}
+              />
+              <ActionButton
+                label="삭제"
+                action="delete"
+                onClick={() => handleDeleteUser(id)}
+                disabled={loading || saving}
+              />
             </div>
           ),
           className: "w-24 text-center",

@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigation } from "../../services/NavigationService";
-import { getUsers } from "../../api";
 import DataTable from "../../components/DataTable";
 import Button from "../../components/Button";
 import ActionButton from "../../components/ActionButton";
@@ -10,50 +9,30 @@ import Select from "../../components/forms/Select";
 import Alert from "../../components/Alert";
 
 const UserManagementPage: React.FC = () => {
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<any[]>([]);
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [alertMessage, setAlertMessage] = useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
-  // 회원 목록 조회
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const { users, total } = await getUsers(currentPage, pageSize);
-      setUsers(users);
-      setTotalUsers(total);
-      setError(null);
-    } catch (err) {
-      setError("회원 목록을 불러오는 중 오류가 발생했습니다.");
-      console.error("Error fetching users:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchUsers();
-  }, [currentPage, pageSize]);
-
   // 회원 상세 정보 모달 열기
-  const handleViewUser = (user: User) => {
-    setCurrentUser({ ...user });
+  const handleViewUser = (user: any) => {
+    setCurrentUser(user);
     setIsEditing(false);
     setShowModal(true);
   };
 
   // 회원 수정 모달 열기
-  const handleEditUser = (user: User) => {
-    setCurrentUser({ ...user });
+  const handleEditUser = (user: any) => {
+    setCurrentUser(user);
     setIsEditing(true);
     setShowModal(true);
   };
@@ -66,7 +45,6 @@ const UserManagementPage: React.FC = () => {
       // 실제 구현에서는 API 호출로 회원 정보 업데이트
       setAlertMessage({ type: "success", message: "회원 정보가 성공적으로 수정되었습니다." });
       setShowModal(false);
-      fetchUsers();
     } catch (err) {
       setAlertMessage({ type: "error", message: "회원 정보 저장 중 오류가 발생했습니다." });
       console.error("Error saving user:", err);
@@ -87,42 +65,38 @@ const UserManagementPage: React.FC = () => {
   // 입력 필드 변경 처리
   const handleInputChange = (name: string, value: any) => {
     if (!currentUser) return;
-    setCurrentUser({ ...currentUser, [name]: value });
+    setCurrentUser(Object.assign({}, currentUser, { [name]: value }));
   };
 
   // 테이블 컬럼 정의
   const columns = [
     { header: "이메일", accessor: "email" },
     { header: "닉네임", accessor: "nickname" },
-    {
-      header: "역할",
-      accessor: "role",
-      cell: (value: string) => {
-        let badgeClass = "bg-gray-100 text-gray-800";
-        if (value === "admin") badgeClass = "bg-blue-100 text-blue-800";
-        if (value === "superadmin") badgeClass = "bg-purple-100 text-purple-800";
-
-        return <span className={`px-2 py-1 rounded-full text-xs ${badgeClass}`}>{value}</span>;
-      },
-    },
-    { header: "점수", accessor: "score" },
+    { header: "등급", accessor: "rank" },
+    { header: "상태", accessor: "status" },
+    { header: "포인트", accessor: "score" },
     {
       header: "가입일",
       accessor: "createdAt",
       cell: (value: string) => new Date(value).toLocaleDateString(),
     },
     {
-      header: "최근 로그인",
-      accessor: "lastLoginAt",
-      cell: (value: string) => (value ? new Date(value).toLocaleDateString() : "-"),
-    },
-    {
       header: "관리",
       accessor: "id",
-      cell: (value: number, row: User) => (
+      cell: (value: number, row: any) => (
         <div className="flex space-x-2">
-          <ActionButton onClick={() => handleViewUser(row)} icon="view" tooltip="상세 보기" />
-          <ActionButton onClick={() => handleEditUser(row)} icon="edit" tooltip="수정" />
+          <ActionButton onClick={() => handleEditUser(row)} action="edit" label="수정" size="sm" />
+          <ActionButton
+            onClick={() => {
+              if (window.confirm("정말로 이 회원을 삭제하시겠습니까?")) {
+                setUsers((prev) => prev.filter((u: any) => u.id !== row.id));
+                setAlertMessage({ type: "success", message: "회원이 삭제되었습니다." });
+              }
+            }}
+            action="delete"
+            label="삭제"
+            size="sm"
+          />
         </div>
       ),
     },
@@ -202,20 +176,6 @@ const UserManagementPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Select
-                label="역할"
-                name="role"
-                value={currentUser.role || ""}
-                onChange={(e) => handleInputChange("role", e.target.value)}
-                options={[
-                  { value: "user", label: "일반 회원" },
-                  { value: "admin", label: "관리자" },
-                  { value: "superadmin", label: "최고 관리자" },
-                ]}
-                disabled={!isEditing}
-                required
-              />
-
               <Input
                 label="점수"
                 name="score"
@@ -232,17 +192,6 @@ const UserManagementPage: React.FC = () => {
                 name="createdAt"
                 value={
                   currentUser.createdAt ? new Date(currentUser.createdAt).toLocaleDateString() : ""
-                }
-                disabled
-              />
-
-              <Input
-                label="최근 로그인"
-                name="lastLoginAt"
-                value={
-                  currentUser.lastLoginAt
-                    ? new Date(currentUser.lastLoginAt).toLocaleDateString()
-                    : "-"
                 }
                 disabled
               />
