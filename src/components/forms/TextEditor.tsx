@@ -375,6 +375,18 @@ const initQuill = async (
   }
 };
 
+// --- [임베드 버튼 SVG 아이콘 등록] ---
+// 영상(플레이) 관련 SVG 아이콘 (Quill 툴바용)
+const embedIcon =
+  '<svg viewBox="0 0 18 18" width="18" height="18"><circle cx="9" cy="9" r="8" stroke="currentColor" stroke-width="1.5" fill="none"/><polygon points="7,6 13,9 7,12" fill="currentColor"/></svg>';
+
+try {
+  Quill.import("ui/icons")["embed"] = embedIcon;
+} catch (e) {
+  // Quill가 아직 준비 안된 경우 무시
+}
+// --- [임베드 버튼 SVG 아이콘 등록 끝] ---
+
 const TextEditor: React.FC<TextEditorProps> = ({
   content,
   setContent,
