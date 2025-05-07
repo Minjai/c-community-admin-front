@@ -177,7 +177,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
       content: "",
       boardId: boardId,
       isPublic: 1,
-      position: 1, // 새 가이드라인은 항상 1번 순서
+      position: 0, // 새 가이드라인은 항상 0번 순서
       imageUrl: "",
       tags: [], // 복원
     });
@@ -231,16 +231,8 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
         await GuidelineApiService.updateGuideline(currentGuideline.id, dataToSend);
         toast.success("가이드라인이 수정되었습니다.");
       } else {
-        // 기존 가이드라인들의 position을 모두 +1로 서버에 반영
-        await Promise.all(
-          guidelines.map((guideline) =>
-            GuidelineApiService.updateGuideline(guideline.id, {
-              position: (guideline.position || 0) + 1,
-            })
-          )
-        );
-        // 새 가이드라인은 position 1로 생성
-        await GuidelineApiService.createGuideline({ ...dataToSend, position: 1 });
+        // 새 가이드라인은 position 0으로 생성
+        await GuidelineApiService.createGuideline({ ...dataToSend, position: 0 });
         toast.success("새 가이드라인이 추가되었습니다.");
       }
 

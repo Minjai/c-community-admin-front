@@ -297,100 +297,6 @@ const UserRankManagement: React.FC = () => {
     fetchRanks(currentPage, pageSize);
   };
 
-  // 등급 순서 위로 이동
-  const handleMoveUp = async (index: number) => {
-    if (index <= 0 && currentPage === 1) return;
-    setMoving(true);
-    setAlertMessage(null);
-    setSelectedRankIds([]);
-    try {
-      const newRanks = [...ranks];
-      const temp = newRanks[index];
-      newRanks[index] = newRanks[index - 1];
-      newRanks[index - 1] = temp;
-
-      // position 값 업데이트
-      const updatedRanks = newRanks.map((rank, idx) => ({
-        ...rank,
-        position: idx + 1,
-      }));
-
-      setRanks(updatedRanks);
-
-      // 서버에 순서 변경 요청
-      await axios.put(`/admin/ranks/${temp.id}/position`, {
-        position: index,
-      });
-
-      await axios.put(`/admin/ranks/${newRanks[index].id}/position`, {
-        position: index + 1,
-      });
-
-      setAlertMessage({
-        type: "success",
-        message: "등급 순서가 변경되었습니다.",
-      });
-    } catch (error: any) {
-      console.error("Error moving rank up:", error);
-      setAlertMessage({
-        type: "error",
-        message: `등급 순서 변경 중 오류가 발생했습니다: ${
-          error.response?.data?.message || error.message
-        }`,
-      });
-      fetchRanks(currentPage, pageSize);
-    } finally {
-      setMoving(false);
-    }
-  };
-
-  // 등급 순서 아래로 이동
-  const handleMoveDown = async (index: number) => {
-    if (index >= ranks.length - 1 && currentPage === totalPages) return;
-    setMoving(true);
-    setAlertMessage(null);
-    setSelectedRankIds([]);
-    try {
-      const newRanks = [...ranks];
-      const temp = newRanks[index];
-      newRanks[index] = newRanks[index + 1];
-      newRanks[index + 1] = temp;
-
-      // position 값 업데이트
-      const updatedRanks = newRanks.map((rank, idx) => ({
-        ...rank,
-        position: idx + 1,
-      }));
-
-      setRanks(updatedRanks);
-
-      // 서버에 순서 변경 요청
-      await axios.put(`/admin/ranks/${temp.id}/position`, {
-        position: index + 2,
-      });
-
-      await axios.put(`/admin/ranks/${newRanks[index].id}/position`, {
-        position: index + 1,
-      });
-
-      setAlertMessage({
-        type: "success",
-        message: "등급 순서가 변경되었습니다.",
-      });
-    } catch (error: any) {
-      console.error("Error moving rank down:", error);
-      setAlertMessage({
-        type: "error",
-        message: `등급 순서 변경 중 오류가 발생했습니다: ${
-          error.response?.data?.message || error.message
-        }`,
-      });
-      fetchRanks(currentPage, pageSize);
-    } finally {
-      setMoving(false);
-    }
-  };
-
   // 입력 변경 핸들러
   const handleInputChange = (name: string, value: any) => {
     if (currentRank) {
@@ -461,20 +367,6 @@ const UserRankManagement: React.FC = () => {
         accessor: "id" as keyof UserRank,
         cell: (id: number, row: UserRank, index: number) => (
           <div className="flex space-x-1 justify-center">
-            <ActionButton
-              label="위로"
-              action="up"
-              size="sm"
-              onClick={() => handleMoveUp(index)}
-              disabled={moving || (index <= 0 && currentPage === 1)}
-            />
-            <ActionButton
-              label="아래로"
-              action="down"
-              size="sm"
-              onClick={() => handleMoveDown(index)}
-              disabled={moving || (index >= ranks.length - 1 && currentPage === totalPages)}
-            />
             <ActionButton
               label="수정"
               action="edit"

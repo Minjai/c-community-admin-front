@@ -235,17 +235,7 @@ const MainBannerPage: React.FC = () => {
         }
 
         try {
-          // 기존 배너들의 position을 모두 +1로 서버에 반영
-          await Promise.all(
-            banners.map((banner) =>
-              BannerApiService.updateMainBanner(banner.id, {
-                id: banner.id,
-                position: (banner.position || 0) + 1,
-              })
-            )
-          );
-
-          // 새 배너는 position 1로 생성
+          // 새 배너는 position 0으로 생성
           const startDate = new Date(currentBanner.startDate).toISOString();
           const endDate = new Date(currentBanner.endDate).toISOString();
 
@@ -257,7 +247,7 @@ const MainBannerPage: React.FC = () => {
               startDate: startDate,
               endDate: endDate,
               isPublic: currentBanner.isPublic,
-              position: 1, // 새 배너는 항상 1번 순서
+              position: 0, // 새 배너는 항상 0번 순서
               bannerType: "main",
             },
             pcImageFile,

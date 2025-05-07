@@ -605,12 +605,10 @@ const CasinoRecommendationManagement = () => {
     setError(null);
 
     try {
-      // 새 항목의 displayOrder 계산 (allRecommendations 기준)
+      // 새 항목의 displayOrder는 항상 0으로 생성
       const newDisplayOrder = isEditing
         ? allRecommendations.find((rec) => rec.id === currentRecommendationId)?.displayOrder
-        : allRecommendations.length > 0
-        ? Math.max(...allRecommendations.map((rec) => rec.displayOrder || 0)) + 1
-        : 1;
+        : 0;
 
       // 날짜 변환 시도 (오류 처리 추가)
       let startDateISO, endDateISO;

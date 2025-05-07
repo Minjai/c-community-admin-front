@@ -198,27 +198,26 @@ function FooterManagementPage() {
     const idsToDelete = Array.from(selectedIds);
 
     try {
-      await axios.delete(`/footer`, { data: { ids: idsToDelete } });
+      let successCount = 0;
+      let errorCount = 0;
+      for (const id of idsToDelete) {
+        try {
+          await axios.delete(`/footer/${id}`);
+          successCount++;
+        } catch (err) {
+          errorCount++;
+        }
+      }
       setAlertMessage({
-        type: "success",
-        message: `${idsToDelete.length}개의 푸터 항목이 삭제되었습니다.`,
+        type: errorCount === 0 ? "success" : "error",
+        message:
+          errorCount === 0
+            ? `${successCount}개의 푸터 항목이 삭제되었습니다.`
+            : `${successCount}개 삭제 성공, ${errorCount}개 삭제 실패.`,
       });
       setSelectedIds(new Set());
-
-      // 페이지 조정 로직 (서버 측 기준)
-      const deletedCount = idsToDelete.length;
-      const remainingItemsOnPage =
-        footers.length - footers.filter((f) => idsToDelete.includes(f.id)).length;
-      const newTotalItems = totalItems - deletedCount;
-      const newTotalPages = Math.ceil(newTotalItems / pageSize);
-
-      if (remainingItemsOnPage <= 0 && currentPage > 1 && currentPage > newTotalPages) {
-        // 현재 페이지 모든 항목 삭제 후 이전 페이지로
-        setCurrentPage(currentPage - 1);
-      } else {
-        // 현재 페이지 또는 최대 페이지로 새로고침
-        fetchFooters(Math.min(currentPage, newTotalPages || 1), pageSize);
-      }
+      // 삭제 후 목록 새로고침
+      fetchFooters(currentPage, pageSize);
     } catch (err) {
       console.error("Error deleting selected footers:", err);
       setAlertMessage({ type: "error", message: "선택된 푸터 항목 삭제 중 오류가 발생했습니다." });

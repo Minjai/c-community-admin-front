@@ -108,7 +108,7 @@ const RemittanceBannerPage: React.FC = () => {
       link: "",
       imageUrl: "",
       isPublic: 1,
-      displayOrder: 1,
+      displayOrder: 0,
       createdAt: "",
       updatedAt: "",
     });

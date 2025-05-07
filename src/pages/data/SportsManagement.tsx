@@ -282,13 +282,7 @@ export default function SportsManagement() {
     try {
       let displayOrder: number;
       if (modalType === "add") {
-        displayOrder = 1;
-        // 기존 항목 모두 +1
-        await Promise.all(
-          categories.map((cat) =>
-            updateSportCategory(cat.id, { displayOrder: (cat.displayOrder || 0) + 1 })
-          )
-        );
+        displayOrder = 0;
       } else {
         displayOrder = currentCategory?.displayOrder ?? 1;
       }

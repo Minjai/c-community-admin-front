@@ -166,7 +166,7 @@ const CasinoCompanyPage: React.FC = () => {
       description: "",
       imageUrl: "",
       isPublic: 1,
-      displayOrder: 1,
+      displayOrder: 0, // 새 업체는 항상 0번 순서
       linkUrl1: "",
       linkUrl2: "",
       rating: 0,
@@ -219,12 +219,7 @@ const CasinoCompanyPage: React.FC = () => {
         return;
       }
       if (!isEditing) {
-        // 새 업체 추가 시 기존 업체 모두 +1
-        await Promise.all(
-          companies.map((comp) =>
-            CasinoCompanyApiService.updateDisplayOrder(comp.id, (comp.displayOrder || 0) + 1)
-          )
-        );
+        // 기존 업체 displayOrder는 건드리지 않음, 새 업체는 displayOrder: 0
       }
       // URL 처리
       const processedCompany = processUrls(currentCompany);
