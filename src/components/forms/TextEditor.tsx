@@ -145,6 +145,8 @@ class EmbedBlot extends BlockEmbed {
 const Link = Quill.import("formats/link");
 
 class CustomLink extends Link {
+  static blotName = "link";
+
   static create(value: string) {
     const node = super.create(value);
     value = this.sanitize(value);
@@ -155,6 +157,12 @@ class CustomLink extends Link {
     return node;
   }
 
+  static formats(domNode: HTMLElement) {
+    return Link.formats(domNode);
+  }
+  static value(domNode: HTMLElement) {
+    return Link.value(domNode);
+  }
   static sanitize(url: string): string {
     // 기본 Link sanitize 호출 (XSS 방지 등)
     let sanitizedUrl = super.sanitize(url);
@@ -386,7 +394,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
   const initializedRef = useRef<boolean>(false);
   const prevContentRef = useRef<string>(content || "");
   const internalChangeRef = useRef<boolean>(false);
-  const quillInstanceRef = useRef<Quill | null>(null);
+  const quillInstanceRef = useRef<any>(null);
 
   // 에디터 초기화 useEffect
   useEffect(() => {
@@ -1121,6 +1129,35 @@ const TextEditor: React.FC<TextEditorProps> = ({
     }
   }, [imageHandler, embedHandler]); // videoHandler -> embedHandler
 
+  // 툴팁(팝업) 위치를 에디터 상단 중앙에 고정 (document 전체에서 감지)
+  useEffect(() => {
+    // 툴팁 위치를 중앙으로 이동시키는 함수
+    const centerTooltip = () => {
+      const tooltip = document.querySelector(
+        '.ql-tooltip.ql-editing[data-mode="link"]'
+      ) as HTMLElement | null;
+      if (tooltip) {
+        tooltip.style.left = "50%";
+        tooltip.style.transform = "translateX(-50%)";
+        tooltip.style.right = "auto";
+        tooltip.style.top = "0px";
+        tooltip.style.marginTop = "0px";
+        tooltip.style.zIndex = "1000";
+      }
+    };
+
+    // MutationObserver로 body 전체에서 툴팁 위치 감지
+    const observer = new MutationObserver(centerTooltip);
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // 혹시 모를 초기 툴팁도 커버
+    setTimeout(centerTooltip, 100);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   return (
     <ErrorBoundary>
       <div className="text-editor-wrapper mb-0 pb-0">
@@ -1138,7 +1175,7 @@ const TextEditor: React.FC<TextEditorProps> = ({
                     ["bold", "italic", "underline", "strike"],
                     [{ list: "ordered" }, { list: "bullet" }],
                     [{ align: [] }],
-                    ["link", "image", "embed"], // video -> embed
+                    ["link", "image", "embed"], // link 버튼 복구
                   ]
                 : [
                     [{ header: [1, 2, 3, false] }],
