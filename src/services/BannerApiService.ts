@@ -278,7 +278,7 @@ const BannerApiService = {
               // ISO 형식으로 변환
               const dateValue = new Date(bannerData[key]).toISOString();
               formData.append(key, dateValue);
-              console.log(`변환된 ${key} (멀티파트):`, dateValue);
+              //console.log(`변환된 ${key} (멀티파트):`, dateValue);
             } catch (e) {
               console.error(`${key} 형식 오류 (멀티파트):`, e);
               formData.append(key, bannerData[key]); // 오류 시 원본 값 사용
@@ -304,10 +304,10 @@ const BannerApiService = {
         //console.log("모바일 이미지 추가:", mobileImage.name, mobileImage.size, mobileImage.type);
       }
 
-      //console.log(`Sending multipart PUT request to /banner/main/${id}`, {
-        formDataKeys: [...formData.keys()],
-        hasImages: { pc: !!pcImage, mobile: !!mobileImage },
-      });
+      console.log(`Sending multipart PUT request to /banner/main/${id}`, {
+         formDataKeys: [...formData.keys()],
+         hasImages: { pc: !!pcImage, mobile: !!mobileImage },
+       });
 
       const response = await axios.put(`/banner/main/${id}`, formData, {
         headers: {
@@ -418,12 +418,12 @@ const BannerApiService = {
 
       if (mobileImage && mobileImage instanceof File && mobileImage.size > 0) {
         formData.append("mUrl", mobileImage); // "mobileImage"에서 "mUrl"로 변경
-        console.log(
-          "모바일 이미지 추가(업체):",
-          mobileImage.name,
-          mobileImage.size,
-          mobileImage.type
-        );
+        // console.log(
+        //   "모바일 이미지 추가(업체):",
+        //   mobileImage.name,
+        //   mobileImage.size,
+        //   mobileImage.type
+        // );
       }
 
       // Authorization 헤더는 인터셉터에서 자동으로 추가됨
