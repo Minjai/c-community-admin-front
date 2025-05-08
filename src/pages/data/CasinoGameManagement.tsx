@@ -135,10 +135,10 @@ const CasinoGameManagement = () => {
   useEffect(() => {
     // Only run when currentGame is set for editing
     if (isEditing && currentGame) {
-      console.log(
-        "[CasinoGameManagement useEffect] currentGame.description:",
-        currentGame.description
-      );
+      // console.log(
+      //   "[CasinoGameManagement useEffect] currentGame.description:",
+      //   currentGame.description
+      // );
       setTitle(currentGame.title || "");
       setDescription(currentGame.description || "");
       setIsPublic(currentGame.isPublic === 1 ? 1 : 0);

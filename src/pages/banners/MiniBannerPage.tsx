@@ -122,13 +122,13 @@ const MiniBannerPage: React.FC = () => {
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
     setModalError(null);
-    console.log("수정할 배너 데이터:", banner);
+    //console.log("수정할 배너 데이터:", banner);
 
     const formattedStartDate = formatDateForInput(banner.startDate);
     const formattedEndDate = formatDateForInput(banner.endDate);
 
-    console.log("DatePicker 표시용 시작일:", formattedStartDate);
-    console.log("DatePicker 표시용 종료일:", formattedEndDate);
+    // console.log("DatePicker 표시용 시작일:", formattedStartDate);
+    // console.log("DatePicker 표시용 종료일:", formattedEndDate);
 
     setCurrentBanner({
       ...banner,

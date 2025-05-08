@@ -55,7 +55,7 @@ const UserRankManagement: React.FC = () => {
     try {
       // API 호출 시 page, limit 파라미터 전달
       const response = await axios.get(`/admin/ranks?page=${page}&limit=${limit}`);
-      console.log("회원 등급 응답 구조:", response.data);
+      //console.log("회원 등급 응답 구조:", response.data);
 
       // 응답 구조 ({ ranks: [], pagination: {} }) 확인 및 처리
       if (response.data && response.data.ranks && response.data.pagination) {

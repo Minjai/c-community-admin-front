@@ -47,7 +47,7 @@ const NoticeManagement = () => {
         },
       });
 
-      console.log("공지사항 API 응답:", response.data);
+      //console.log("공지사항 API 응답:", response.data);
 
       // 응답 데이터 형식에 따라 처리
       let noticesData: Post[] = [];

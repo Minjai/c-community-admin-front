@@ -31,7 +31,7 @@ export const authService = {
       // VITE_API_BASE_URL이 이미 http://localhost:3000/api이므로 중복을 제거
       const loginUrl = `${API_URL.replace("/api", "")}/admin/login`;
 
-      console.log("로그인 요청 URL:", loginUrl); // 디버깅용 로그
+      //console.log("로그인 요청 URL:", loginUrl); // 디버깅용 로그
 
       const response = await axios.post(loginUrl, credentials);
       if (response.data.success) {

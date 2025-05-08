@@ -61,7 +61,7 @@ const UserManagement = () => {
 
     try {
       const response = await axios.get(`/admin/users?page=${page}&limit=${limit}`);
-      console.log("회원 정보 API 응답:", response.data);
+      //console.log("회원 정보 API 응답:", response.data);
 
       if (response.data && response.data.data && response.data.pagination) {
         const fetchedUsers = response.data.data || [];

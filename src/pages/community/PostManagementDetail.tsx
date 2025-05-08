@@ -75,7 +75,7 @@ const uploadBase64ImageToS3 = async (
     const sizeInBytes = Math.ceil((base64Data.length * 3) / 4);
     const sizeInMB = sizeInBytes / (1024 * 1024);
 
-    console.log(`이미지 업로드 시도: 크기 약 ${sizeInMB.toFixed(2)}MB`);
+    //console.log(`이미지 업로드 시도: 크기 약 ${sizeInMB.toFixed(2)}MB`);
 
     // 크기 제한 (8MB)
     if (sizeInMB > 8) {
@@ -88,12 +88,12 @@ const uploadBase64ImageToS3 = async (
 
     // 대용량 이미지는 청크로 나누어 처리
     if (sizeInMB > 4) {
-      console.log("대용량 이미지 감지. FormData를 사용한 업로드를 권장합니다.");
+      //console.log("대용량 이미지 감지. FormData를 사용한 업로드를 권장합니다.");
     }
 
     // 이미지 업로드는 게시물 저장 시 함께 처리될 예정이므로 여기서는 가짜 응답을 반환
     // 실제 구현에서는 이 함수 호출이 필요 없을 수 있음
-    console.log("이미지 데이터 준비 완료, 게시물 저장 시 함께 전송됩니다.");
+    //console.log("이미지 데이터 준비 완료, 게시물 저장 시 함께 전송됩니다.");
     return `temp_image_url_${Date.now()}.jpg`;
   } catch (error: any) {
     console.error("이미지 처리 오류:", error);
@@ -157,7 +157,7 @@ const PostDetail = () => {
       const contentAnalysis = analyzeContent(content);
 
       // **이미지와 콘텐츠를 함께 저장하는 새로운 접근법**
-      console.log("서버 API 명세에 맞춰 이미지와 게시물을 함께 전송합니다.");
+      //console.log("서버 API 명세에 맞춰 이미지와 게시물을 함께 전송합니다.");
 
       // 서버측 요구사항에 맞게 요청 형식 변경
       const formData = new FormData();
@@ -178,22 +178,22 @@ const PostDetail = () => {
             if (file) {
               formData.append("images", file);
               imageCount++;
-              console.log(
-                `Base64 이미지를 File로 변환하여 추가: ${file.name} (${file.size} bytes)`
-              );
+              // console.log(
+              //   `Base64 이미지를 File로 변환하여 추가: ${file.name} (${file.size} bytes)`
+              // );
             }
           }
         }
 
-        console.log(`총 ${imageCount}개의 이미지가 FormData에 추가됨`);
+        //console.log(`총 ${imageCount}개의 이미지가 FormData에 추가됨`);
       } else {
-        console.log("이미지가 감지되지 않았습니다.");
+        //console.log("이미지가 감지되지 않았습니다.");
       }
 
       // 진행률 설정
       setUploadProgress(30);
 
-      console.log("FormData 준비 완료");
+      //console.log("FormData 준비 완료");
 
       const response = await axios({
         method: isEditMode ? "PUT" : "POST",
@@ -202,13 +202,13 @@ const PostDetail = () => {
         onUploadProgress: (progressEvent: AxiosProgressEvent) => {
           const total = progressEvent.total || 0;
           const progress = total ? Math.round((progressEvent.loaded * 100) / total) : 0;
-          console.log(`업로드 진행률: ${progress}%`);
+          //console.log(`업로드 진행률: ${progress}%`);
           setUploadProgress(30 + progress * 0.7); // 30%~100% 구간으로 설정
         },
       });
 
       if (response.data && (response.data.success || response.data.post)) {
-        console.log("게시물 저장 성공:", response.data);
+        //console.log("게시물 저장 성공:", response.data);
         setLoading(false);
         alert(isEditMode ? "게시물이 수정되었습니다." : "게시물이 작성되었습니다.");
         navigate("/community/posts");
@@ -239,8 +239,8 @@ const PostDetail = () => {
     setLoading(true);
     try {
       // API 응답 처리를 위한 로그 추가
-      console.log(`게시물 데이터 요청 중: /post/${id}`);
-      console.log(`댓글 데이터 요청 중: /comment/${id}`);
+      // console.log(`게시물 데이터 요청 중: /post/${id}`);
+      // console.log(`댓글 데이터 요청 중: /comment/${id}`);
 
       const [postResponse, commentsResponse] = await Promise.all([
         axios.get(`/post/${id}`),

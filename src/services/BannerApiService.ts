@@ -121,7 +121,7 @@ const BannerApiService = {
             // ISO 형식으로 변환
             const dateValue = new Date(bannerData[key]).toISOString();
             formData.append(key, dateValue);
-            console.log(`변환된 ${key} (멀티파트):`, dateValue);
+            //console.log(`변환된 ${key} (멀티파트):`, dateValue);
           } catch (e) {
             console.error(`${key} 형식 오류 (멀티파트):`, e);
             formData.append(key, bannerData[key]); // 오류 시 원본 값 사용
@@ -236,7 +236,7 @@ const BannerApiService = {
             // ISO 형식인지 확인하고 아니면 변환 시도
             const startDate = new Date(bannerData.startDate);
             bannerData.startDate = startDate.toISOString();
-            console.log("변환된 startDate:", bannerData.startDate);
+            //console.log("변환된 startDate:", bannerData.startDate);
           } catch (e) {
             console.error("startDate 형식 오류:", e);
           }
@@ -247,7 +247,7 @@ const BannerApiService = {
             // ISO 형식인지 확인하고 아니면 변환 시도
             const endDate = new Date(bannerData.endDate);
             bannerData.endDate = endDate.toISOString();
-            console.log("변환된 endDate:", bannerData.endDate);
+            //console.log("변환된 endDate:", bannerData.endDate);
           } catch (e) {
             console.error("endDate 형식 오류:", e);
           }
@@ -296,15 +296,15 @@ const BannerApiService = {
       // 이미지 파일 추가 - key 이름을 서버 요구사항에 맞게 수정
       if (pcImage && pcImage instanceof File && pcImage.size > 0) {
         formData.append("pUrl", pcImage); // "pcImage"에서 "pUrl"로 변경
-        console.log("PC 이미지 추가:", pcImage.name, pcImage.size, pcImage.type);
+        //console.log("PC 이미지 추가:", pcImage.name, pcImage.size, pcImage.type);
       }
 
       if (mobileImage && mobileImage instanceof File && mobileImage.size > 0) {
         formData.append("mUrl", mobileImage); // "mobileImage"에서 "mUrl"로 변경
-        console.log("모바일 이미지 추가:", mobileImage.name, mobileImage.size, mobileImage.type);
+        //console.log("모바일 이미지 추가:", mobileImage.name, mobileImage.size, mobileImage.type);
       }
 
-      console.log(`Sending multipart PUT request to /banner/main/${id}`, {
+      //console.log(`Sending multipart PUT request to /banner/main/${id}`, {
         formDataKeys: [...formData.keys()],
         hasImages: { pc: !!pcImage, mobile: !!mobileImage },
       });
@@ -360,7 +360,7 @@ const BannerApiService = {
             // ISO 형식인지 확인하고 아니면 변환 시도
             const startDate = new Date(bannerData.startDate);
             bannerData.startDate = startDate.toISOString();
-            console.log("변환된 startDate (업체):", bannerData.startDate);
+            //console.log("변환된 startDate (업체):", bannerData.startDate);
           } catch (e) {
             console.error("startDate 형식 오류 (업체):", e);
           }
@@ -371,7 +371,7 @@ const BannerApiService = {
             // ISO 형식인지 확인하고 아니면 변환 시도
             const endDate = new Date(bannerData.endDate);
             bannerData.endDate = endDate.toISOString();
-            console.log("변환된 endDate (업체):", bannerData.endDate);
+            //console.log("변환된 endDate (업체):", bannerData.endDate);
           } catch (e) {
             console.error("endDate 형식 오류 (업체):", e);
           }
@@ -413,7 +413,7 @@ const BannerApiService = {
       // 이미지 파일 추가 - key 이름을 서버 요구사항에 맞게 수정
       if (pcImage && pcImage instanceof File && pcImage.size > 0) {
         formData.append("pUrl", pcImage); // "pcImage"에서 "pUrl"로 변경
-        console.log("PC 이미지 추가(업체):", pcImage.name, pcImage.size, pcImage.type);
+        //console.log("PC 이미지 추가(업체):", pcImage.name, pcImage.size, pcImage.type);
       }
 
       if (mobileImage && mobileImage instanceof File && mobileImage.size > 0) {

@@ -58,7 +58,7 @@ const MainBannerPage: React.FC = () => {
       // BannerApiService.getMainBanners에 page와 limit 파라미터 전달
       // 반환 타입을 ApiResponse<Banner[]>로 명시
       const response: ApiResponse<Banner[]> = await BannerApiService.getMainBanners(page, limit);
-      console.log("API Response:", response); // 응답 로깅 (디버깅용)
+      //console.log("API Response:", response); // 응답 로깅 (디버깅용)
 
       // API 응답 구조에 맞게 데이터와 페이지네이션 정보 추출
       if (response && response.success && Array.isArray(response.data)) {
@@ -138,13 +138,13 @@ const MainBannerPage: React.FC = () => {
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
     setModalError(null);
-    console.log("수정할 배너 데이터:", banner);
+    //console.log("수정할 배너 데이터:", banner);
 
     const formattedStartDate = formatDateForInput(banner.startDate);
     const formattedEndDate = formatDateForInput(banner.endDate);
 
-    console.log("DatePicker 표시용 시작일:", formattedStartDate);
-    console.log("DatePicker 표시용 종료일:", formattedEndDate);
+    // console.log("DatePicker 표시용 시작일:", formattedStartDate);
+    // console.log("DatePicker 표시용 종료일:", formattedEndDate);
 
     setCurrentBanner({
       ...banner,
@@ -181,25 +181,25 @@ const MainBannerPage: React.FC = () => {
           const startDate = new Date(currentBanner.startDate).toISOString();
           const endDate = new Date(currentBanner.endDate).toISOString();
 
-          console.log("날짜 변환 전/후 비교:", {
-            원래_시작일: currentBanner.startDate,
-            변환된_시작일: startDate,
-            원래_종료일: currentBanner.endDate,
-            변환된_종료일: endDate,
-          });
+          // console.log("날짜 변환 전/후 비교:", {
+          //   원래_시작일: currentBanner.startDate,
+          //   변환된_시작일: startDate,
+          //   원래_종료일: currentBanner.endDate,
+          //   변환된_종료일: endDate,
+          // });
 
           // 서버 측 500 에러 디버깅을 위해 추가 로깅
-          console.log("Banner data being sent:", {
-            id: currentBanner.id,
-            title: currentBanner.title,
-            linkUrl: currentBanner.linkUrl,
-            linkUrl2: null,
-            startDate: startDate,
-            endDate: endDate,
-            isPublic: currentBanner.isPublic,
-            position: currentBanner.position,
-            bannerType: "main",
-          });
+          // console.log("Banner data being sent:", {
+          //   id: currentBanner.id,
+          //   title: currentBanner.title,
+          //   linkUrl: currentBanner.linkUrl,
+          //   linkUrl2: null,
+          //   startDate: startDate,
+          //   endDate: endDate,
+          //   isPublic: currentBanner.isPublic,
+          //   position: currentBanner.position,
+          //   bannerType: "main",
+          // });
 
           // 이미지 업로드 문제 확인을 위해 임시로 이미지 없이 업데이트 시도
           await BannerApiService.updateMainBanner(

@@ -23,7 +23,7 @@ export class GuidelineApiService {
     limit: number = 10
   ): Promise<ApiResponse<Guideline[]>> {
     try {
-      console.log(`Fetching guidelines for category: ${boardId}, page: ${page}, limit: ${limit}`);
+      //console.log(`Fetching guidelines for category: ${boardId}, page: ${page}, limit: ${limit}`);
       const response: AxiosResponse<any> = await axios.get("/guidelines", {
         params: {
           boardId,
@@ -31,7 +31,7 @@ export class GuidelineApiService {
           limit,
         },
       });
-      console.log("Guideline API Response:", response); // Log the full response
+      //console.log("Guideline API Response:", response); // Log the full response
 
       if (
         response.data &&
@@ -41,7 +41,7 @@ export class GuidelineApiService {
       ) {
         // Extract pagination details from response.data.data
         const { items, total, page: currentPage, limit: pageSize, totalPages } = response.data.data;
-        console.log("Parsed Pagination:", { totalItems: total, currentPage, pageSize, totalPages }); // Log parsed pagination
+        //console.log("Parsed Pagination:", { totalItems: total, currentPage, pageSize, totalPages }); // Log parsed pagination
 
         const pagination: PaginationInfo = {
           totalItems: total,
@@ -49,7 +49,7 @@ export class GuidelineApiService {
           pageSize,
           totalPages,
         };
-        console.log("Parsed Pagination:", pagination); // Log parsed pagination
+        //console.log("Parsed Pagination:", pagination); // Log parsed pagination
 
         return {
           success: true,
@@ -149,14 +149,14 @@ export class GuidelineApiService {
         }
 
         // FormData 내용 로그
-        console.log("FormData로 전송되는 필드:");
+        //console.log("FormData로 전송되는 필드:");
         for (let [key, value] of formData.entries()) {
           if (key === "image") {
-            console.log(`${key}: [File 객체]`);
+            //console.log(`${key}: [File 객체]`);
           } else if (key === "content") {
-            console.log(`${key}: ${String(value).substring(0, 100)}...`);
+            //console.log(`${key}: ${String(value).substring(0, 100)}...`);
           } else {
-            console.log(`${key}: ${value}`);
+            //console.log(`${key}: ${value}`);
           }
         }
 
@@ -168,7 +168,7 @@ export class GuidelineApiService {
         return response.data;
       } else {
         // JSON 데이터 로그
-        console.log("JSON으로 전송되는 데이터:", data);
+        //console.log("JSON으로 전송되는 데이터:", data);
 
         // 일반 JSON 데이터로 처리
         const response = await axios.post("/guidelines", data);
@@ -254,14 +254,14 @@ export class GuidelineApiService {
         }
 
         // FormData 내용 로그
-        console.log(`FormData로 가이드라인(ID: ${id}) 수정 필드:`);
+        //console.log(`FormData로 가이드라인(ID: ${id}) 수정 필드:`);
         for (let [key, value] of formData.entries()) {
           if (key === "image") {
-            console.log(
-              `${key}: [File 객체: ${(value as File).name}, 타입: ${(value as File).type}]`
-            );
+            // console.log(
+            //   `${key}: [File 객체: ${(value as File).name}, 타입: ${(value as File).type}]`
+            // );
           } else if (key === "content") {
-            console.log(`${key}: ${String(value).substring(0, 100)}...`);
+            //console.log(`${key}: ${String(value).substring(0, 100)}...`);
           } else {
             console.log(`${key}: ${value}`);
           }

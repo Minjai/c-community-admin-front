@@ -294,8 +294,8 @@ const CasinoRecommendationManagement = () => {
 
   // Open Edit Modal
   const handleOpenEditModal = (recommendation: CasinoRecommendation) => {
-    console.log("[DEBUG] Opening edit modal with data:", recommendation);
-    console.log("[DEBUG] Current available games:", availableGames);
+    // console.log("[DEBUG] Opening edit modal with data:", recommendation);
+    // console.log("[DEBUG] Current available games:", availableGames);
     setIsEditing(true);
     setCurrentRecommendationId(recommendation.id);
     setTitle(recommendation.title || "");
