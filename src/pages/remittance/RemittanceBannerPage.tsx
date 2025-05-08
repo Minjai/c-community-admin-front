@@ -493,7 +493,6 @@ const RemittanceBannerPage: React.FC = () => {
         ),
         className: "w-px px-4",
       },
-      { header: "ID", accessor: "id" as keyof RemittanceBanner },
       {
         header: "로고",
         accessor: "imageUrl" as keyof RemittanceBanner,
