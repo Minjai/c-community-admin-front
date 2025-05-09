@@ -75,7 +75,6 @@ const RemittanceBannerPage: React.FC = () => {
         setTotalPages(pagination.totalPages || 0);
         setCurrentPage(pagination.currentPage || page);
         setPageSize(pagination.pageSize || limit);
-        setSelectedBannerIds([]);
       } else {
         setBanners([]);
         setOriginalBanners([]);
@@ -117,8 +116,6 @@ const RemittanceBannerPage: React.FC = () => {
     setIsEditing(false);
     setAlertMessage(null);
     setSelectedBannerIds([]);
-    // 기존 배너 displayOrder +1
-    setBanners((prev) => prev.map((b) => ({ ...b, displayOrder: (b.displayOrder || 0) + 1 })));
   };
 
   // 배너 수정 모달 열기
@@ -401,13 +398,14 @@ const RemittanceBannerPage: React.FC = () => {
 
   // 입력 변경 핸들러
   const handleInputChange = (name: string, value: any) => {
-    if (currentBanner) {
+    setCurrentBanner((prev) => {
+      if (!prev) return prev;
       if (name === "isPublic") {
-        setCurrentBanner({ ...currentBanner, [name]: value === "1" ? 1 : 0 });
+        return { ...prev, isPublic: value };
       } else {
-        setCurrentBanner({ ...currentBanner, [name]: value });
+        return { ...prev, [name]: value };
       }
-    }
+    });
   };
 
   // 모달 닫기 핸들러
@@ -631,20 +629,20 @@ const RemittanceBannerPage: React.FC = () => {
             />
           </div>
         )}
-        <div className="flex justify-start space-x-2 mb-4">
-          <Button onClick={handleSaveBanner} disabled={saving}>
-            {saving ? "저장 중..." : "저장"}
-          </Button>
-          <Button variant="secondary" onClick={handleCloseModal} disabled={saving}>
-            취소
-          </Button>
-        </div>
-        {/* 공개여부 체크박스: 버튼 아래, 입력폼 위 */}
-        <div className="flex justify-end items-center mb-4">
+        {/* 저장/취소는 왼쪽, 공개여부는 오른쪽 정렬 */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex space-x-2">
+            <Button onClick={handleSaveBanner} disabled={saving}>
+              {saving ? "저장 중..." : "저장"}
+            </Button>
+            <Button variant="secondary" onClick={handleCloseModal} disabled={saving}>
+              취소
+            </Button>
+          </div>
           <label className="flex items-center space-x-2">
             <input
               type="checkbox"
-              checked={currentBanner?.isPublic === 1}
+              checked={!!currentBanner && currentBanner.isPublic === 1}
               onChange={(e) => handleInputChange("isPublic", e.target.checked ? 1 : 0)}
               className="form-checkbox h-4 w-4 text-blue-600"
             />
@@ -670,17 +668,21 @@ const RemittanceBannerPage: React.FC = () => {
           {/* 썸네일 미리보기 */}
           <div className="flex flex-col items-start space-y-2">
             <span className="text-sm text-gray-700">썸네일 미리보기</span>
-            <img
-              src={
-                logoFile
-                  ? URL.createObjectURL(logoFile)
-                  : currentBanner?.imageUrl || "/placeholder-image.png"
-              }
-              alt="썸네일 미리보기"
-              className="h-16 w-auto object-contain border border-gray-200 bg-white rounded"
-              style={{ maxWidth: 200 }}
-              onError={(e) => (e.currentTarget.src = "/placeholder-image.png")}
-            />
+            {logoFile ? (
+              <img
+                src={URL.createObjectURL(logoFile)}
+                alt="썸네일 미리보기"
+                className="h-16 w-auto object-contain border border-gray-200 bg-white rounded"
+                style={{ maxWidth: 200 }}
+              />
+            ) : currentBanner?.imageUrl ? (
+              <img
+                src={currentBanner.imageUrl}
+                alt="썸네일 미리보기"
+                className="h-16 w-auto object-contain border border-gray-200 bg-white rounded"
+                style={{ maxWidth: 200 }}
+              />
+            ) : null}
             <span className="text-xs text-gray-500 mt-1">권장 사이즈: 36x36</span>
           </div>
           {/* 파일 업로드 */}
