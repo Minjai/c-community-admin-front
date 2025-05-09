@@ -135,6 +135,7 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
 
       console.log("Formatted user data:", formattedUser);
       setUser(formattedUser);
+      setAdminMemo(userData.adminMemo || "");
 
       // rank ID가 있으면 selectedRank 설정
       if (userData.rank) {
