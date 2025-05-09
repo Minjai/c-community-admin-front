@@ -631,6 +631,26 @@ const RemittanceBannerPage: React.FC = () => {
             />
           </div>
         )}
+        <div className="flex justify-start space-x-2 mb-4">
+          <Button onClick={handleSaveBanner} disabled={saving}>
+            {saving ? "저장 중..." : "저장"}
+          </Button>
+          <Button variant="secondary" onClick={handleCloseModal} disabled={saving}>
+            취소
+          </Button>
+        </div>
+        {/* 공개여부 체크박스: 버튼 아래, 입력폼 위 */}
+        <div className="flex justify-end items-center mb-4">
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={currentBanner?.isPublic === 1}
+              onChange={(e) => handleInputChange("isPublic", e.target.checked ? 1 : 0)}
+              className="form-checkbox h-4 w-4 text-blue-600"
+            />
+            <span className="text-sm text-gray-700">공개</span>
+          </label>
+        </div>
         <div className="space-y-4">
           <Input
             label="사이트명"
@@ -647,30 +667,24 @@ const RemittanceBannerPage: React.FC = () => {
             required
             placeholder="https://example.com"
           />
-          <FileUpload label="로고 이미지" onChange={handleFileChange} />
-          <div>
-            <label htmlFor="isPublic" className="block text-sm font-medium text-gray-700">
-              공개여부
-            </label>
-            <select
-              id="isPublic"
-              name="isPublic"
-              value={currentBanner?.isPublic === undefined ? 1 : currentBanner.isPublic}
-              onChange={(e) => handleInputChange("isPublic", e.target.value)}
-              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-            >
-              <option value="1">공개</option>
-              <option value="0">비공개</option>
-            </select>
+          {/* 썸네일 미리보기 */}
+          <div className="flex flex-col items-start space-y-2">
+            <span className="text-sm text-gray-700">썸네일 미리보기</span>
+            <img
+              src={
+                logoFile
+                  ? URL.createObjectURL(logoFile)
+                  : currentBanner?.imageUrl || "/placeholder-image.png"
+              }
+              alt="썸네일 미리보기"
+              className="h-16 w-auto object-contain border border-gray-200 bg-white rounded"
+              style={{ maxWidth: 200 }}
+              onError={(e) => (e.currentTarget.src = "/placeholder-image.png")}
+            />
+            <span className="text-xs text-gray-500 mt-1">권장 사이즈: 36x36</span>
           </div>
-        </div>
-        <div className="flex justify-end space-x-2 mt-6">
-          <Button variant="secondary" onClick={handleCloseModal} disabled={saving}>
-            취소
-          </Button>
-          <Button onClick={handleSaveBanner} disabled={saving}>
-            {saving ? "저장 중..." : "저장"}
-          </Button>
+          {/* 파일 업로드 */}
+          <FileUpload label="로고 이미지" onChange={handleFileChange} />
         </div>
       </Modal>
     </div>

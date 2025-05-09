@@ -34,6 +34,7 @@ export function formatDateForDisplay(dateString: string | null | undefined): str
       // console.error("Invalid date string provided:", dateString); // 콘솔 오류 제거
       return dateString; // 원본 문자열 반환
     }
+    // yyyy.MM.dd HH:mm 포맷으로 고정 (월-일 순서)
     return format(date, "yyyy.MM.dd HH:mm", { locale: ko });
   } catch (error) {
     console.error("Error formatting date for display:", error);

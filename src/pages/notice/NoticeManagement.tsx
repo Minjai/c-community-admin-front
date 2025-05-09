@@ -39,7 +39,7 @@ const NoticeManagement = () => {
   const getAllNotices = async (page = 1) => {
     setLoading(true);
     try {
-      const response = await axios.get("/post", {
+      const response = await axios.get("/post/admin/notis", {
         params: {
           page,
           pageSize: pagination.limit,
