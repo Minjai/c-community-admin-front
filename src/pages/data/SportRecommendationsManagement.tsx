@@ -515,6 +515,20 @@ export default function SportRecommendationsManagement() {
     return gameIds ? `${gameIds.length}개` : "0개";
   };
 
+  // --- 날짜 포맷 교정 함수 추가 ---
+  function normalizeDateString(dateStr?: string): string {
+    if (!dateStr) return "";
+    // yyyy.dd.mm 또는 yyyy.mm.dd 등 다양한 포맷을 yyyy-mm-dd로 변환
+    const dotPattern = /^(\d{4})\.(\d{2})\.(\d{2})/;
+    if (dotPattern.test(dateStr)) {
+      const [, yyyy, part2, part3] = dateStr.match(dotPattern)!;
+      // 무조건 두 번째가 '일', 세 번째가 '월'로 간주
+      return `${yyyy}-${part3}-${part2}`;
+    }
+    // 기타 포맷은 그대로 반환
+    return dateStr;
+  }
+
   // 게임 선택 모달 내용 렌더링 함수 추가
   const renderGameSelectionModal = () => {
     return (
@@ -593,7 +607,9 @@ export default function SportRecommendationsManagement() {
                     <div>
                       <div className="font-medium text-sm">{game.matchName}</div>
                       <div className="text-xs text-gray-600">
-                        {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
+                        {formatDateForDisplay(
+                          normalizeDateString(game.dateTime?.replace("FRO", ""))
+                        )}
                       </div>
                     </div>
                     <button
@@ -665,7 +681,9 @@ export default function SportRecommendationsManagement() {
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
                         {game.league} ({game.sport}) |{" "}
-                        {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
+                        {formatDateForDisplay(
+                          normalizeDateString(game.dateTime?.replace("FRO", ""))
+                        )}
                       </div>
                     </div>
                   </div>
@@ -796,40 +814,28 @@ export default function SportRecommendationsManagement() {
         const now = new Date();
         const startTime = row.startTime ? new Date(row.startTime) : null;
         const endTime = row.endTime ? new Date(row.endTime) : null;
-        
+
         // 비공개 상태
         if (value !== 1) {
-          return (
-            <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">
-              비공개
-            </span>
-          );
+          return <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">비공개</span>;
         }
-        
+
         // 공개 상태이지만 시작 시간이 미래인 경우 (공개 전)
         if (startTime && startTime > now) {
           return (
-            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
-              공개 전
-            </span>
+            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">공개 전</span>
           );
         }
-        
+
         // 공개 상태이지만 종료 시간이 과거인 경우 (공개 종료)
         if (endTime && endTime < now) {
           return (
-            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
-              공개 종료
-            </span>
+            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">공개 종료</span>
           );
         }
-        
+
         // 현재 공개 중인 상태
-        return (
-          <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">
-            공개
-          </span>
-        );
+        return <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">공개</span>;
       },
     },
     {
