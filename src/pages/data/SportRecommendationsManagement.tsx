@@ -522,8 +522,8 @@ export default function SportRecommendationsManagement() {
     const dotPattern = /^(\d{4})\.(\d{2})\.(\d{2})/;
     if (dotPattern.test(dateStr)) {
       const [, yyyy, part2, part3] = dateStr.match(dotPattern)!;
-      // 무조건 두 번째가 '일', 세 번째가 '월'로 간주
-      return `${yyyy}-${part3}-${part2}`;
+      // 두 번째가 '월', 세 번째가 '일'로 간주하여 반환
+      return `${yyyy}-${part2}-${part3}`;
     }
     // 기타 포맷은 그대로 반환
     return dateStr;
