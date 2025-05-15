@@ -24,7 +24,7 @@ export class GuidelineApiService {
   ): Promise<ApiResponse<Guideline[]>> {
     try {
       //console.log(`Fetching guidelines for category: ${boardId}, page: ${page}, limit: ${limit}`);
-      const response: AxiosResponse<any> = await axios.get("/guidelines", {
+      const response: AxiosResponse<any> = await axios.get("/guidelines/all", {
         params: {
           boardId,
           page,
