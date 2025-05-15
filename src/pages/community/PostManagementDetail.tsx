@@ -121,6 +121,11 @@ interface Response {
   error?: string;
 }
 
+// Quill이 인식할 수 있도록 <iframe ...>을 embed로 변환하는 함수
+function normalizeContentForQuill(html: string): string {
+  return html || "";
+}
+
 const PostDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -276,7 +281,7 @@ const PostDetail = () => {
         setPost(postData);
         setTitle(postData.title || "");
         setTimeout(() => {
-          setContent(postData.content || "");
+          setContent(normalizeContentForQuill(postData.content || ""));
         }, 0);
         const popularStatusFromServer = postData.isPopular;
         console.log("서버에서 받은 isPopular 값:", popularStatusFromServer);
@@ -581,6 +586,21 @@ const PostDetail = () => {
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
           <p className="mt-4 text-gray-600">게시물 정보를 불러오는 중입니다...</p>
         </div>
+      </div>
+    );
+  }
+
+  // 읽기 모드: 수정/작성이 아닌 경우(예: isEditMode=false, isNewPost=false)에는 미리보기로 HTML 렌더링
+  if (!isEditMode && !isNewPost) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold mb-6">게시물 보기</h1>
+        <div className="mb-6 border rounded p-4 bg-white">
+          <div dangerouslySetInnerHTML={{ __html: content }} />
+        </div>
+        <Button variant="secondary" onClick={() => navigate(-1)}>
+          목록으로
+        </Button>
       </div>
     );
   }
