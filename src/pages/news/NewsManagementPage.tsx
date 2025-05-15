@@ -575,10 +575,6 @@ const NewsManagementPage = () => {
         >
           {`선택 삭제 (${selectedNewsIds.length})`}
         </Button>
-        {/* 뉴스 추가 버튼 */}
-        <Button variant="primary" onClick={handleAddNews} disabled={loading || saving}>
-          뉴스 추가
-        </Button>
       </div>
 
       {/* Loading Overlay */}
