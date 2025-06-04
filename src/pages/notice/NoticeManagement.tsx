@@ -39,7 +39,7 @@ const NoticeManagement = () => {
   const getAllNotices = async (page = 1) => {
     setLoading(true);
     try {
-      const response = await axios.get("/post/admin/notis", {
+      const response = await axios.get("/post", {
         params: {
           page,
           pageSize: pagination.limit,
@@ -47,7 +47,7 @@ const NoticeManagement = () => {
         },
       });
 
-      //console.log("공지사항 API 응답:", response.data);
+      console.log("공지사항 API 응답:", response.data);
 
       // 응답 데이터 형식에 따라 처리
       let noticesData: Post[] = [];
@@ -110,28 +110,21 @@ const NoticeManagement = () => {
     setAlertMessage(null);
     const idsToDelete = Array.from(selectedIds);
 
-    let successCount = 0;
-    let errorCount = 0;
-    for (const id of idsToDelete) {
-      try {
-        await axios.delete(`/post/${id}`);
-        successCount++;
-      } catch (error) {
-        errorCount++;
-        console.error(`공지사항(ID: ${id}) 삭제 오류:`, error);
-      }
+    try {
+      // Assume bulk delete endpoint is DELETE /post with body { ids: [...] }
+      await axios.delete(`/post`, { data: { ids: idsToDelete } });
+      setAlertMessage({
+        type: "success",
+        message: `${idsToDelete.length}개의 공지사항이 삭제되었습니다.`,
+      });
+      setSelectedIds(new Set()); // Clear selection
+      getAllNotices(pagination.page); // Refresh list
+    } catch (error) {
+      console.error("선택 공지사항 삭제 오류:", error);
+      setAlertMessage({ type: "error", message: "선택된 공지사항 삭제 중 오류가 발생했습니다." });
+    } finally {
+      setDeleting(false);
     }
-
-    setAlertMessage({
-      type: errorCount === 0 ? "success" : "error",
-      message:
-        errorCount === 0
-          ? `${successCount}개의 공지사항이 삭제되었습니다.`
-          : `${successCount}개 삭제 성공, ${errorCount}개 삭제 실패.`,
-    });
-    setSelectedIds(new Set()); // Clear selection
-    getAllNotices(pagination.page); // Refresh list
-    setDeleting(false);
   };
 
   // 공지사항 삭제 처리

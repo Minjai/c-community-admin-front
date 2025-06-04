@@ -506,14 +506,14 @@ const TextEditor: React.FC<TextEditorProps> = ({
 
         // Always attempt to convert the incoming HTML string to Delta format
         try {
-          //console.log("[TextEditor useEffect] Received new content prop:", content); // Log incoming prop
+          console.log("[TextEditor useEffect] Received new content prop:", content); // Log incoming prop
           const delta = quillInstance.clipboard.convert(content);
-          //console.log("[TextEditor useEffect] Converted to Delta:", JSON.stringify(delta)); // Log converted Delta
+          console.log("[TextEditor useEffect] Converted to Delta:", JSON.stringify(delta)); // Log converted Delta
           quillInstance.setContents(delta, "silent");
-          // console.log(
-          //   "[TextEditor useEffect] setContents called. Current editor HTML:",
-          //   quillInstance.root.innerHTML
-          // ); // Log HTML after setContents
+          console.log(
+            "[TextEditor useEffect] setContents called. Current editor HTML:",
+            quillInstance.root.innerHTML
+          ); // Log HTML after setContents
         } catch (error) {
           console.error("Error setting Quill content in TextEditor:", error);
           // Optional: Set fallback text or handle the error appropriately

@@ -27,9 +27,10 @@ import SportRecommendationsManagement from "./pages/data/SportRecommendationsMan
 import UserManagement from "./pages/users/UserManagement";
 import UserRankManagement from "./pages/users/UserRankManagement";
 import AdminManagement from "./pages/users/AdminManagement";
-import NewsManagementListPage from "./pages/news/NewsManagementListPage";
+import NewsCasinoListPage from "@pages/news/news-casino/NewsCasinoListPage.tsx";
 import RemittanceBannerPage from "./pages/remittance/RemittanceBannerPage";
 import FooterManagementPage from "./pages/footer/FooterManagementPage";
+import NewsSportsPage from "@pages/news/news-sports/NewsSportsPage.tsx";
 
 // 추후 구현할 페이지들을 위한 임시 컴포넌트
 const NotImplemented = ({ pageName }: { pageName: string }) => (
@@ -195,13 +196,21 @@ function App() {
 
               {/* 뉴스 관리 */}
               <Route
-                path="news/list"
+                path="news/casino/list"
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
-                    <NewsManagementListPage />
+                    <NewsCasinoListPage />
                   </RoleBasedRoute>
                 }
               />
+                <Route
+                    path="news/sports/list"
+                    element={
+                        <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                            <NewsSportsPage />
+                        </RoleBasedRoute>
+                    }
+                />
 
               {/* 커뮤니티 관리 */}
               <Route

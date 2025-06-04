@@ -16,8 +16,8 @@ import {
   formatDateForDisplay,
   formatDateForInput,
   convertToISOString,
-  getCurrentDateTimeLocalString,
 } from "../../utils/dateUtils";
+import SearchInput from "@components/SearchInput.tsx";
 
 const MainBannerPage: React.FC = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -28,6 +28,9 @@ const MainBannerPage: React.FC = () => {
   const [currentBanner, setCurrentBanner] = useState<Banner | null>(null);
   const [modalError, setModalError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  // 검색 value 상태
+    const [searchValue, setSearchValue] = useState<string>("");
 
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -42,23 +45,26 @@ const MainBannerPage: React.FC = () => {
   // 선택된 배너 ID 상태 추가
   const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
 
-  // 날짜 입력 처리 함수
-  const handleDateChange = (name: string, dateString: string) => {
-    if (!dateString) return;
-    const isoDate = convertToISOString(dateString);
-    handleInputChange(name, isoDate);
-  };
+  const handleSearch = (type: string, value: string) => {
+
+    if (type === 'title') {
+      fetchBanners(currentPage, pageSize, value).then(r => {
+        // 검색 후 선택된 배너 ID 초기화
+        setSelectedBannerIds([]);
+      });
+    }
+  }
 
   // 배너 목록 조회 (페이지네이션 적용)
-  const fetchBanners = async (page: number = 1, limit: number = 10) => {
+  const fetchBanners = async (page: number = 1, limit: number = 10, searchValue: string = '') => {
     setLoading(true);
     setError(null); // 에러 초기화
 
     try {
       // BannerApiService.getMainBanners에 page와 limit 파라미터 전달
       // 반환 타입을 ApiResponse<Banner[]>로 명시
-      const response: ApiResponse<Banner[]> = await BannerApiService.getMainBanners(page, limit);
-      //console.log("API Response:", response); // 응답 로깅 (디버깅용)
+      const response: ApiResponse<Banner[]> = await BannerApiService.getMainBanners(page, limit, searchValue);
+      console.log("API Response:", response); // 응답 로깅 (디버깅용)
 
       // API 응답 구조에 맞게 데이터와 페이지네이션 정보 추출
       if (response && response.success && Array.isArray(response.data)) {
@@ -138,13 +144,13 @@ const MainBannerPage: React.FC = () => {
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
     setModalError(null);
-    //console.log("수정할 배너 데이터:", banner);
+    console.log("수정할 배너 데이터:", banner);
 
     const formattedStartDate = formatDateForInput(banner.startDate);
     const formattedEndDate = formatDateForInput(banner.endDate);
 
-    // console.log("DatePicker 표시용 시작일:", formattedStartDate);
-    // console.log("DatePicker 표시용 종료일:", formattedEndDate);
+    console.log("DatePicker 표시용 시작일:", formattedStartDate);
+    console.log("DatePicker 표시용 종료일:", formattedEndDate);
 
     setCurrentBanner({
       ...banner,
@@ -181,25 +187,25 @@ const MainBannerPage: React.FC = () => {
           const startDate = new Date(currentBanner.startDate).toISOString();
           const endDate = new Date(currentBanner.endDate).toISOString();
 
-          // console.log("날짜 변환 전/후 비교:", {
-          //   원래_시작일: currentBanner.startDate,
-          //   변환된_시작일: startDate,
-          //   원래_종료일: currentBanner.endDate,
-          //   변환된_종료일: endDate,
-          // });
+          console.log("날짜 변환 전/후 비교:", {
+            원래_시작일: currentBanner.startDate,
+            변환된_시작일: startDate,
+            원래_종료일: currentBanner.endDate,
+            변환된_종료일: endDate,
+          });
 
           // 서버 측 500 에러 디버깅을 위해 추가 로깅
-          // console.log("Banner data being sent:", {
-          //   id: currentBanner.id,
-          //   title: currentBanner.title,
-          //   linkUrl: currentBanner.linkUrl,
-          //   linkUrl2: null,
-          //   startDate: startDate,
-          //   endDate: endDate,
-          //   isPublic: currentBanner.isPublic,
-          //   position: currentBanner.position,
-          //   bannerType: "main",
-          // });
+          console.log("Banner data being sent:", {
+            id: currentBanner.id,
+            title: currentBanner.title,
+            linkUrl: currentBanner.linkUrl,
+            linkUrl2: null,
+            startDate: startDate,
+            endDate: endDate,
+            isPublic: currentBanner.isPublic,
+            position: currentBanner.position,
+            bannerType: "main",
+          });
 
           // 이미지 업로드 문제 확인을 위해 임시로 이미지 없이 업데이트 시도
           await BannerApiService.updateMainBanner(
@@ -560,6 +566,7 @@ const MainBannerPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">메인 배너 관리</h1>
+        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch}/>
         <div className="flex space-x-2">
           {/* 순서 저장 버튼 */}
           <Button onClick={handleBulkPositionSave} variant="primary" disabled={loading}>

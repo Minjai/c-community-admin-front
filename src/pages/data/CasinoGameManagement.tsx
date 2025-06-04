@@ -11,6 +11,7 @@ import Alert from "@/components/Alert";
 import { formatDate, formatDateForDisplay } from "@/utils/dateUtils";
 import { extractDataArray } from "../../api/util";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import SearchInput from "@components/SearchInput.tsx";
 
 // 카지노 게임 타입 정의
 interface CasinoGame {
@@ -55,8 +56,17 @@ const CasinoGameManagement = () => {
   // 선택된 게임 ID 상태 추가
   const [selectedGameIds, setSelectedGameIds] = useState<number[]>([]);
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
+  const handleSearch = (type: string, value: string) => {
+    if (type === 'title') {
+      fetchGames(currentPage, pageSize, value);
+    }
+  }
+
   // 게임 목록 조회 (페이지네이션 적용)
-  const fetchGames = async (page: number = currentPage, limit: number = pageSize) => {
+  const fetchGames = async (page: number = currentPage, limit: number = pageSize, searchValue: string = '') => {
     setLoading(true);
 
     try {
@@ -64,6 +74,7 @@ const CasinoGameManagement = () => {
         params: {
           page: page,
           limit: limit,
+          title: searchValue,
         },
       });
 
@@ -135,10 +146,10 @@ const CasinoGameManagement = () => {
   useEffect(() => {
     // Only run when currentGame is set for editing
     if (isEditing && currentGame) {
-      // console.log(
-      //   "[CasinoGameManagement useEffect] currentGame.description:",
-      //   currentGame.description
-      // );
+      console.log(
+        "[CasinoGameManagement useEffect] currentGame.description:",
+        currentGame.description
+      );
       setTitle(currentGame.title || "");
       setDescription(currentGame.description || "");
       setIsPublic(currentGame.isPublic === 1 ? 1 : 0);
@@ -373,29 +384,6 @@ const CasinoGameManagement = () => {
     }
   };
 
-  // 게임 순서 아래로 이동
-  const handleMoveDown = async (index: number) => {
-    if (index >= games.length - 1) return; // 이미 마지막 항목이면 이동하지 않음
-
-    try {
-      const gameToMove = games[index];
-      const gameBelow = games[index + 1];
-
-      // 위치 교환
-      const newPosition = gameBelow.position;
-      const oldPosition = gameToMove.position;
-
-      await axios.patch(`/casino/${gameToMove.id}`, { position: newPosition });
-      await axios.patch(`/casino/${gameBelow.id}`, { position: oldPosition });
-
-      setAlertMessage({ type: "success", message: "게임 순서가 변경되었습니다." });
-      fetchGames(); // 목록 새로고침
-    } catch (err) {
-      console.error("Error moving game down:", err);
-      setAlertMessage({ type: "error", message: "게임 순서 변경 중 오류가 발생했습니다." });
-    }
-  };
-
   // DataTable 컬럼 정의
   const columns = [
     // 체크박스 컬럼 추가
@@ -576,6 +564,7 @@ const CasinoGameManagement = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">카지노 게임 관리</h1>
+        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch} />
         <div className="flex space-x-2">
           <Button
             onClick={handleBulkDelete}

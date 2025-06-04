@@ -114,7 +114,8 @@ export const getSportCategories = async (): Promise<any[]> => {
 
 export const getAllSportCategoriesAdmin = async (
   page: number = 1,
-  limit: number = 10
+  limit: number = 10,
+  searchValue: any = "",
 ): Promise<{ data: SportCategory[]; pagination: any }> => {
   try {
     const response = await axios.get(`/sport-categories/admin?page=${page}&limit=${limit}`);
@@ -222,6 +223,8 @@ export const getSportRecommendations = async (params = {}): Promise<{ data: any[
     });
 
     const response = await axios.get(`/sport-recommendations/admin?${queryParams.toString()}`);
+
+    console.log("response:", response);
 
     if (response.data && response.data.success) {
       return {

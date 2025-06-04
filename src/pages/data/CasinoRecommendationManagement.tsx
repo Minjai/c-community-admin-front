@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, ReactNode } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import axios from "@/api/axios";
 import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
@@ -7,7 +7,6 @@ import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
 import {
-  formatDate,
   formatDateForDisplay,
   formatISODateToDateTimeLocal,
   convertDateTimeLocalToISOUTC,
@@ -15,6 +14,8 @@ import {
 import { extractDataArray } from "../../api/util";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { toast } from "react-toastify";
+import { DragManager } from "./components/drag/DragManager";
+import SearchInput from "@components/SearchInput.tsx";
 
 // Add a utility function to determine the display status based on dates
 const getDisplayStatus = (startDateStr: string, endDateStr: string): string => {
@@ -115,6 +116,9 @@ const CasinoRecommendationManagement = () => {
   // 선택된 추천 ID 상태 추가
   const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<number[]>([]);
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(0); // 초기값 0으로 설정
@@ -129,14 +133,24 @@ const CasinoRecommendationManagement = () => {
     setIsPublic(publicSettings === "public" ? 1 : 0);
   }, [publicSettings]);
 
+  const handleSearch = (type: string, value: string) => {
+    if (type === 'title') {
+      fetchRecommendations(value);
+    }
+  }
+
   // 게임 추천 목록 조회 (클라이언트 측 페이지네이션 로직 수정)
-  const fetchRecommendations = useCallback(async () => {
+  const fetchRecommendations = useCallback(async (searchValue:string) => {
     // page, limit 제거
     setLoading(true);
     setError(null);
     try {
       // 페이지네이션 없이 전체 데이터 요청
-      const response = await axios.get("/casino-recommends");
+      const response = await axios.get("/casino-recommends", {
+        params: {
+          title: searchValue,
+        },
+      });
 
       // API 응답 구조 확인 및 처리 (data가 배열이라고 가정)
       if (response.data && response.data.success && Array.isArray(response.data.data)) {
@@ -257,7 +271,7 @@ const CasinoRecommendationManagement = () => {
   };
 
   useEffect(() => {
-    fetchRecommendations(); // 컴포넌트 마운트 시 데이터 로드
+    fetchRecommendations(''); // 컴포넌트 마운트 시 데이터 로드
     fetchAvailableGames();
   }, [fetchRecommendations]); // fetchRecommendations 의존성 추가 (내부 pageSize 의존성 때문에)
 
@@ -294,8 +308,8 @@ const CasinoRecommendationManagement = () => {
 
   // Open Edit Modal
   const handleOpenEditModal = (recommendation: CasinoRecommendation) => {
-    // console.log("[DEBUG] Opening edit modal with data:", recommendation);
-    // console.log("[DEBUG] Current available games:", availableGames);
+    console.log("[DEBUG] Opening edit modal with data:", recommendation);
+    console.log("[DEBUG] Current available games:", availableGames);
     setIsEditing(true);
     setCurrentRecommendationId(recommendation.id);
     setTitle(recommendation.title || "");
@@ -361,7 +375,7 @@ const CasinoRecommendationManagement = () => {
       } catch (err) {
         setError("추천 목록 삭제 중 오류가 발생했습니다.");
         console.error("Delete error:", err);
-        fetchRecommendations(); // 에러 발생 시에는 다시 불러오기
+        fetchRecommendations(''); // 에러 발생 시에는 다시 불러오기
       } finally {
         setLoading(false);
       }
@@ -414,7 +428,7 @@ const CasinoRecommendationManagement = () => {
     } catch (error: any) {
       console.error("추천 목록 일괄 삭제 중 오류 발생:", error);
       setError("추천 목록 삭제 중 일부 오류가 발생했습니다. 목록을 확인해주세요.");
-      fetchRecommendations(); // 에러 시 전체 다시 로드
+      fetchRecommendations(''); // 에러 시 전체 다시 로드
     } finally {
       setLoading(false);
     }
@@ -481,11 +495,11 @@ const CasinoRecommendationManagement = () => {
       await axios.put(`/casino-recommends/${targetItem.id}`, targetItemPayload);
 
       // Fetch updated data from server after successful updates
-      fetchRecommendations();
+      fetchRecommendations('');
     } catch (err) {
       setError("순서 변경 중 오류가 발생했습니다.");
       // Fetch recommendations even on error to try and get consistent state
-      fetchRecommendations();
+      fetchRecommendations('');
     } finally {
       setLoading(false);
     }
@@ -530,11 +544,11 @@ const CasinoRecommendationManagement = () => {
       await axios.put(`/casino-recommends/${targetItem.id}`, targetItemPayload);
 
       // Fetch updated data from server after successful updates
-      fetchRecommendations();
+      fetchRecommendations('');
     } catch (err) {
       setError("순서 변경 중 오류가 발생했습니다.");
       // Fetch recommendations even on error to try and get consistent state
-      fetchRecommendations();
+      fetchRecommendations('');
     } finally {
       setLoading(false);
     }
@@ -646,7 +660,7 @@ const CasinoRecommendationManagement = () => {
         await axios.post("/casino-recommends", payload);
         setAlertMessage({ type: "success", message: "새 게임 추천이 성공적으로 등록되었습니다." });
       }
-      fetchRecommendations(); // 저장 후 데이터 다시 로드
+      fetchRecommendations(''); // 저장 후 데이터 다시 로드
       handleCloseModal();
     } catch (err: unknown) {
       console.error("[DEBUG] Error during save:", err);
@@ -854,7 +868,7 @@ const CasinoRecommendationManagement = () => {
         )
       );
       toast.success("순서가 저장되었습니다.");
-      fetchRecommendations();
+      fetchRecommendations('');
     } catch (err) {
       toast.error("순서 저장 중 오류가 발생했습니다.");
     } finally {
@@ -862,10 +876,64 @@ const CasinoRecommendationManagement = () => {
     }
   };
 
+  // === 드래그 앤 드롭 시작 ===
+  // DragManager 인스턴스 보관
+  const dragManagerRef = useRef<DragManager | null>(null);
+
+  useEffect(() => {
+    if (selectedGames.length > 0) {
+      dragManagerRef.current = new DragManager((from, to) => {
+      const tempSelectedGames = [...selectedGames];
+      const tempSelectedGameIds = [...selectedGameIds];
+
+        // 원본을 건드리지 않고 새로운 배열 생성
+      const games = [
+        ...tempSelectedGames.slice(0, from),
+        ...tempSelectedGames.slice(from + 1)
+      ];
+      const ids = [
+        ...tempSelectedGameIds.slice(0, from),
+        ...tempSelectedGameIds.slice(from + 1)
+      ];
+
+      const newGames = [
+        ...games.slice(0, to),
+        selectedGames[from],
+        ...games.slice(to)
+      ];
+      const newIds = [
+        ...ids.slice(0, to),
+        selectedGameIds[from],
+        ...ids.slice(to)
+      ];
+
+      setSelectedGames(newGames);
+      setSelectedGameIds(newIds);
+      });
+    }
+  }, [selectedGames, selectedGameIds]);
+
+  // 드래그 이벤트 핸들러
+  const handleDragStart = (index: number) => {
+    if(!dragManagerRef.current)return;
+    dragManagerRef.current.startDrag(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (index: number) => {
+    if(!dragManagerRef.current)return;
+    dragManagerRef.current.drop(index);
+  };
+  // === 드래그 앤 드롭 종료 ===
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">카지노 게임 추천 관리</h1>
+        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch}/>
         <div className="flex space-x-2">
           {/* 순서 저장 버튼 */}
           <Button
@@ -1058,6 +1126,11 @@ const CasinoRecommendationManagement = () => {
                         <div
                           key={index}
                           className="flex justify-between items-center py-1 px-2 bg-gray-50 mb-1 rounded overflow-hidden"
+                          draggable
+                          onDragStart={() => handleDragStart(index)}
+                          onDragOver={handleDragOver}
+                          onDrop={() => handleDrop(index)}
+                          style={{ cursor: 'grab' }}
                         >
                           <span
                             className="text-sm truncate flex-1 mr-2 min-w-0 overflow-hidden whitespace-nowrap"

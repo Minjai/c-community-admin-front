@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from "react";
-import axios from "@/api/axios";
-import DataTable from "@/components/DataTable";
-import Button from "@/components/Button";
-import ActionButton from "@/components/ActionButton";
-import Modal from "@/components/Modal";
-import Input from "@/components/forms/Input";
-import Alert from "@/components/Alert";
-import { formatDate } from "@/utils/dateUtils";
+import axios from "@api/axios.ts";
+import DataTable from "@components/DataTable.tsx";
+import Button from "@components/Button.tsx";
+import ActionButton from "@components/ActionButton.tsx";
+import Modal from "@components/Modal.tsx";
+import Input from "@components/forms/Input.tsx";
+import Alert from "@components/Alert.tsx";
+import { formatDate } from "@utils/dateUtils.ts";
 import { toast } from "react-toastify";
-import { ApiResponse, PaginationInfo, Post } from "@/types"; // Import necessary types
-import LoadingOverlay from "@/components/LoadingOverlay";
+import LoadingOverlay from "@components/LoadingOverlay.tsx";
 
 // 뉴스 아이템 타입 정의 (API 응답 기준)
 interface NewsItem {
@@ -27,7 +26,7 @@ interface NewsItem {
   // Add other fields from API if needed (date, content, html_description)
 }
 
-const NewsManagementPage = () => {
+const NewsCasinoPage = () => {
   const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,18 +84,26 @@ const NewsManagementPage = () => {
         console.log("추출된 페이지 정보:", paginationInfo);
 
         const mappedNewsData: NewsItem[] = articles
-          .filter((item: any) => {
-            const isValidId = typeof item.id === "number" && item.id > 0;
-            if (!isValidId) {
-              console.warn("Invalid or missing ID found in news item, filtering out:", item);
-            }
-            return isValidId;
-          })
-          .map((item: any) => ({
-            ...item,
-            thumbnailUrl: item.thumbnail || item.thumbnailUrl || null,
-            description: item.description || null,
-          }));
+            .filter((item: any) => {
+              const isValidId = typeof item.id === "number" && item.id > 0;
+              if (!isValidId) {
+                console.warn("Invalid or missing ID found in news item, filtering out:", item);
+              }
+              return isValidId;
+            })
+            .map((item: any) => ({
+              ...item,
+              thumbnailUrl: item.thumbnail || item.thumbnailUrl || null,
+              description: item.description || null,
+            }))
+            .sort((a:any, b:any) => {
+              // isSelected=1인 뉴스 먼저
+              if (b.isSelected !== a.isSelected) {
+                return b.isSelected - a.isSelected;
+              }
+              // 그 다음 최신순
+              return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+            });
         setNews(mappedNewsData);
 
         // 페이지네이션 상태 업데이트 (API 응답 기준)
@@ -575,6 +582,10 @@ const NewsManagementPage = () => {
         >
           {`선택 삭제 (${selectedNewsIds.length})`}
         </Button>
+        {/* 뉴스 추가 버튼 */}
+        <Button variant="primary" onClick={handleAddNews} disabled={loading || saving}>
+          뉴스 추가
+        </Button>
       </div>
 
       {/* Loading Overlay */}
@@ -661,4 +672,4 @@ const NewsManagementPage = () => {
   );
 };
 
-export default NewsManagementPage;
+export default NewsCasinoPage;

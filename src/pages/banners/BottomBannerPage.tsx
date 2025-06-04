@@ -17,6 +17,7 @@ import {
   getCurrentDateTimeLocalString,
 } from "../../utils/dateUtils";
 import LoadingOverlay from "../../components/LoadingOverlay";
+import SearchInput from "@components/SearchInput.tsx";
 
 const BottomBannerPage: React.FC = () => {
   const [banners, setBanners] = useState<Banner[]>([]);
@@ -30,6 +31,9 @@ const BottomBannerPage: React.FC = () => {
   const [pcImageFile, setPcImageFile] = useState<File | null>(null);
   const [mobileImageFile, setMobileImageFile] = useState<File | null>(null);
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
@@ -39,13 +43,23 @@ const BottomBannerPage: React.FC = () => {
   // 선택된 배너 ID 상태 추가
   const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
 
+  const handleSearch = (type: string, value: string) => {
+
+    if (type === 'title') {
+      fetchBanners(currentPage, pageSize, value).then(r => {
+        // 검색 후 선택된 배너 ID 초기화
+        setSelectedBannerIds([]);
+      });
+    }
+  }
+
   // 배너 목록 조회 (페이지네이션 적용)
-  const fetchBanners = async (page: number = 1, limit: number = 10) => {
+  const fetchBanners = async (page: number = 1, limit: number = 10, searchValue: string = '') => {
     setLoading(true);
     setError("");
 
     try {
-      const response = await BannerApiService.getBottomBanners(page, limit);
+      const response = await BannerApiService.getBottomBanners(page, limit, searchValue);
       if (response && response.success && Array.isArray(response.data)) {
         // position 기준 오름차순 정렬 (작은 값이 위로), position이 같으면 createdAt 내림차순(최신이 위)
         const sortedBanners = [...response.data].sort((a, b) => {
@@ -122,13 +136,13 @@ const BottomBannerPage: React.FC = () => {
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
     setModalError(null);
-    //console.log("수정할 배너 데이터:", banner);
+    console.log("수정할 배너 데이터:", banner);
 
     const formattedStartDate = formatDateForInput(banner.startDate);
     const formattedEndDate = formatDateForInput(banner.endDate);
 
-    // console.log("DatePicker 표시용 시작일:", formattedStartDate);
-    // console.log("DatePicker 표시용 종료일:", formattedEndDate);
+    console.log("DatePicker 표시용 시작일:", formattedStartDate);
+    console.log("DatePicker 표시용 종료일:", formattedEndDate);
 
     setCurrentBanner({
       ...banner,
@@ -501,6 +515,7 @@ const BottomBannerPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">하단 배너 관리</h1>
+        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch}/>
         <div className="flex space-x-2">
           {/* 순서 저장 버튼 */}
           <Button onClick={handleBulkPositionSave} variant="primary" disabled={loading}>

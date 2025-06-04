@@ -20,6 +20,7 @@ import {
   formatDate,
 } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import { DragManager } from "./components/drag/DragManager";
 
 // 스포츠 종목 추천 관리 컴포넌트
 export default function SportRecommendationsManagement() {
@@ -306,24 +307,13 @@ export default function SportRecommendationsManagement() {
 
     try {
       const detailData = await getSportRecommendationById(recommendation.id);
-      // sportGames가 있으면 displayOrder 오름차순으로 정렬해서 selectedGames에 세팅
-      let games: SportGame[] = [];
-      if (detailData.sportGames && detailData.sportGames.length > 0) {
-        const sortedSportGames = detailData.sportGames
-          .slice()
-          .sort((a: any, b: any) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0));
-        games = sortedSportGames.map((sg: any) => ({
-          ...sg.sportGame,
-          displayOrder: sg.displayOrder,
-        }));
-      } else if (detailData.games) {
-        games = detailData.games;
-      }
+      const gameIds = detailData.games ? detailData.games.map((game: SportGame) => game.id) : [];
+      const games = detailData.games || [];
       setSelectedGames(games);
 
       setFormData({
         title: detailData.title || "",
-        sportGameIds: games.map((g) => g.id),
+        sportGameIds: gameIds,
         startTime: formatISODateToDateTimeLocal(detailData.startTime),
         endTime: formatISODateToDateTimeLocal(detailData.endTime),
         isPublic: detailData.isPublic === 1 ? 1 : 0,
@@ -472,18 +462,12 @@ export default function SportRecommendationsManagement() {
     setError(null);
     setSuccess(null);
 
-    // displayOrder는 selectedGames 배열 순서대로 부여 (정렬하지 않고 그대로)
-    const sportGames = selectedGames.map((g, idx) => ({
-      id: g.id,
-      displayOrder: idx + 1,
-    }));
     const payload = {
       ...formData,
-      sportGameIds: selectedGames.map((g) => g.id),
-      sportGames,
+      sportGameIds: selectedGames.map((g) => g.id), // Use selectedGames state
       startTime: convertDateTimeLocalToISOUTC(formData.startTime),
       endTime: convertDateTimeLocalToISOUTC(formData.endTime),
-      displayOrder: formData.displayOrder || 0,
+      displayOrder: formData.displayOrder || 0, // Ensure displayOrder is a number
     };
 
     try {
@@ -527,24 +511,53 @@ export default function SportRecommendationsManagement() {
     setSelectedGames((prevSelected) => prevSelected.filter((game) => game.id !== gameId));
   };
 
+
+    // === 드래그 앤 드롭 시작 ===
+    // DragManager 인스턴스 보관
+    const dragManagerRef = useRef<DragManager | null>(null);
+
+    useEffect(() => {
+      if (selectedGames.length > 0) {
+        dragManagerRef.current = new DragManager((from, to) => {
+        const tempSelectedGames = [...selectedGames];
+
+          // 원본을 건드리지 않고 새로운 배열 생성
+        const games = [
+          ...tempSelectedGames.slice(0, from),
+          ...tempSelectedGames.slice(from + 1)
+        ];
+
+        const newGames = [
+          ...games.slice(0, to),
+          selectedGames[from],
+          ...games.slice(to)
+        ];
+
+        setSelectedGames(newGames);
+        });
+      }
+    }, [selectedGames]);
+
+    // 드래그 이벤트 핸들러
+    const handleDragStart = (index: number) => {
+      if(!dragManagerRef.current)return;
+      dragManagerRef.current.startDrag(index);
+    };
+  
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+    };
+  
+    const handleDrop = (index: number) => {
+      if(!dragManagerRef.current)return;
+      dragManagerRef.current.drop(index);
+    };
+    // === 드래그 앤 드롭 종료 ===
+
   // 게임 수 표시 렌더링 함수
   const renderGameCount = (gameIds: number[]) => {
     return gameIds ? `${gameIds.length}개` : "0개";
   };
-
-  // --- 날짜 포맷 교정 함수 추가 ---
-  function normalizeDateString(dateStr?: string): string {
-    if (!dateStr) return "";
-    // yyyy.dd.mm 또는 yyyy.mm.dd 등 다양한 포맷을 yyyy-mm-dd로 변환
-    const dotPattern = /^(\d{4})\.(\d{2})\.(\d{2})(?:\s+(\d{2}:\d{2}))?/;
-    const match = dateStr.match(dotPattern);
-    if (match) {
-      const [, yyyy, mm, dd, time] = match;
-      return `${yyyy}-${mm}-${dd}${time ? " " + time : ""}`;
-    }
-    // 기타 포맷은 그대로 반환
-    return dateStr;
-  }
 
   // 게임 선택 모달 내용 렌더링 함수 추가
   const renderGameSelectionModal = () => {
@@ -616,17 +629,23 @@ export default function SportRecommendationsManagement() {
           >
             {selectedGames.length > 0 ? (
               <div className="space-y-2">
-                {selectedGames.map((game) => (
+                {selectedGames.map((game, index) => (
                   <div
                     key={game.id}
                     className="flex justify-between items-center border-b pb-2 last:border-b-0"
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={handleDragOver}
+                    onDrop={() => handleDrop(index)}
+                    style={{ cursor: 'grab' }}
                   >
                     <div>
                       <div className="font-medium text-sm">{game.matchName}</div>
-                      <div className="text-xs text-gray-600">
-                        {formatDateForDisplay(
-                          normalizeDateString(game.dateTime?.replace("FRO", ""))
-                        )}
+                      <div className="flex items-center space-x-4">
+                        <p className="text-xs text-gray-500">{game.league}</p>
+                        <div className="text-xs text-gray-600">
+                          {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
+                        </div>
                       </div>
                     </div>
                     <button
@@ -698,9 +717,7 @@ export default function SportRecommendationsManagement() {
                       </div>
                       <div className="text-xs text-gray-500 mt-1">
                         {game.league} ({game.sport}) |{" "}
-                        {formatDateForDisplay(
-                          normalizeDateString(game.dateTime?.replace("FRO", ""))
-                        )}
+                        {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
                       </div>
                     </div>
                   </div>
@@ -831,28 +848,40 @@ export default function SportRecommendationsManagement() {
         const now = new Date();
         const startTime = row.startTime ? new Date(row.startTime) : null;
         const endTime = row.endTime ? new Date(row.endTime) : null;
-
+        
         // 비공개 상태
         if (value !== 1) {
-          return <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">비공개</span>;
+          return (
+            <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">
+              비공개
+            </span>
+          );
         }
-
+        
         // 공개 상태이지만 시작 시간이 미래인 경우 (공개 전)
         if (startTime && startTime > now) {
           return (
-            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">공개 전</span>
+            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
+              공개 전
+            </span>
           );
         }
-
+        
         // 공개 상태이지만 종료 시간이 과거인 경우 (공개 종료)
         if (endTime && endTime < now) {
           return (
-            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">공개 종료</span>
+            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
+              공개 종료
+            </span>
           );
         }
-
+        
         // 현재 공개 중인 상태
-        return <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">공개</span>;
+        return (
+          <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">
+            공개
+          </span>
+        );
       },
     },
     {

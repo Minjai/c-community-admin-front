@@ -46,7 +46,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
     },
     {
       title: "뉴스 관리",
-      subItems: [{ name: "뉴스 관리", path: "/news/list" }],
+      subItems: [{ name: "카지노 뉴스", path: "/news/casino/list" }, {name: "스포츠 뉴스", path: "/news/sports/list"}],
     },
     {
       title: "커뮤니티 관리",

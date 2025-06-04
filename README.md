@@ -323,7 +323,7 @@ vite build
   - `PUT /api/admin/account/{id}`: 관리자 정보 수정 (이메일, 닉네임, 비밀번호)
   - `DELETE /api/admin/account/{id}`: 관리자 계정 삭제
 
-### 9. 뉴스 관리 (`src/pages/news/NewsManagementListPage.tsx`)
+### 9. 뉴스 관리 (`src/pages/news/NewsCasinoListPage.tsx`)
 
 - **서비스:** `src/api/axios.ts` (직접 호출)
 - **주요 기능:** 뉴스 목록 조회, 추가, 수정, 삭제, 공개 상태 변경

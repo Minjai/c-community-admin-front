@@ -13,6 +13,7 @@ import Alert from "@/components/Alert";
 import { formatDate, formatDateForDisplay } from "@/utils/dateUtils";
 import { toast } from "react-toastify";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import SearchInput from "@components/SearchInput.tsx";
 
 // Guideline 타입에 position과 displayOrder, tags 추가 (복원)
 interface GuidelineWithOrder extends Guideline {
@@ -49,6 +50,9 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
 
   const [selectedGuidelineIds, setSelectedGuidelineIds] = useState<number[]>([]);
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
   const handleEditorContentChange = useCallback(
     (content: string) => {
       if (currentGuideline) {
@@ -79,12 +83,20 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
 
   const { path, title } = getPageInfo();
 
-  const fetchGuidelines = async (page: number = 1, limit: number = 10) => {
+  
+  const handleSearch = (type: string, value: string) => {
+    // title
+    if (type === "title") {
+      fetchGuidelines(currentPage, pageSize, value);
+    }
+  }
+
+  const fetchGuidelines = async (page: number = 1, limit: number = 10, searchValue: string = '') => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await GuidelineApiService.getGuidelines(boardId, page, limit);
+      const response = await GuidelineApiService.getGuidelines(boardId, page, limit, searchValue);
 
       if (response && response.success && Array.isArray(response.data)) {
         // Process tags: Convert comma-separated string to array (복원)
@@ -507,6 +519,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">{title}</h1>
+        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch}/>
         <div className="flex space-x-2">
           <Button onClick={handleBulkPositionSave} variant="primary" disabled={loading || isSaving}>
             순서 저장

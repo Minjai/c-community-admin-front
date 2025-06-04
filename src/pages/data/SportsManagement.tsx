@@ -15,6 +15,7 @@ import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import Input from "@/components/forms/Input";
 import Select from "@/components/forms/Select";
+import SearchInput from "@components/SearchInput.tsx";
 
 // 스포츠 이름 매핑 객체 추가
 const sportNameMapping: Record<string, string> = {
@@ -95,6 +96,9 @@ export default function SportsManagement() {
 
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
   // 페이지네이션 상태 (서버 데이터 기반)
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(0);
@@ -152,12 +156,19 @@ export default function SportsManagement() {
   // 선택된 종목 경기
   const [selectedSport, setSelectedSport] = useState<string>("");
 
+  const handleSearch = (type: string, value: string) => {
+    // if (type === 'displayName') {
+    //   fetchSportCategories(1, PAGE_SIZE, value);
+    // }
+  }
+
   // fetchSportCategories: 서버 측 페이지네이션 적용
-  const fetchSportCategories = useCallback(async (page: number, limit: number) => {
+  const fetchSportCategories = useCallback(async (page: number, limit: number, searchValue: string = '') => {
     setLoading(true);
     setError(null);
     try {
-      const response = await getAllSportCategoriesAdmin(page, limit);
+      const response = await getAllSportCategoriesAdmin(page, limit, searchValue);
+      console.log("Fetched categories:", response.data);
       const fetchedCategories = response.data || [];
       const pagination: any = response.pagination || {
         totalItems: 0,
@@ -326,41 +337,6 @@ export default function SportsManagement() {
 
   const handleSportSelect = (sport: string) => {
     setSelectedSport(sport);
-  };
-
-  // handleMoveUp/Down: 서버 API 필요 (현재는 임시 로직, 서버 API 구현 후 수정 필요)
-  // 서버 페이지네이션 하에서는 순서 변경 후 현재 페이지를 리프레시해야 함
-  const handleMoveUp = async (index: number) => {
-    if (index <= 0 && currentPage === 1) return;
-    const currentItem = categories[index];
-    const targetItem = categories[index - 1];
-    setLoading(true);
-    try {
-      await swapDisplayOrder(currentItem, targetItem);
-      setSuccess("순서가 변경되었습니다.");
-      fetchSportCategories(currentPage, pageSize);
-    } catch (err) {
-      const apiError = (err as any)?.response?.data?.message || "순서 변경 중 오류";
-      setError(apiError);
-    } finally {
-      setLoading(false);
-    }
-  };
-  const handleMoveDown = async (index: number) => {
-    if (index >= categories.length - 1 && currentPage === totalPages) return;
-    const currentItem = categories[index];
-    const targetItem = categories[index + 1];
-    setLoading(true);
-    try {
-      await swapDisplayOrder(currentItem, targetItem);
-      setSuccess("순서가 변경되었습니다.");
-      fetchSportCategories(currentPage, pageSize);
-    } catch (err) {
-      const apiError = (err as any)?.response?.data?.message || "순서 변경 중 오류";
-      setError(apiError);
-    } finally {
-      setLoading(false);
-    }
   };
 
   // handleBulkDelete: 서버 측 페이지네이션 로직 적용
@@ -587,9 +563,9 @@ export default function SportsManagement() {
       {success && <Alert type="success" message={success} onClose={() => setSuccess(null)} />}
 
       <LoadingOverlay isLoading={loading} />
-
       {/* 상단 버튼 영역 */}
       <div className="flex justify-end space-x-2 mb-4">
+        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch}/>
         <Button onClick={handleBulkDisplayOrderSave} disabled={loading}>
           순서 저장
         </Button>

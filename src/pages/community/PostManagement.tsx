@@ -37,7 +37,7 @@ const PostManagement = () => {
         },
       });
 
-      //console.log("게시물 API 응답:", response.data);
+      console.log("게시물 API 응답:", response.data);
 
       // 서버 응답 형식에 맞게 처리
       if (response.data) {
@@ -82,7 +82,7 @@ const PostManagement = () => {
 
     try {
       const response = await axios.delete(`/post/${id}`);
-      //console.log("삭제 응답:", response.status, response.data);
+      console.log("삭제 응답:", response.status, response.data);
 
       if (response.status === 200 || response.status === 204) {
         alert("게시물이 삭제되었습니다.");

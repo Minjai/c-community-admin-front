@@ -10,7 +10,7 @@ const PostManagementAll: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // TODO: API 호출하여 게시물 저장
-    //console.log({ title, content });
+    console.log({ title, content });
   };
 
   return (

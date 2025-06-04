@@ -14,7 +14,7 @@ const Input: React.FC<InputProps> = ({
   ...props
 }) => {
   return (
-    <div className="mb-4">
+    <div>
       {label && (
         <label htmlFor={props.id} className="label">
           {label}

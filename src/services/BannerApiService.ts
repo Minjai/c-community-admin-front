@@ -4,11 +4,11 @@ import { Banner, ApiResponse, PaginationInfo } from "../types";
 // 배너 API 서비스
 const BannerApiService = {
   // 메인 배너 목록 조회 (페이지네이션 적용)
-  getMainBanners: async (page = 1, limit = 10): Promise<ApiResponse<Banner[]>> => {
+  getMainBanners: async (page = 1, limit = 10, searchValue = ""): Promise<ApiResponse<Banner[]>> => {
     try {
       // API 요청 시 page와 limit 파라미터 추가
       const response = await axios.get("/banner/main", {
-        params: { page, limit },
+        params: { page, limit, title: searchValue },
       });
       // 전체 응답 객체 반환 (success, data, pagination 등 포함)
       return response.data;
@@ -25,10 +25,10 @@ const BannerApiService = {
   },
 
   // 업체 배너 목록 조회
-  getCompanyBanners: async (page = 1, limit = 10): Promise<ApiResponse<Banner[]>> => {
+  getCompanyBanners: async (page = 1, limit = 10, searchValue = ''): Promise<ApiResponse<Banner[]>> => {
     try {
       const response = await axios.get("/banner/company", {
-        params: { page, limit },
+        params: { page, limit, title: searchValue },
       });
       return response.data;
     } catch (error: any) {
@@ -43,10 +43,10 @@ const BannerApiService = {
   },
 
   // 하단 배너 목록 조회
-  getBottomBanners: async (page = 1, limit = 10): Promise<ApiResponse<Banner[]>> => {
+  getBottomBanners: async (page = 1, limit = 10, searchValue = ''): Promise<ApiResponse<Banner[]>> => {
     try {
       const response = await axios.get("/banner/bottom", {
-        params: { page, limit },
+        params: { page, limit, title: searchValue },
       });
       // API 응답 구조 수정: 루트 레벨의 pagination 객체를 사용하도록 변경
       if (response.data && response.data.success) {
@@ -91,10 +91,10 @@ const BannerApiService = {
   },
 
   // 미니 배너 목록 조회
-  getMiniBanners: async (page = 1, limit = 10): Promise<ApiResponse<Banner[]>> => {
+  getMiniBanners: async (page = 1, limit = 10 , searchValue = ''): Promise<ApiResponse<Banner[]>> => {
     try {
       const response = await axios.get("/banner/mini", {
-        params: { page, limit },
+        params: { page, limit, title: searchValue },
       });
       return response.data;
     } catch (error: any) {
@@ -121,7 +121,7 @@ const BannerApiService = {
             // ISO 형식으로 변환
             const dateValue = new Date(bannerData[key]).toISOString();
             formData.append(key, dateValue);
-            //console.log(`변환된 ${key} (멀티파트):`, dateValue);
+            console.log(`변환된 ${key} (멀티파트):`, dateValue);
           } catch (e) {
             console.error(`${key} 형식 오류 (멀티파트):`, e);
             formData.append(key, bannerData[key]); // 오류 시 원본 값 사용
@@ -236,7 +236,7 @@ const BannerApiService = {
             // ISO 형식인지 확인하고 아니면 변환 시도
             const startDate = new Date(bannerData.startDate);
             bannerData.startDate = startDate.toISOString();
-            //console.log("변환된 startDate:", bannerData.startDate);
+            console.log("변환된 startDate:", bannerData.startDate);
           } catch (e) {
             console.error("startDate 형식 오류:", e);
           }
@@ -247,7 +247,7 @@ const BannerApiService = {
             // ISO 형식인지 확인하고 아니면 변환 시도
             const endDate = new Date(bannerData.endDate);
             bannerData.endDate = endDate.toISOString();
-            //console.log("변환된 endDate:", bannerData.endDate);
+            console.log("변환된 endDate:", bannerData.endDate);
           } catch (e) {
             console.error("endDate 형식 오류:", e);
           }
@@ -278,7 +278,7 @@ const BannerApiService = {
               // ISO 형식으로 변환
               const dateValue = new Date(bannerData[key]).toISOString();
               formData.append(key, dateValue);
-              //console.log(`변환된 ${key} (멀티파트):`, dateValue);
+              console.log(`변환된 ${key} (멀티파트):`, dateValue);
             } catch (e) {
               console.error(`${key} 형식 오류 (멀티파트):`, e);
               formData.append(key, bannerData[key]); // 오류 시 원본 값 사용
@@ -296,18 +296,18 @@ const BannerApiService = {
       // 이미지 파일 추가 - key 이름을 서버 요구사항에 맞게 수정
       if (pcImage && pcImage instanceof File && pcImage.size > 0) {
         formData.append("pUrl", pcImage); // "pcImage"에서 "pUrl"로 변경
-        //console.log("PC 이미지 추가:", pcImage.name, pcImage.size, pcImage.type);
+        console.log("PC 이미지 추가:", pcImage.name, pcImage.size, pcImage.type);
       }
 
       if (mobileImage && mobileImage instanceof File && mobileImage.size > 0) {
         formData.append("mUrl", mobileImage); // "mobileImage"에서 "mUrl"로 변경
-        //console.log("모바일 이미지 추가:", mobileImage.name, mobileImage.size, mobileImage.type);
+        console.log("모바일 이미지 추가:", mobileImage.name, mobileImage.size, mobileImage.type);
       }
 
       console.log(`Sending multipart PUT request to /banner/main/${id}`, {
-         formDataKeys: [...formData.keys()],
-         hasImages: { pc: !!pcImage, mobile: !!mobileImage },
-       });
+        formDataKeys: [...formData.keys()],
+        hasImages: { pc: !!pcImage, mobile: !!mobileImage },
+      });
 
       const response = await axios.put(`/banner/main/${id}`, formData, {
         headers: {
@@ -360,7 +360,7 @@ const BannerApiService = {
             // ISO 형식인지 확인하고 아니면 변환 시도
             const startDate = new Date(bannerData.startDate);
             bannerData.startDate = startDate.toISOString();
-            //console.log("변환된 startDate (업체):", bannerData.startDate);
+            console.log("변환된 startDate (업체):", bannerData.startDate);
           } catch (e) {
             console.error("startDate 형식 오류 (업체):", e);
           }
@@ -371,7 +371,7 @@ const BannerApiService = {
             // ISO 형식인지 확인하고 아니면 변환 시도
             const endDate = new Date(bannerData.endDate);
             bannerData.endDate = endDate.toISOString();
-            //console.log("변환된 endDate (업체):", bannerData.endDate);
+            console.log("변환된 endDate (업체):", bannerData.endDate);
           } catch (e) {
             console.error("endDate 형식 오류 (업체):", e);
           }
@@ -413,17 +413,17 @@ const BannerApiService = {
       // 이미지 파일 추가 - key 이름을 서버 요구사항에 맞게 수정
       if (pcImage && pcImage instanceof File && pcImage.size > 0) {
         formData.append("pUrl", pcImage); // "pcImage"에서 "pUrl"로 변경
-        //console.log("PC 이미지 추가(업체):", pcImage.name, pcImage.size, pcImage.type);
+        console.log("PC 이미지 추가(업체):", pcImage.name, pcImage.size, pcImage.type);
       }
 
       if (mobileImage && mobileImage instanceof File && mobileImage.size > 0) {
         formData.append("mUrl", mobileImage); // "mobileImage"에서 "mUrl"로 변경
-        // console.log(
-        //   "모바일 이미지 추가(업체):",
-        //   mobileImage.name,
-        //   mobileImage.size,
-        //   mobileImage.type
-        // );
+        console.log(
+          "모바일 이미지 추가(업체):",
+          mobileImage.name,
+          mobileImage.size,
+          mobileImage.type
+        );
       }
 
       // Authorization 헤더는 인터셉터에서 자동으로 추가됨
