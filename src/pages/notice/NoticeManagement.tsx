@@ -24,6 +24,7 @@ const NoticeManagement = () => {
     message: string;
   } | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
+  const [displayOrders, setDisplayOrders] = useState<Record<number, number>>({});
 
   // 공지사항 상세 페이지로 이동
   const handleClick = (id: number) => {
@@ -65,6 +66,12 @@ const NoticeManagement = () => {
       }
 
       setNotices(noticesData);
+      // displayOrder 상태 초기화
+      const orderMap: Record<number, number> = {};
+      noticesData.forEach((n) => {
+        orderMap[n.id] = n.displayOrder;
+      });
+      setDisplayOrders(orderMap);
       setPagination({
         ...pagination,
         page,
@@ -166,6 +173,29 @@ const NoticeManagement = () => {
     navigate("/notice/new");
   };
 
+  // displayOrder 입력 변경 핸들러
+  const handleOrderChange = (id: number, value: number) => {
+    setDisplayOrders((prev) => ({ ...prev, [id]: value }));
+  };
+
+  // 순서저장 버튼 클릭 핸들러
+  const handleSaveOrder = async () => {
+    setLoading(true);
+    try {
+      // 변경된 displayOrder만 추출
+      const changed = notices.filter((n) => displayOrders[n.id] !== n.displayOrder);
+      for (const n of changed) {
+        await axios.patch(`/post/admin/${n.id}/display-order`, { displayOrder: displayOrders[n.id] });
+      }
+      setAlertMessage({ type: "success", message: "순서가 저장되었습니다." });
+      getAllNotices(pagination.page);
+    } catch (error) {
+      setAlertMessage({ type: "error", message: "순서 저장 중 오류가 발생했습니다." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // DataTable 컬럼 정의
   const columns = [
     {
@@ -217,6 +247,21 @@ const NoticeManagement = () => {
       cell: (isPublic: number) => (isPublic === 1 ? "공개" : "비공개"),
     },
     {
+      header: "순서",
+      accessor: "displayOrder" as keyof Post,
+      cell: (value: number, row: Post) => (
+        <input
+          type="number"
+          className="w-20 border rounded px-2 py-1 text-center"
+          value={displayOrders[row.id] ?? value ?? 0}
+          onChange={(e) => handleOrderChange(row.id, Number(e.target.value))}
+          disabled={loading || deleting}
+          style={{ minWidth: 60 }}
+        />
+      ),
+      className: "w-24 px-2 text-center",
+    },
+    {
       header: "관리",
       accessor: "id" as keyof Post,
       cell: (id: number, row: Post) => (
@@ -249,6 +294,9 @@ const NoticeManagement = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">공지사항 관리</h1>
         <div className="flex space-x-2">
+          <Button variant="primary" onClick={handleSaveOrder} disabled={loading || deleting}>
+            순서저장
+          </Button>
           <Button
             variant="danger"
             onClick={handleDeleteSelected}

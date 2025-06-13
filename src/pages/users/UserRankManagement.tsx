@@ -18,7 +18,7 @@ interface UserRank {
   score: number;
   createdAt: string;
   updatedAt?: string;
-  position?: number;
+  displayOrder?: number;
 }
 
 const UserRankManagement: React.FC = () => {
@@ -47,6 +47,9 @@ const UserRankManagement: React.FC = () => {
   // 파일 상태 관리
   const [imageFile, setImageFile] = useState<File | null>(null);
 
+  // 순서 입력 상태 추가
+  const [orderInputs, setOrderInputs] = useState<Record<number, number>>({});
+
   // 등급 목록 조회
   const fetchRanks = useCallback(async (page: number = 1, limit: number = 10) => {
     setLoading(true);
@@ -68,14 +71,14 @@ const UserRankManagement: React.FC = () => {
           rankName: rank.rankName || rank.name || "",
           image: rank.image || rank.imageUrl || "",
           score: rank.score || 0,
-          position: rank.position || rank.displayOrder || 0,
+          displayOrder: rank.displayOrder || rank.position || 0,
           createdAt: rank.createdAt || new Date().toISOString(),
           updatedAt: rank.updatedAt || rank.createdAt || "",
         }));
 
         // 정렬은 서버에서 지원하지 않으면 여기서 유지 가능
         const sortedRanks = [...processedRanks].sort(
-          (a, b) => (b.position || 0) - (a.position || 0)
+          (a, b) => (b.displayOrder || 0) - (a.displayOrder || 0)
         );
 
         setRanks(sortedRanks); // 현재 페이지 데이터 설정
@@ -84,6 +87,13 @@ const UserRankManagement: React.FC = () => {
         setCurrentPage(pagination.currentPage || page);
         setPageSize(pagination.pageSize || limit);
         setSelectedRankIds([]); // 페이지 변경 시 선택 초기화
+
+        // 순서 입력 상태 초기화
+        const orderMap: Record<number, number> = {};
+        sortedRanks.forEach((r) => {
+          orderMap[r.id] = r.displayOrder || 0;
+        });
+        setOrderInputs(orderMap);
       } else {
         console.error("회원 등급 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
         setRanks([]);
@@ -316,6 +326,28 @@ const UserRankManagement: React.FC = () => {
     setImageFile(file);
   };
 
+  // 순서 입력 변경 핸들러
+  const handleOrderInputChange = (id: number, value: number) => {
+    setOrderInputs((prev) => ({ ...prev, [id]: value }));
+  };
+
+  // 순서저장 버튼 클릭 핸들러
+  const handleSaveOrder = async () => {
+    setLoading(true);
+    try {
+      const changed = ranks.filter((r) => orderInputs[r.id] !== (r.displayOrder || 0));
+      for (const r of changed) {
+        await axios.put(`/admin/ranks/${r.id}`, { displayOrder: orderInputs[r.id] });
+      }
+      setAlertMessage({ type: "success", message: "순서가 저장되었습니다." });
+      fetchRanks(currentPage, pageSize);
+    } catch (error) {
+      setAlertMessage({ type: "error", message: "순서 저장 중 오류가 발생했습니다." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // DataTable 컬럼 정의
   const columns = useMemo(
     () => [
@@ -363,6 +395,21 @@ const UserRankManagement: React.FC = () => {
       { header: "기준 포인트", accessor: "score" as keyof UserRank },
       { header: "생성일", accessor: "createdAt" as keyof UserRank, cell: formatDate },
       {
+        header: "순서",
+        accessor: "displayOrder" as keyof UserRank,
+        cell: (value: number, row: UserRank) => (
+          <input
+            type="number"
+            className="w-20 border rounded px-2 py-1 text-center"
+            value={orderInputs[row.id] ?? value ?? 0}
+            onChange={(e) => handleOrderInputChange(row.id, Number(e.target.value))}
+            disabled={loading}
+            style={{ minWidth: 60 }}
+          />
+        ),
+        className: "w-24 px-2 text-center",
+      },
+      {
         header: "관리",
         accessor: "id" as keyof UserRank,
         cell: (id: number, row: UserRank, index: number) => (
@@ -384,7 +431,7 @@ const UserRankManagement: React.FC = () => {
         className: "text-center",
       },
     ],
-    [ranks, selectedRankIds, loading, moving, currentPage, totalPages] // 의존성 업데이트
+    [ranks, selectedRankIds, loading, moving, currentPage, totalPages, orderInputs]
   );
 
   return (
@@ -392,6 +439,9 @@ const UserRankManagement: React.FC = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">회원 등급 관리</h1>
         <div className="flex space-x-2">
+          <Button variant="primary" onClick={handleSaveOrder} disabled={loading}>
+            순서저장
+          </Button>
           <Button
             variant="danger"
             onClick={handleBulkDelete}

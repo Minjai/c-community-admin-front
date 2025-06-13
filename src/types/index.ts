@@ -18,6 +18,7 @@ export interface Post {
   isPopular: number;
   isPublic?: boolean | number;
   position?: number;
+  displayOrder: number;
   imageUrl?: string;
   tags?: string[];
   author?: User;

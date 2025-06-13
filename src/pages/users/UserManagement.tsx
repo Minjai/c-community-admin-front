@@ -343,9 +343,11 @@ const UserManagement = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold mb-6">회원 관리</h1>
-        <Button onClick={handleOpenPointModal} disabled={selectedUsers.length === 0 || loading}>
-          포인트 일괄 지급
-        </Button>
+        <div className="flex space-x-2">
+          <Button onClick={handleOpenPointModal} disabled={selectedUsers.length === 0 || loading}>
+            포인트 일괄 지급
+          </Button>
+        </div>
       </div>
 
       {alertMessage && (
