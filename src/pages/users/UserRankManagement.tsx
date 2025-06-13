@@ -78,7 +78,7 @@ const UserRankManagement: React.FC = () => {
 
         // 정렬은 서버에서 지원하지 않으면 여기서 유지 가능
         const sortedRanks = [...processedRanks].sort(
-          (a, b) => (b.displayOrder || 0) - (a.displayOrder || 0)
+          (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
         );
 
         setRanks(sortedRanks); // 현재 페이지 데이터 설정
@@ -337,7 +337,7 @@ const UserRankManagement: React.FC = () => {
     try {
       const changed = ranks.filter((r) => orderInputs[r.id] !== (r.displayOrder || 0));
       for (const r of changed) {
-        await axios.put(`/admin/ranks/${r.id}`, { displayOrder: orderInputs[r.id] });
+        await axios.patch(`/ranks/display-order`, { id: r.id, displayOrder: orderInputs[r.id] });
       }
       setAlertMessage({ type: "success", message: "순서가 저장되었습니다." });
       fetchRanks(currentPage, pageSize);
