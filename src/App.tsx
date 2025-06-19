@@ -27,6 +27,7 @@ import SportRecommendationsManagement from "./pages/data/SportRecommendationsMan
 import UserManagement from "./pages/users/UserManagement";
 import UserRankManagement from "./pages/users/UserRankManagement";
 import AdminManagement from "./pages/users/AdminManagement";
+import InquiryManagement from "./pages/users/InquiryManagement";
 import NewsCasinoListPage from "@pages/news/news-casino/NewsCasinoListPage.tsx";
 import RemittanceBannerPage from "./pages/remittance/RemittanceBannerPage";
 import FooterManagementPage from "./pages/footer/FooterManagementPage";
@@ -203,14 +204,14 @@ function App() {
                   </RoleBasedRoute>
                 }
               />
-                <Route
-                    path="news/sports/list"
-                    element={
-                        <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
-                            <NewsSportsPage />
-                        </RoleBasedRoute>
-                    }
-                />
+              <Route
+                path="news/sports/list"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <NewsSportsPage />
+                  </RoleBasedRoute>
+                }
+              />
 
               {/* 커뮤니티 관리 */}
               <Route
@@ -268,6 +269,14 @@ function App() {
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
                     <AdminManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="users/inquiries"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <InquiryManagement />
                   </RoleBasedRoute>
                 }
               />

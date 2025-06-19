@@ -46,7 +46,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
     },
     {
       title: "뉴스 관리",
-      subItems: [{ name: "카지노 뉴스", path: "/news/casino/list" }, {name: "스포츠 뉴스", path: "/news/sports/list"}],
+      subItems: [
+        { name: "카지노 뉴스", path: "/news/casino/list" },
+        { name: "스포츠 뉴스", path: "/news/sports/list" },
+      ],
     },
     {
       title: "커뮤니티 관리",
@@ -61,6 +64,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
         { name: "회원 정보 관리", path: "/users/info" },
         { name: "관리자 계정 관리", path: "/users/admin" },
       ],
+    },
+    {
+      title: "회원 문의 관리",
+      subItems: [{ name: "1:1 문의 관리", path: "/users/inquiries" }],
     },
     {
       title: "기타 관리",
