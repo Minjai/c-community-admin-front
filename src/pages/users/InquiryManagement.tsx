@@ -71,6 +71,10 @@ const InquiryManagement = () => {
   // 관리자 메모 상태
   const [adminMemo, setAdminMemo] = useState<string>("");
 
+  // 카테고리 필터 상태
+  const [showCategoryFilter, setShowCategoryFilter] = useState<boolean>(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
   const [users, setUsers] = useState<{ id: number; nickname: string }[]>([]);
 
   // 유저 목록 불러오기
@@ -93,6 +97,22 @@ const InquiryManagement = () => {
   const getNickname = (userId: number) => {
     const user = users.find((u) => u.id === userId);
     return user ? user.nickname : "-";
+  };
+
+  // 필터링된 문의 목록
+  const filteredInquiries = selectedCategory
+    ? inquiries.filter((inquiry) => inquiry.category === selectedCategory)
+    : inquiries;
+
+  // 카테고리 필터 토글
+  const handleCategoryFilterToggle = () => {
+    setShowCategoryFilter(!showCategoryFilter);
+  };
+
+  // 카테고리 선택
+  const handleCategorySelect = (category: string | null) => {
+    setSelectedCategory(category);
+    setShowCategoryFilter(false);
   };
 
   // 1대1 문의 목록 조회
@@ -127,6 +147,23 @@ const InquiryManagement = () => {
   useEffect(() => {
     fetchInquiries(currentPage, pageSize);
   }, [fetchInquiries, currentPage, pageSize]);
+
+  // 카테고리 필터 외부 클릭 시 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showCategoryFilter) {
+        setShowCategoryFilter(false);
+      }
+    };
+
+    if (showCategoryFilter) {
+      document.addEventListener("click", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("click", handleClickOutside);
+    };
+  }, [showCategoryFilter]);
 
   // 페이지 변경 핸들러
   const handlePageChange = (page: number) => {
@@ -508,6 +545,69 @@ const InquiryManagement = () => {
       ),
     },
     {
+      header: (
+        <div className="relative">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCategoryFilterToggle();
+            }}
+            className="flex items-center space-x-1 text-left"
+          >
+            <span>구분</span>
+            <svg
+              className={`w-4 h-4 transition-transform ${showCategoryFilter ? "rotate-180" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </button>
+          {showCategoryFilter && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 min-w-[120px]">
+              <button
+                onClick={() => handleCategorySelect(null)}
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
+                  selectedCategory === null ? "bg-blue-50 text-blue-600" : ""
+                }`}
+              >
+                전체
+              </button>
+              <button
+                onClick={() => handleCategorySelect("GENERAL")}
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
+                  selectedCategory === "GENERAL" ? "bg-blue-50 text-blue-600" : ""
+                }`}
+              >
+                General
+              </button>
+              <button
+                onClick={() => handleCategorySelect("ADVERTISING")}
+                className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
+                  selectedCategory === "ADVERTISING" ? "bg-blue-50 text-blue-600" : ""
+                }`}
+              >
+                Advertising
+              </button>
+            </div>
+          )}
+        </div>
+      ),
+      accessor: "category" as keyof Inquiry,
+      className: "w-24",
+      cell: (value: any, inquiry: Inquiry) => (
+        <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+          {inquiry.category}
+        </span>
+      ),
+    },
+    {
       header: "문의",
       accessor: "title" as keyof Inquiry,
       className: "w-80",
@@ -604,16 +704,20 @@ const InquiryManagement = () => {
       {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
 
       <DataTable
-        data={inquiries}
+        data={filteredInquiries}
         columns={columns}
         loading={loading}
         pagination={{
           currentPage,
-          totalItems,
+          totalItems: filteredInquiries.length,
           pageSize,
           onPageChange: handlePageChange,
         }}
-        emptyMessage="등록된 1:1 문의가 없습니다."
+        emptyMessage={
+          selectedCategory
+            ? `${selectedCategory} 구분의 문의가 없습니다.`
+            : "등록된 1:1 문의가 없습니다."
+        }
       />
 
       {/* 답변 모달 */}
