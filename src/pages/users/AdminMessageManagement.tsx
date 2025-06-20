@@ -779,6 +779,11 @@ const AdminMessageManagement = () => {
             onClick={handleDeleteSelected}
             variant="outline"
             disabled={sending || selectedMessages.length === 0}
+            className={
+              selectedMessages.length > 0
+                ? "bg-red-600 hover:bg-red-700 text-white border-red-600 hover:border-red-700"
+                : ""
+            }
           >
             선택 삭제 {selectedMessages.length > 0 && `(${selectedMessages.length})`}
           </Button>
