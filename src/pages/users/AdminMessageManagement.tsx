@@ -28,6 +28,9 @@ interface AdminMessage {
   sentAt: string;
   status: string;
   sentBy: string;
+  targetRankIds?: number[]; // 그룹 발송 시 선택된 등급 ID들
+  targetRanks?: { id: number; rankName: string; users: { id: number; nickname: string }[] }[]; // 상세 조회 시 등급 정보
+  recipients?: { user: { id: number; nickname: string } }[]; // 개별 발송 시 수신자 정보
 }
 
 const AdminMessageManagement = () => {
@@ -52,6 +55,15 @@ const AdminMessageManagement = () => {
   const [messageTitle, setMessageTitle] = useState<string>("");
   const [messageContent, setMessageContent] = useState<string>("");
   const [messageCategory, setMessageCategory] = useState<string>("GENERAL");
+
+  // 회원 선택 관련 상태
+  const [selectedUsers, setSelectedUsers] = useState<
+    { id: number; nickname: string; email: string }[]
+  >([]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [filteredUsers, setFilteredUsers] = useState<
+    { id: number; nickname: string; email: string }[]
+  >([]);
   const [recipientId, setRecipientId] = useState<number | null>(null);
   const [sending, setSending] = useState<boolean>(false);
 
@@ -59,25 +71,34 @@ const AdminMessageManagement = () => {
   const [showGroupSendModal, setShowGroupSendModal] = useState<boolean>(false);
   const [groupMessageTitle, setGroupMessageTitle] = useState<string>("");
   const [groupMessageContent, setGroupMessageContent] = useState<string>("");
-  const [selectedRankId, setSelectedRankId] = useState<number | string | null>(null); // "all" 문자열도 허용
+  const [selectedRankIds, setSelectedRankIds] = useState<number[]>([]); // 여러 등급 선택 가능
+  const [isAllSelected, setIsAllSelected] = useState<boolean>(false); // 전체 선택 여부
   const [ranks, setRanks] = useState<{ id: number; rankName: string; userCount: number }[]>([]);
 
   // 쪽지 상세 보기 모달 상태
   const [showDetailModal, setShowDetailModal] = useState<boolean>(false);
+  const [showIndividualDetailModal, setShowIndividualDetailModal] = useState<boolean>(false);
   const [selectedMessage, setSelectedMessage] = useState<AdminMessage | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
 
   // 카테고리 필터 상태
   const [showCategoryFilter, setShowCategoryFilter] = useState<boolean>(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
-  const [users, setUsers] = useState<{ id: number; nickname: string }[]>([]);
+  const [users, setUsers] = useState<{ id: number; nickname: string; email: string }[]>([]);
 
   // 유저 목록 불러오기
   const fetchUsers = useCallback(async () => {
     try {
       const response = await axios.get("/admin/users?page=1&limit=1000");
       if (response.data && response.data.data) {
-        setUsers(response.data.data.map((u: any) => ({ id: u.id, nickname: u.nickname })));
+        setUsers(
+          response.data.data.map((u: any) => ({
+            id: u.id,
+            nickname: u.nickname,
+            email: u.email || "",
+          }))
+        );
       }
     } catch (e) {
       setUsers([]);
@@ -88,6 +109,26 @@ const AdminMessageManagement = () => {
     fetchUsers();
     fetchRanks();
   }, [fetchUsers]);
+
+  // 검색어에 따른 회원 필터링 및 알파벳 순 정렬
+  useEffect(() => {
+    let result = users;
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = users.filter(
+        (user) =>
+          user.nickname.toLowerCase().includes(query) ||
+          user.email.toLowerCase().includes(query) ||
+          user.id.toString().includes(query)
+      );
+    }
+
+    // 알파벳 순으로 정렬
+    result = result.sort((a, b) => a.nickname.localeCompare(b.nickname));
+
+    setFilteredUsers(result);
+  }, [users, searchQuery]);
 
   // 등급 목록 불러오기
   const fetchRanks = useCallback(async () => {
@@ -112,6 +153,29 @@ const AdminMessageManagement = () => {
   const getNickname = (userId: number) => {
     const user = users.find((u) => u.id === userId);
     return user ? user.nickname : "-";
+  };
+
+  // 대상자 표시 함수 (2명까지 표시하고 나머지는 "외 N명")
+  const formatRecipients = (message: AdminMessage) => {
+    if (message.category === "GROUP") {
+      // 그룹 발송의 경우 기존 로직 유지
+      return message.recipientNickname || getNickname(message.recipientId);
+    } else {
+      // 개별 발송의 경우 닉네임 파싱해서 표시
+      const recipientDisplay = message.recipientNickname || getNickname(message.recipientId);
+
+      // 쉼표로 구분된 닉네임들을 파싱
+      if (recipientDisplay.includes(",")) {
+        const nicknames = recipientDisplay.split(",").map((name) => name.trim());
+        if (nicknames.length <= 2) {
+          return nicknames.join(", ");
+        } else {
+          return `${nicknames.slice(0, 2).join(", ")} (외 ${nicknames.length - 2}명)`;
+        }
+      }
+
+      return recipientDisplay;
+    }
   };
 
   // 필터링된 쪽지 목록
@@ -146,7 +210,29 @@ const AdminMessageManagement = () => {
           let recipientDisplay = "-";
           if (msg.messageType === "GROUP") {
             if (msg.targetRanks && msg.targetRanks.length > 0) {
-              recipientDisplay = msg.targetRanks.map((rank: any) => rank.rankName).join(", ");
+              // 등급별 사용자들의 닉네임 수집
+              const allNicknames: string[] = [];
+              msg.targetRanks.forEach((rank: any) => {
+                if (rank.users) {
+                  rank.users.forEach((user: any) => {
+                    if (user.nickname) {
+                      allNicknames.push(user.nickname);
+                    }
+                  });
+                }
+              });
+
+              if (allNicknames.length > 0) {
+                if (allNicknames.length <= 2) {
+                  recipientDisplay = allNicknames.join(", ");
+                } else {
+                  recipientDisplay = `${allNicknames.slice(0, 2).join(", ")} (외 ${
+                    allNicknames.length - 2
+                  }명)`;
+                }
+              } else {
+                recipientDisplay = msg.targetRanks.map((rank: any) => rank.rankName).join(", ");
+              }
             } else if (msg.targetRankIds && msg.targetRankIds.length > 0) {
               recipientDisplay = `등급 ${msg.targetRankIds.length}개`;
             } else {
@@ -154,9 +240,17 @@ const AdminMessageManagement = () => {
             }
           } else if (msg.messageType === "INDIVIDUAL") {
             if (msg.recipients && msg.recipients.length > 0) {
-              recipientDisplay = msg.recipients
+              const nicknames = msg.recipients
                 .map((r: any) => r.user?.nickname || "알 수 없음")
-                .join(", ");
+                .filter(Boolean);
+
+              if (nicknames.length <= 2) {
+                recipientDisplay = nicknames.join(", ");
+              } else {
+                recipientDisplay = `${nicknames.slice(0, 2).join(", ")} (외 ${
+                  nicknames.length - 2
+                }명)`;
+              }
             } else {
               recipientDisplay = "개별 발송";
             }
@@ -172,6 +266,7 @@ const AdminMessageManagement = () => {
             sentAt: msg.createdAt,
             status: MessageStatus.SENT,
             sentBy: msg.sender?.nickname || "관리자",
+            targetRankIds: msg.targetRankIds || [], // 그룹 발송 시 선택된 등급 ID들
           };
         });
 
@@ -252,6 +347,25 @@ const AdminMessageManagement = () => {
     setMessageContent("");
     setMessageCategory("GENERAL");
     setRecipientId(null);
+    setSelectedUsers([]);
+    setSearchQuery("");
+  };
+
+  // 회원 선택/해제
+  const handleToggleUser = (user: { id: number; nickname: string; email: string }) => {
+    setSelectedUsers((prevSelected) => {
+      const isSelected = prevSelected.some((u) => u.id === user.id);
+      if (isSelected) {
+        return prevSelected.filter((u) => u.id !== user.id);
+      } else {
+        return [...prevSelected, user];
+      }
+    });
+  };
+
+  // 선택된 회원 제거
+  const handleRemoveSelectedUser = (userId: number) => {
+    setSelectedUsers((prevSelected) => prevSelected.filter((user) => user.id !== userId));
   };
 
   // 그룹 발송 모달 열기
@@ -259,20 +373,49 @@ const AdminMessageManagement = () => {
     setShowGroupSendModal(true);
     setGroupMessageTitle("");
     setGroupMessageContent("");
-    setSelectedRankId(null);
+    setSelectedRankIds([]);
+    setIsAllSelected(false);
   };
 
-  // 등급 선택 핸들러 (단일 선택 + 전체)
-  const handleRankSelect = (rankId: number | string) => {
-    setSelectedRankId(rankId);
+  // 등급 선택 핸들러 (다중 선택)
+  const handleRankSelect = (rankId: number) => {
+    if (isAllSelected) return; // 전체 선택 시 개별 선택 불가
+
+    setSelectedRankIds((prev) => {
+      if (prev.includes(rankId)) {
+        return prev.filter((id) => id !== rankId);
+      } else {
+        return [...prev, rankId];
+      }
+    });
+  };
+
+  // 전체 선택 핸들러
+  const handleSelectAll = () => {
+    setIsAllSelected(true);
+    setSelectedRankIds([]); // 개별 선택 초기화
+  };
+
+  // 전체 선택 해제 핸들러
+  const handleDeselectAll = () => {
+    setIsAllSelected(false);
+    setSelectedRankIds([]);
   };
 
   // 쪽지 발송
   const handleSendMessage = async () => {
-    if (!messageTitle.trim() || !messageContent.trim() || !recipientId) {
+    if (!messageTitle.trim() || !messageContent.trim()) {
       setAlertMessage({
         type: "error",
-        message: "제목, 내용, 수신자를 모두 입력해주세요.",
+        message: "제목과 내용을 모두 입력해주세요.",
+      });
+      return;
+    }
+
+    if (selectedUsers.length === 0) {
+      setAlertMessage({
+        type: "error",
+        message: "발송할 회원을 선택해주세요.",
       });
       return;
     }
@@ -282,12 +425,12 @@ const AdminMessageManagement = () => {
       await axios.post("/admin/messages/messages/individual", {
         title: messageTitle,
         content: messageContent,
-        recipientIds: [recipientId], // 백엔드 API에 맞게 배열로 전송
+        recipientIds: selectedUsers.map((user) => user.id),
       });
 
       setAlertMessage({
         type: "success",
-        message: "쪽지가 성공적으로 발송되었습니다.",
+        message: `${selectedUsers.length}명에게 쪽지가 성공적으로 발송되었습니다.`,
       });
       setShowSendModal(false);
       fetchMessages(currentPage, pageSize);
@@ -311,7 +454,7 @@ const AdminMessageManagement = () => {
       return;
     }
 
-    if (!selectedRankId) {
+    if (!isAllSelected && selectedRankIds.length === 0) {
       setAlertMessage({
         type: "error",
         message: "발송할 대상 등급을 선택해주세요.",
@@ -321,14 +464,10 @@ const AdminMessageManagement = () => {
 
     setSending(true);
     try {
-      // 전체 선택 시 모든 등급 ID를 배열로 전송
       const requestData = {
         title: groupMessageTitle,
         content: groupMessageContent,
-        targetRankIds:
-          selectedRankId === "all"
-            ? ranks.map((rank) => rank.id) // 전체 선택 시 모든 등급 ID 배열
-            : [selectedRankId], // 개별 선택 시에도 배열로 전송
+        targetRankIds: isAllSelected ? ranks.map((rank) => rank.id) : selectedRankIds,
       };
 
       await axios.post("/admin/messages/messages/group", requestData);
@@ -351,9 +490,46 @@ const AdminMessageManagement = () => {
   };
 
   // 쪽지 상세 보기
-  const handleOpenDetailModal = (message: AdminMessage) => {
-    setSelectedMessage(message);
-    setShowDetailModal(true);
+  const handleOpenDetailModal = async (message: AdminMessage) => {
+    // 개별 발송과 그룹 발송에 따라 다른 모달 열기
+    if (message.category === "INDIVIDUAL") {
+      setShowIndividualDetailModal(true);
+    } else {
+      setShowDetailModal(true);
+    }
+
+    setLoadingDetail(true);
+
+    try {
+      // 상세 정보 조회
+      const response = await axios.get(`/admin/messages/messages/${message.id}`);
+      const detailData = response.data;
+
+      if (message.category === "INDIVIDUAL") {
+        // 개별 발송의 경우 recipients 정보 추가
+        setSelectedMessage({
+          ...message,
+          recipients: detailData.recipients || [],
+        });
+      } else {
+        // 그룹 발송의 경우 기존 로직
+        const targetRankIds = detailData.targetRanks
+          ? detailData.targetRanks.map((rank: any) => rank.id)
+          : [];
+
+        setSelectedMessage({
+          ...message,
+          targetRankIds: targetRankIds,
+          targetRanks: detailData.targetRanks || [],
+        });
+      }
+    } catch (error) {
+      console.error("메시지 상세 조회 실패:", error);
+      // 실패 시 기본 메시지 정보라도 표시
+      setSelectedMessage(message);
+    } finally {
+      setLoadingDetail(false);
+    }
   };
 
   // 쪽지 삭제
@@ -496,28 +672,20 @@ const AdminMessageManagement = () => {
                 전체
               </button>
               <button
-                onClick={() => handleCategorySelect("GENERAL")}
+                onClick={() => handleCategorySelect("GROUP")}
                 className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
-                  selectedCategory === "GENERAL" ? "bg-blue-50 text-blue-600" : ""
+                  selectedCategory === "GROUP" ? "bg-blue-50 text-blue-600" : ""
                 }`}
               >
-                일반
+                그룹
               </button>
               <button
-                onClick={() => handleCategorySelect("NOTICE")}
+                onClick={() => handleCategorySelect("INDIVIDUAL")}
                 className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
-                  selectedCategory === "NOTICE" ? "bg-blue-50 text-blue-600" : ""
+                  selectedCategory === "INDIVIDUAL" ? "bg-blue-50 text-blue-600" : ""
                 }`}
               >
-                알림
-              </button>
-              <button
-                onClick={() => handleCategorySelect("EVENT")}
-                className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-100 ${
-                  selectedCategory === "EVENT" ? "bg-blue-50 text-blue-600" : ""
-                }`}
-              >
-                이벤트
+                개별
               </button>
             </div>
           )}
@@ -526,13 +694,19 @@ const AdminMessageManagement = () => {
       accessor: "category" as keyof AdminMessage,
       className: "w-24",
       cell: (value: any, message: AdminMessage) => (
-        <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-          {message.category === "GENERAL"
-            ? "일반"
-            : message.category === "NOTICE"
-            ? "알림"
-            : message.category === "EVENT"
-            ? "이벤트"
+        <span
+          className={`px-2 py-1 text-xs font-medium rounded-full ${
+            message.category === "GROUP"
+              ? "bg-blue-100 text-blue-800"
+              : message.category === "INDIVIDUAL"
+              ? "bg-green-100 text-green-800"
+              : "bg-gray-100 text-gray-800"
+          }`}
+        >
+          {message.category === "GROUP"
+            ? "그룹"
+            : message.category === "INDIVIDUAL"
+            ? "개별"
             : message.category}
         </span>
       ),
@@ -555,8 +729,7 @@ const AdminMessageManagement = () => {
       header: "대상자",
       accessor: "recipientId" as keyof AdminMessage,
       className: "w-32",
-      cell: (value: any, message: AdminMessage) =>
-        message.recipientNickname || getNickname(message.recipientId),
+      cell: (value: any, message: AdminMessage) => formatRecipients(message),
     },
     {
       header: "발송일시",
@@ -569,13 +742,7 @@ const AdminMessageManagement = () => {
       accessor: "id" as keyof AdminMessage,
       className: "w-24 text-center",
       cell: (id: number, message: AdminMessage) => (
-        <div className="flex space-x-2">
-          <ActionButton
-            label="보기"
-            action="edit"
-            onClick={() => handleOpenDetailModal(message)}
-            disabled={loading || sending}
-          />
+        <div className="flex justify-center">
           <ActionButton
             label="삭제"
             action="delete"
@@ -649,35 +816,105 @@ const AdminMessageManagement = () => {
       <Modal
         isOpen={showSendModal}
         onClose={() => setShowSendModal(false)}
-        title="쪽지 발송"
+        title="회원 발송"
         size="xl"
       >
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4">
-            <Select
-              label="구분"
-              value={messageCategory}
-              onChange={(e) => setMessageCategory(e.target.value)}
-              options={[
-                { value: "GENERAL", label: "일반" },
-                { value: "NOTICE", label: "알림" },
-                { value: "EVENT", label: "이벤트" },
-              ]}
-            />
-            <Select
-              label="수신자"
-              value={recipientId?.toString() || ""}
-              onChange={(e) => setRecipientId(parseInt(e.target.value) || null)}
-              options={[
-                { value: "", label: "수신자 선택" },
-                ...users.map((user) => ({
-                  value: user.id.toString(),
-                  label: user.nickname,
-                })),
-              ]}
-            />
+          {/* 선택된 회원 표시 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              선택된 회원 ({selectedUsers.length})
+            </label>
+            <div
+              className="border border-gray-300 rounded-md p-3 bg-gray-50"
+              style={{ minHeight: "100px", maxHeight: "200px", overflowY: "auto" }}
+            >
+              {selectedUsers.length > 0 ? (
+                <div className="space-y-2">
+                  {selectedUsers.map((user) => (
+                    <div
+                      key={user.id}
+                      className="flex justify-between items-center border-b pb-2 last:border-b-0"
+                    >
+                      <div>
+                        <div className="font-medium text-sm">{user.nickname}</div>
+                        <div className="text-xs text-gray-500">{user.email}</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveSelectedUser(user.id)}
+                        className="text-red-500 hover:text-red-700 text-xs p-1"
+                        disabled={sending}
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                  아래 목록에서 회원을 선택해주세요.
+                </div>
+              )}
+            </div>
           </div>
 
+          {/* 회원 선택 */}
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-700">회원 선택</label>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="회원 검색 (닉네임, 이메일...)"
+                className="input w-64"
+                disabled={sending}
+              />
+            </div>
+            <div
+              className="border border-gray-300 rounded-md p-3"
+              style={{ maxHeight: "300px", overflowY: "auto" }}
+            >
+              {filteredUsers.length > 0 ? (
+                <div className="space-y-2">
+                  {filteredUsers.map((user) => (
+                    <div
+                      key={user.id}
+                      className={`p-2 border rounded-md cursor-pointer flex items-center ${
+                        selectedUsers.some((u) => u.id === user.id)
+                          ? "bg-blue-50 border-blue-300"
+                          : "border-gray-200 hover:bg-gray-50"
+                      }`}
+                      onClick={() => !sending && handleToggleUser(user)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.some((u) => u.id === user.id)}
+                        onChange={() => {}}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          !sending && handleToggleUser(user);
+                        }}
+                        className="h-4 w-4 text-blue-600 mr-3 rounded focus:ring-blue-500"
+                        disabled={sending}
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">{user.nickname}</div>
+                        <div className="text-xs text-gray-500">{user.email}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center p-6 text-gray-500">
+                  {searchQuery.trim() ? "검색 결과가 없습니다." : "등록된 회원이 없습니다."}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 제목 */}
           <Input
             label="제목"
             value={messageTitle}
@@ -685,11 +922,13 @@ const AdminMessageManagement = () => {
             placeholder="쪽지 제목을 입력하세요"
           />
 
+          {/* 내용 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
             <TextEditor content={messageContent} setContent={setMessageContent} height="300px" />
           </div>
 
+          {/* 버튼 */}
           <div className="flex justify-end space-x-3">
             <Button onClick={() => setShowSendModal(false)} variant="outline" disabled={sending}>
               취소
@@ -712,59 +951,90 @@ const AdminMessageManagement = () => {
           {/* 대상 그룹 선택 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-4">대상 등급</label>
+
+            {/* 개별 등급 선택 */}
             <div className="grid grid-cols-3 gap-3 mb-4">
               {ranks.map((rank) => (
                 <div
                   key={rank.id}
-                  className={`p-3 border rounded-md cursor-pointer transition-colors ${
-                    selectedRankId === rank.id
-                      ? "bg-blue-50 border-blue-300"
-                      : "border-gray-200 hover:border-gray-300"
+                  className={`p-3 border rounded-md transition-colors ${
+                    isAllSelected
+                      ? "bg-gray-100 border-gray-200 cursor-not-allowed opacity-50"
+                      : selectedRankIds.includes(rank.id)
+                      ? "bg-blue-50 border-blue-300 cursor-pointer"
+                      : "border-gray-200 hover:border-gray-300 cursor-pointer"
                   }`}
-                  onClick={() => handleRankSelect(rank.id)}
+                  onClick={() => !isAllSelected && handleRankSelect(rank.id)}
                 >
                   <div className="flex items-center">
                     <input
-                      type="radio"
-                      name="targetRank"
-                      checked={selectedRankId === rank.id}
+                      type="checkbox"
+                      checked={selectedRankIds.includes(rank.id)}
                       onChange={() => handleRankSelect(rank.id)}
-                      className="mr-2 text-blue-600 focus:ring-blue-500"
+                      disabled={isAllSelected}
+                      className="mr-2 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                     />
                     <div className="flex-1">
-                      <span className="text-sm font-medium">{rank.rankName}</span>
-                      <div className="text-xs text-gray-500">({rank.userCount}명)</div>
+                      <span
+                        className={`text-sm font-medium ${isAllSelected ? "text-gray-400" : ""}`}
+                      >
+                        {rank.rankName}
+                      </span>
+                      <div
+                        className={`text-xs ${isAllSelected ? "text-gray-400" : "text-gray-500"}`}
+                      >
+                        ({rank.userCount}명)
+                      </div>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* 전체 선택 */}
-            <div
-              className={`p-3 border rounded-md cursor-pointer transition-colors ${
-                selectedRankId === "all"
-                  ? "bg-green-50 border-green-300"
-                  : "border-gray-200 hover:border-gray-300"
-              }`}
-              onClick={() => handleRankSelect("all")}
-            >
-              <div className="flex items-center">
-                <input
-                  type="radio"
-                  name="targetRank"
-                  checked={selectedRankId === "all"}
-                  onChange={() => handleRankSelect("all")}
-                  className="mr-2 text-green-600 focus:ring-green-500"
-                />
-                <div className="flex-1">
-                  <span className="text-sm font-medium text-green-700">전체</span>
-                  <div className="text-xs text-gray-500">
-                    (총 {ranks.reduce((sum, rank) => sum + rank.userCount, 0)}명)
+            {/* 전체 선택 버튼 */}
+            <div className="mb-4">
+              <div
+                className={`p-3 border rounded-md cursor-pointer transition-colors ${
+                  isAllSelected
+                    ? "bg-green-50 border-green-300"
+                    : "border-gray-200 hover:border-gray-300"
+                }`}
+                onClick={isAllSelected ? handleDeselectAll : handleSelectAll}
+              >
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={isAllSelected}
+                    onChange={isAllSelected ? handleDeselectAll : handleSelectAll}
+                    className="mr-2 text-green-600 focus:ring-green-500"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-green-700">전체</span>
+                    <div className="text-xs text-gray-500">
+                      (총 {ranks.reduce((sum, rank) => sum + rank.userCount, 0)}명)
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* 선택된 등급 요약 */}
+            {(isAllSelected || selectedRankIds.length > 0) && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                <div className="text-sm font-medium text-green-800">
+                  {isAllSelected ? `전체 등급 선택됨` : `선택된 등급: ${selectedRankIds.length}개`}
+                </div>
+                <div className="text-xs text-green-600 mt-1">
+                  총 대상자:{" "}
+                  {isAllSelected
+                    ? ranks.reduce((sum, rank) => sum + rank.userCount, 0)
+                    : ranks
+                        .filter((rank) => selectedRankIds.includes(rank.id))
+                        .reduce((sum, rank) => sum + rank.userCount, 0)}
+                  명
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 제목 */}
@@ -809,81 +1079,223 @@ const AdminMessageManagement = () => {
         size="xl"
       >
         <div className="space-y-6">
-          {selectedMessage && (
+          {loadingDetail ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">상세 정보를 불러오는 중...</div>
+            </div>
+          ) : selectedMessage ? (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">구분</label>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm">
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                      {selectedMessage.category === "GENERAL"
-                        ? "일반"
-                        : selectedMessage.category === "NOTICE"
-                        ? "알림"
-                        : selectedMessage.category === "EVENT"
-                        ? "이벤트"
-                        : selectedMessage.category}
-                    </span>
-                  </div>
+              {/* 대상 등급 선택 (읽기 전용) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-4">대상 등급</label>
+
+                {/* 개별 등급 선택 (읽기 전용) */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {ranks.map((rank) => {
+                    // 실제 발송된 등급인지 확인
+                    const isSelectedRank =
+                      selectedMessage.targetRankIds?.includes(rank.id) || false;
+                    const isAllSelected = selectedMessage.targetRankIds?.length === ranks.length;
+
+                    return (
+                      <div
+                        key={rank.id}
+                        className={`p-3 border rounded-md transition-colors ${
+                          isSelectedRank && !isAllSelected
+                            ? "bg-blue-50 border-blue-300"
+                            : isAllSelected
+                            ? "bg-gray-100 border-gray-200 cursor-not-allowed opacity-50"
+                            : "border-gray-200"
+                        } cursor-not-allowed`}
+                      >
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelectedRank && !isAllSelected}
+                            readOnly
+                            className="mr-2 text-blue-600 focus:ring-blue-500 pointer-events-none"
+                          />
+                          <div className="flex-1">
+                            <span
+                              className={`text-sm font-medium ${
+                                isAllSelected ? "text-gray-400" : ""
+                              }`}
+                            >
+                              {rank.rankName}
+                            </span>
+                            <div
+                              className={`text-xs ${
+                                isAllSelected ? "text-gray-400" : "text-gray-500"
+                              }`}
+                            >
+                              ({rank.userCount}명)
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">수신자</label>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm">
-                    {selectedMessage.recipientNickname || getNickname(selectedMessage.recipientId)}
-                  </div>
+
+                {/* 전체 선택 버튼 (읽기 전용) */}
+                <div className="mb-4">
+                  {(() => {
+                    const isAllSelected = selectedMessage.targetRankIds?.length === ranks.length;
+                    return (
+                      <div
+                        className={`p-3 border rounded-md transition-colors ${
+                          isAllSelected ? "bg-green-50 border-green-300" : "border-gray-200"
+                        } cursor-not-allowed`}
+                      >
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={isAllSelected}
+                            readOnly
+                            className="mr-2 text-green-600 focus:ring-green-500 pointer-events-none"
+                          />
+                          <div className="flex-1">
+                            <span className="text-sm font-medium text-green-700">전체</span>
+                            <div className="text-xs text-gray-500">
+                              (총 {ranks.reduce((sum, rank) => sum + rank.userCount, 0)}명)
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
+
+                {/* 선택된 등급 요약 (읽기 전용) */}
+                {selectedMessage.category === "GROUP" &&
+                  selectedMessage.targetRankIds &&
+                  selectedMessage.targetRankIds.length > 0 && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <div className="text-sm font-medium text-green-800">
+                        {selectedMessage.targetRankIds.length === ranks.length
+                          ? "전체 등급 선택됨"
+                          : `선택된 등급: ${selectedMessage.targetRankIds.length}개`}
+                      </div>
+                      <div className="text-xs text-green-600 mt-1">
+                        총 대상자:{" "}
+                        {selectedMessage.targetRankIds.length === ranks.length
+                          ? ranks.reduce((sum, rank) => sum + rank.userCount, 0)
+                          : ranks
+                              .filter((rank) => selectedMessage.targetRankIds?.includes(rank.id))
+                              .reduce((sum, rank) => sum + rank.userCount, 0)}
+                        명
+                      </div>
+                    </div>
+                  )}
               </div>
 
+              {/* 제목 (읽기 전용) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">제목</label>
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm">
-                  {selectedMessage.title}
-                </div>
+                <input
+                  type="text"
+                  value={selectedMessage.title}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 cursor-not-allowed"
+                />
               </div>
 
+              {/* 내용 (읽기 전용) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
                 <div
-                  className="p-4 bg-gray-50 border border-gray-200 rounded-md text-sm min-h-[200px] max-h-[400px] overflow-y-auto prose prose-sm max-w-none"
+                  className="w-full min-h-[300px] max-h-[400px] p-4 border border-gray-300 rounded-md bg-gray-50 text-gray-700 overflow-y-auto prose prose-sm max-w-none"
                   dangerouslySetInnerHTML={{ __html: selectedMessage.content }}
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">발송일시</label>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm">
-                    {formatDate(selectedMessage.sentAt)}
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">발송자</label>
-                  <div className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm">
-                    {selectedMessage.sentBy}
-                  </div>
+              {/* 버튼 */}
+              <div className="flex justify-end space-x-3">
+                <Button onClick={() => setShowDetailModal(false)} variant="outline">
+                  닫기
+                </Button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </Modal>
+
+      {/* 개별 발송 상세 보기 모달 */}
+      <Modal
+        isOpen={showIndividualDetailModal}
+        onClose={() => setShowIndividualDetailModal(false)}
+        title="회원 발송 상세"
+        size="xl"
+      >
+        <div className="space-y-6">
+          {loadingDetail ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="text-gray-500">상세 정보를 불러오는 중...</div>
+            </div>
+          ) : selectedMessage ? (
+            <>
+              {/* 선택된 회원 표시 (읽기 전용) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  선택된 회원 ({selectedMessage.recipients?.length || 0})
+                </label>
+                <div
+                  className="border border-gray-300 rounded-md p-3 bg-gray-50"
+                  style={{ minHeight: "100px", maxHeight: "200px", overflowY: "auto" }}
+                >
+                  {selectedMessage.recipients && selectedMessage.recipients.length > 0 ? (
+                    <div className="space-y-2">
+                      {selectedMessage.recipients.map((recipient, index) => (
+                        <div
+                          key={recipient.user.id}
+                          className="flex justify-between items-center border-b pb-2 last:border-b-0"
+                        >
+                          <div>
+                            <div className="font-medium text-sm">{recipient.user.nickname}</div>
+                            <div className="text-xs text-gray-500">
+                              {users.find((u) => u.id === recipient.user.id)?.email ||
+                                `ID: ${recipient.user.id}`}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                      수신자 정보가 없습니다.
+                    </div>
+                  )}
                 </div>
               </div>
 
+              {/* 제목 (읽기 전용) */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">상태</label>
-                <div className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm">
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded-full ${getMessageStatusClassName(
-                      selectedMessage.status
-                    )}`}
-                  >
-                    {selectedMessage.status === MessageStatus.SENT
-                      ? "발송완료"
-                      : selectedMessage.status === MessageStatus.PENDING
-                      ? "발송대기"
-                      : selectedMessage.status === MessageStatus.FAILED
-                      ? "발송실패"
-                      : selectedMessage.status}
-                  </span>
-                </div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">제목</label>
+                <input
+                  type="text"
+                  value={selectedMessage.title}
+                  readOnly
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700 cursor-not-allowed"
+                />
+              </div>
+
+              {/* 내용 (읽기 전용) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
+                <div
+                  className="w-full min-h-[300px] max-h-[400px] p-4 border border-gray-300 rounded-md bg-gray-50 text-gray-700 overflow-y-auto prose prose-sm max-w-none"
+                  dangerouslySetInnerHTML={{ __html: selectedMessage.content }}
+                />
+              </div>
+
+              {/* 버튼 */}
+              <div className="flex justify-end space-x-3">
+                <Button onClick={() => setShowIndividualDetailModal(false)} variant="outline">
+                  닫기
+                </Button>
               </div>
             </>
-          )}
+          ) : null}
         </div>
       </Modal>
 
