@@ -28,6 +28,7 @@ import UserManagement from "./pages/users/UserManagement";
 import UserRankManagement from "./pages/users/UserRankManagement";
 import AdminManagement from "./pages/users/AdminManagement";
 import InquiryManagement from "./pages/users/InquiryManagement";
+import AdminMessageManagement from "./pages/users/AdminMessageManagement";
 import NewsCasinoListPage from "@pages/news/news-casino/NewsCasinoListPage.tsx";
 import RemittanceBannerPage from "./pages/remittance/RemittanceBannerPage";
 import FooterManagementPage from "./pages/footer/FooterManagementPage";
@@ -277,6 +278,14 @@ function App() {
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
                     <InquiryManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="users/admin-messages"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <AdminMessageManagement />
                   </RoleBasedRoute>
                 }
               />

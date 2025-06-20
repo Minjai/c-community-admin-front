@@ -67,7 +67,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
     },
     {
       title: "회원 문의 관리",
-      subItems: [{ name: "1:1 문의 관리", path: "/users/inquiries" }],
+      subItems: [
+        { name: "1:1 문의 관리", path: "/users/inquiries" },
+        { name: "관리자 쪽지 발송", path: "/users/admin-messages" },
+      ],
     },
     {
       title: "기타 관리",
