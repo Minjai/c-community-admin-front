@@ -1,2 +1,2 @@
-aws s3 rm s3://c-community-test --recursive
-aws s3 cp ./dist/ s3://c-community-test/ --recursive
+aws s3 rm s3:// --recursive
+aws s3 cp ./dist/ s3://g-scan-staging/ --recursive
