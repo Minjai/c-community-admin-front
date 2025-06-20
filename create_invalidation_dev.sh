@@ -1,1 +1,1 @@
-aws cloudfront create-invalidation --distribution-id E2AN6669ZDZEC5 --path '/*'
+aws cloudfront create-invalidation --distribution-id EK8W5YKM2EOCY --path '/*'
