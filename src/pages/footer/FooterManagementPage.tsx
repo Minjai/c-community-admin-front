@@ -254,7 +254,6 @@ function FooterManagementPage() {
         ),
         className: "w-px px-4",
       },
-      { header: "ID", accessor: "id" },
       {
         header: "제목",
         accessor: "title",

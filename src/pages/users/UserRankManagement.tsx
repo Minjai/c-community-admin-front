@@ -378,7 +378,6 @@ const UserRankManagement: React.FC = () => {
         ),
         className: "w-px px-4",
       },
-      { header: "ID", accessor: "id" as keyof UserRank },
       {
         header: "이미지",
         accessor: "image" as keyof UserRank,

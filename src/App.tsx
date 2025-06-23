@@ -34,6 +34,7 @@ import NewsCasinoListPage from "@pages/news/news-casino/NewsCasinoListPage.tsx";
 import RemittanceBannerPage from "./pages/remittance/RemittanceBannerPage";
 import FooterManagementPage from "./pages/footer/FooterManagementPage";
 import NewsSportsPage from "@pages/news/news-sports/NewsSportsPage.tsx";
+import HomeManagementPage from "./pages/exposure/HomeManagementPage";
 
 // 추후 구현할 페이지들을 위한 임시 컴포넌트
 const NotImplemented = ({ pageName }: { pageName: string }) => (
@@ -356,6 +357,8 @@ function App() {
                   </RoleBasedRoute>
                 }
               />
+              <Route path="/footer" element={<FooterManagementPage />} />
+              <Route path="/exposure/home" element={<HomeManagementPage />} />
             </Route>
 
             <Route path="*" element={<Navigate to="/banners/main" replace />} />
