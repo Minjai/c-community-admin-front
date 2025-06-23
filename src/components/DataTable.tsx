@@ -16,6 +16,7 @@ export interface TableProps<T> {
     totalItems: number;
     onPageChange: (page: number) => void;
   };
+  rowClassName?: (row: T, index: number) => string;
 }
 
 const DataTable = <T extends Record<string, any>>({
@@ -24,6 +25,7 @@ const DataTable = <T extends Record<string, any>>({
   loading = false,
   emptyMessage = "데이터가 없습니다.",
   pagination,
+  rowClassName,
 }: TableProps<T>) => {
   // 페이지네이션 계산
   const totalPages = pagination ? Math.ceil(pagination.totalItems / pagination.pageSize) : 1;
@@ -91,7 +93,7 @@ const DataTable = <T extends Record<string, any>>({
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white">
           {loading ? (
             <tr>
               <td colSpan={columns.length} className="px-6 py-4 text-center">
@@ -109,7 +111,10 @@ const DataTable = <T extends Record<string, any>>({
             </tr>
           ) : (
             data.map((row, rowIndex) => (
-              <tr key={rowIndex} className="hover:bg-gray-50">
+              <tr
+                key={rowIndex}
+                className={`${rowClassName ? rowClassName(row, rowIndex) : "hover:bg-gray-50"}`}
+              >
                 {columns.map((column, colIndex) => (
                   <td
                     key={colIndex}

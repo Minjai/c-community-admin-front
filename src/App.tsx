@@ -20,6 +20,7 @@ import CryptoGuidelineManagement from "./pages/guidelines/CryptoGuidelineManagem
 import NoticeManagement from "./pages/notice/NoticeManagement";
 import NoticeDetail from "./pages/notice/NoticeDetail";
 import CasinoCompanyPage from "./pages/reviews/CasinoCompanyPage";
+import CasinoFilterPage from "./pages/reviews/CasinoFilterPage";
 import CasinoGameManagement from "./pages/data/CasinoGameManagement";
 import CasinoRecommendationManagement from "./pages/data/CasinoRecommendationManagement";
 import SportsManagement from "./pages/data/SportsManagement";
@@ -192,6 +193,14 @@ function App() {
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
                     <CasinoCompanyPage />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="reviews/casino-filter"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <CasinoFilterPage />
                   </RoleBasedRoute>
                 }
               />

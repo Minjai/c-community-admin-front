@@ -25,7 +25,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({
     "inline-flex items-center justify-center font-medium rounded-md focus:outline-none transition-colors";
 
   const actionClasses = {
-    add: "bg-green-600 text-white hover:bg-green-700",
+    add: "bg-blue-600 text-white hover:bg-blue-700",
     delete: "bg-red-600 text-white hover:bg-red-700",
     refresh: "bg-blue-600 text-white hover:bg-blue-700",
     edit: "bg-yellow-600 text-white hover:bg-yellow-700",
