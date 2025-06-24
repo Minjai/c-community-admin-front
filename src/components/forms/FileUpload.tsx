@@ -5,7 +5,8 @@ interface FileUploadProps {
   label?: string;
   error?: string;
   helperText?: string;
-  onChange: (file: File | null) => void;
+  onChange?: (file: File | null) => void;
+  onFileSelect?: (file: File | null) => void;
   id?: string;
   name?: string;
   required?: boolean;
@@ -14,6 +15,8 @@ interface FileUploadProps {
   accept?: string;
   preview?: boolean;
   value?: string;
+  description?: string;
+  initialPreview?: string;
 }
 
 const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
@@ -23,14 +26,17 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
       error,
       helperText,
       onChange,
+      onFileSelect,
       id,
       name,
       required = false,
       disabled = false,
       className = "",
-      accept = ".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp",
+      accept = "image/*",
       preview = true,
       value,
+      description,
+      initialPreview,
     },
     ref
   ) => {
@@ -44,6 +50,12 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
     useEffect(() => {
       setPreviewUrl(value || null);
     }, [value]);
+
+    useEffect(() => {
+      if (initialPreview) {
+        setPreviewUrl(initialPreview);
+      }
+    }, [initialPreview]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const selectedFile = e.target.files?.[0] || null;
@@ -68,7 +80,8 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
           alert(`지원하지 않는 파일 형식입니다. (${accept} 형식만 지원)`);
           setFile(null);
           setPreviewUrl(value || null);
-          onChange(null);
+          onChange?.(null);
+          onFileSelect?.(null);
           if (fileInputRef.current) {
             fileInputRef.current.value = "";
           }
@@ -77,7 +90,8 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
       }
 
       setFile(selectedFile);
-      onChange(selectedFile);
+      onChange?.(selectedFile);
+      onFileSelect?.(selectedFile);
 
       if (selectedFile && preview) {
         const reader = new FileReader();
@@ -96,7 +110,8 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
       e.stopPropagation();
       setFile(null);
       setPreviewUrl(null);
-      onChange(null);
+      onChange?.(null);
+      onFileSelect?.(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -151,7 +166,8 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
         }
 
         setFile(droppedFile);
-        onChange(droppedFile);
+        onChange?.(droppedFile);
+        onFileSelect?.(droppedFile);
 
         if (preview) {
           const reader = new FileReader();
@@ -174,6 +190,7 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
         {label && (
           <label htmlFor={id} className="block mb-1 text-sm font-medium">
             {label}
+            {required && <span className="text-red-500 ml-1">*</span>}
           </label>
         )}
 
@@ -244,6 +261,8 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
 
         {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
         {helperText && !error && <p className="mt-1 text-sm text-gray-500">{helperText}</p>}
+
+        {description && <p className="text-xs text-gray-500 mt-2">{description}</p>}
       </div>
     );
   }

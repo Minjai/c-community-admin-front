@@ -72,18 +72,23 @@ export interface Banner {
   title: string;
   pUrl: string;
   mUrl: string;
-  startDate: string;
-  endDate: string;
+  pcImage?: string;
+  mobileImage?: string;
+  pDescription?: string | null;
+  mDescription?: string | null;
+  linkUrl?: string | null;
+  linkUrl2?: string | null;
   isPublic: number;
+  displayOrder?: number;
   position: number;
-  bannerType: "main" | "company" | "bottom" | "mini";
-  companyDetailPath?: string;
-  companyRedirectPath?: string;
-  linkUrl?: string;
-  linkUrl2?: string;
-  targetPath?: string;
   createdAt?: string;
   updatedAt?: string;
+  bannerType: string;
+  startDate: string;
+  endDate: string;
+  showButton?: boolean;
+  buttonText?: string;
+  buttonColor?: string;
 }
 
 // 카지노 업체 관련 타입

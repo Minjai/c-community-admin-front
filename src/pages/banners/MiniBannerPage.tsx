@@ -44,17 +44,16 @@ const MiniBannerPage: React.FC = () => {
   const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
 
   const handleSearch = (type: string, value: string) => {
-
-    if (type === 'title') {
-      fetchBanners(currentPage, pageSize, value).then(r => {
+    if (type === "title") {
+      fetchBanners(currentPage, pageSize, value).then((r) => {
         // 검색 후 선택된 배너 ID 초기화
         setSelectedBannerIds([]);
       });
     }
-  }
+  };
 
   // 배너 목록 조회
-  const fetchBanners = async (page: number = 1, limit: number = 10, searchValue: string = '') => {
+  const fetchBanners = async (page: number = 1, limit: number = 10, searchValue: string = "") => {
     setLoading(true);
     setError("");
 
@@ -141,11 +140,10 @@ const MiniBannerPage: React.FC = () => {
     const formattedStartDate = formatDateForInput(banner.startDate);
     const formattedEndDate = formatDateForInput(banner.endDate);
 
-    console.log("DatePicker 표시용 시작일:", formattedStartDate);
-    console.log("DatePicker 표시용 종료일:", formattedEndDate);
-
     setCurrentBanner({
       ...banner,
+      pcImage: banner.pUrl,
+      mobileImage: banner.mUrl,
       startDate: formattedStartDate,
       endDate: formattedEndDate,
       isPublic: banner.isPublic === 1 ? 1 : 0,
@@ -509,11 +507,52 @@ const MiniBannerPage: React.FC = () => {
     },
   ];
 
+  // 입력 필드 변경 처리
+  const handleInputChange = (name: string, value: any) => {
+    if (!currentBanner) return;
+    setCurrentBanner({ ...currentBanner, [name]: value });
+  };
+
+  const handleFileSelect = (field: "pcImage" | "mobileImage", file: File | null) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setCurrentBanner((prev) => ({
+          ...prev,
+          [field]: result,
+          [field === "pcImage" ? "pUrl" : "mUrl"]: result,
+        }));
+      };
+      reader.readAsDataURL(file);
+      if (field === "pcImage") {
+        setPcImageFile(file);
+      } else {
+        setMobileImageFile(file);
+      }
+    } else {
+      setCurrentBanner((prev) => ({
+        ...prev,
+        [field]: "",
+        [field === "pcImage" ? "pUrl" : "mUrl"]: "",
+      }));
+      if (field === "pcImage") {
+        setPcImageFile(null);
+      } else {
+        setMobileImageFile(null);
+      }
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">미니 배너 관리</h1>
-        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch}/>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-2">
           {/* 순서 저장 버튼 */}
           <Button onClick={handleBulkPositionSave} variant="primary" disabled={loading}>
@@ -600,9 +639,7 @@ const MiniBannerPage: React.FC = () => {
                 type="checkbox"
                 id="isPublic"
                 checked={currentBanner.isPublic === 1}
-                onChange={(e) =>
-                  setCurrentBanner({ ...currentBanner, isPublic: e.target.checked ? 1 : 0 })
-                }
+                onChange={(e) => handleInputChange("isPublic", e.target.checked ? 1 : 0)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                 disabled={isSaving}
               />
@@ -617,50 +654,60 @@ const MiniBannerPage: React.FC = () => {
               label="배너 제목"
               name="title"
               value={currentBanner.title || ""}
-              onChange={(e) => setCurrentBanner({ ...currentBanner, title: e.target.value })}
+              onChange={(e) => handleInputChange("title", e.target.value)}
               required
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FileUpload
-                label="PC 이미지 (권장 크기: 620x130)"
-                name="pUrl"
-                id="pUrl"
-                onChange={(file) => {
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setCurrentBanner({ ...currentBanner, pUrl: reader.result as string });
-                    };
-                    reader.readAsDataURL(file);
-                    setPcImageFile(file);
-                  } else {
-                    setPcImageFile(null);
-                  }
-                }}
-                value={currentBanner.pUrl}
-                required
-              />
+            {currentBanner.showButton && (
+              <div className="space-y-4 pl-8">
+                <div className="flex items-center space-x-2">
+                  <label className="block text-sm font-medium text-gray-700 w-20">버튼 문구</label>
+                  <Input
+                    value={currentBanner.buttonText || ""}
+                    onChange={(e) => handleInputChange("buttonText", e.target.value)}
+                    placeholder="버튼에 표시할 텍스트"
+                    className="flex-1"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <label className="block text-sm font-medium text-gray-700 w-20">버튼 색상</label>
+                  <div className="flex flex-1 items-center space-x-2">
+                    <Input
+                      value={currentBanner.buttonColor || "#000000"}
+                      onChange={(e) => handleInputChange("buttonColor", e.target.value)}
+                      placeholder="#000000"
+                      className="flex-1"
+                    />
+                    <input
+                      type="color"
+                      value={currentBanner.buttonColor || "#000000"}
+                      className="h-9 w-9 p-0 rounded-md border-gray-300 cursor-default"
+                      readOnly
+                      disabled
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
-              <FileUpload
-                label="모바일 이미지 (권장 크기: 370x170)"
-                name="mUrl"
-                id="mUrl"
-                onChange={(file) => {
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setCurrentBanner({ ...currentBanner, mUrl: reader.result as string });
-                    };
-                    reader.readAsDataURL(file);
-                    setMobileImageFile(file);
-                  } else {
-                    setMobileImageFile(null);
-                  }
-                }}
-                value={currentBanner.mUrl}
-                required
-              />
+            {/* 이미지 업로드 영역 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">PC 이미지</label>
+                <FileUpload
+                  onFileSelect={(file) => handleFileSelect("pcImage", file)}
+                  initialPreview={currentBanner.pcImage}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  모바일 이미지
+                </label>
+                <FileUpload
+                  onFileSelect={(file) => handleFileSelect("mobileImage", file)}
+                  initialPreview={currentBanner.mobileImage}
+                />
+              </div>
             </div>
 
             <div>
@@ -668,7 +715,7 @@ const MiniBannerPage: React.FC = () => {
                 label="링크 URL"
                 name="linkUrl"
                 value={currentBanner.linkUrl || ""}
-                onChange={(e) => setCurrentBanner({ ...currentBanner, linkUrl: e.target.value })}
+                onChange={(e) => handleInputChange("linkUrl", e.target.value)}
                 placeholder="https://example.com"
               />
             </div>
@@ -677,12 +724,12 @@ const MiniBannerPage: React.FC = () => {
               <DatePicker
                 label="시작일"
                 value={currentBanner.startDate || ""}
-                onChange={(date) => setCurrentBanner({ ...currentBanner, startDate: date })}
+                onChange={(date) => handleInputChange("startDate", date)}
               />
               <DatePicker
                 label="종료일"
                 value={currentBanner.endDate || ""}
-                onChange={(date) => setCurrentBanner({ ...currentBanner, endDate: date })}
+                onChange={(date) => handleInputChange("endDate", date)}
                 disabled={isSaving}
               />
             </div>

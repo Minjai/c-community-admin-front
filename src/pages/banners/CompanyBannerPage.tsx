@@ -11,10 +11,7 @@ import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import { toast } from "react-toastify";
-import {
-  formatDateForDisplay,
-  formatDateForInput,
-} from "../../utils/dateUtils";
+import { formatDateForDisplay, formatDateForInput } from "../../utils/dateUtils";
 import SearchInput from "@components/SearchInput.tsx";
 
 const CompanyBannerPage: React.FC = () => {
@@ -42,17 +39,16 @@ const CompanyBannerPage: React.FC = () => {
   const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
 
   const handleSearch = (type: string, value: string) => {
-
-    if (type === 'title') {
-      fetchBanners(currentPage, pageSize, value).then(r => {
+    if (type === "title") {
+      fetchBanners(currentPage, pageSize, value).then((r) => {
         // 검색 후 선택된 배너 ID 초기화
         setSelectedBannerIds([]);
       });
     }
-  }
+  };
 
   // 배너 목록 조회
-  const fetchBanners = async (page: number = 1, limit: number = 10, searchValue: string = '') => {
+  const fetchBanners = async (page: number = 1, limit: number = 10, searchValue: string = "") => {
     setLoading(true);
     setError("");
 
@@ -139,11 +135,10 @@ const CompanyBannerPage: React.FC = () => {
     const formattedStartDate = formatDateForInput(banner.startDate);
     const formattedEndDate = formatDateForInput(banner.endDate);
 
-    console.log("DatePicker 표시용 시작일:", formattedStartDate);
-    console.log("DatePicker 표시용 종료일:", formattedEndDate);
-
     setCurrentBanner({
       ...banner,
+      pcImage: banner.pUrl,
+      mobileImage: banner.mUrl,
       startDate: formattedStartDate,
       endDate: formattedEndDate,
       isPublic: banner.isPublic === 1 ? 1 : 0,
@@ -364,6 +359,43 @@ const CompanyBannerPage: React.FC = () => {
     setMobileImageFile(null);
   };
 
+  // 입력 필드 변경 처리
+  const handleInputChange = (name: string, value: any) => {
+    if (!currentBanner) return;
+    setCurrentBanner({ ...currentBanner, [name]: value });
+  };
+
+  const handleFileSelect = (field: "pcImage" | "mobileImage", file: File | null) => {
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        setCurrentBanner((prev) => ({
+          ...prev,
+          [field]: result,
+          [field === "pcImage" ? "pUrl" : "mUrl"]: result,
+        }));
+      };
+      reader.readAsDataURL(file);
+      if (field === "pcImage") {
+        setPcImageFile(file);
+      } else {
+        setMobileImageFile(file);
+      }
+    } else {
+      setCurrentBanner((prev) => ({
+        ...prev,
+        [field]: "",
+        [field === "pcImage" ? "pUrl" : "mUrl"]: "",
+      }));
+      if (field === "pcImage") {
+        setPcImageFile(null);
+      } else {
+        setMobileImageFile(null);
+      }
+    }
+  };
+
   // 데이터 테이블 컬럼 정의
   const columns = [
     {
@@ -531,7 +563,11 @@ const CompanyBannerPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">업체 배너 관리</h1>
-        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch}/>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-2">
           {/* 순서 저장 버튼 */}
           <Button onClick={handleBulkPositionSave} variant="primary" disabled={loading}>
@@ -580,127 +616,160 @@ const CompanyBannerPage: React.FC = () => {
           title={isEditing ? "배너 수정" : "새 배너 추가"}
           size="lg"
         >
-          {/* Modal Error Display (Above top controls) */}
           {modalError && (
             <div className="mb-4">
               <Alert type="error" message={modalError} onClose={() => setModalError(null)} />
             </div>
           )}
 
-          {/* Container for top controls - Reordered */}
-          <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-4">
-            {/* Left side: Action Buttons */}
-            <div className="flex space-x-2">
-              <Button onClick={handleSaveBanner} disabled={isSaving}>
-                {isSaving ? "저장 중..." : isEditing ? "저장" : "추가"}
-              </Button>
-              <Button variant="outline" onClick={handleCloseModal} disabled={isSaving}>
-                취소
-              </Button>
+          <div className="space-y-6">
+            {/* 상단 버튼 영역 */}
+            <div className="flex justify-between items-center">
+              <div className="flex space-x-2">
+                <Button onClick={handleSaveBanner} disabled={isSaving}>
+                  저장
+                </Button>
+                <Button variant="outline" onClick={handleCloseModal} disabled={isSaving}>
+                  취소
+                </Button>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isPublic"
+                  checked={currentBanner.isPublic === 1}
+                  onChange={(e) => handleInputChange("isPublic", e.target.checked ? 1 : 0)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  disabled={isSaving}
+                />
+                <label htmlFor="isPublic" className="text-sm font-medium text-gray-700">
+                  공개 여부
+                </label>
+              </div>
             </div>
 
-            {/* Right side: Public toggle */}
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="isPublic"
-                checked={currentBanner.isPublic === 1}
-                onChange={(e) =>
-                  setCurrentBanner({
-                    ...currentBanner,
-                    isPublic: e.target.checked ? 1 : 0,
-                  })
-                }
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                disabled={isSaving}
-              />
-              <label htmlFor="isPublic" className="text-sm font-medium text-gray-700">
-                공개 여부
-              </label>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {/* Title */}
-            <Input
-              label="배너 제목"
-              name="title"
-              value={currentBanner.title || ""}
-              onChange={(e) => setCurrentBanner({ ...currentBanner, title: e.target.value })}
-              required
-              disabled={isSaving}
-            />
-
-            {/* PC and Mobile Images */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FileUpload
-                label="PC 이미지 (권장 크기: 280x90)"
-                name="pUrl"
-                id="pUrl"
-                onChange={(file) => {
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setCurrentBanner({ ...currentBanner, pUrl: reader.result as string });
-                    };
-                    reader.readAsDataURL(file);
-                    setPcImageFile(file);
-                  } else {
-                    setPcImageFile(null);
-                  }
-                }}
-                value={currentBanner.pUrl}
-                required
-                disabled={isSaving}
-              />
-
-              <FileUpload
-                label="모바일 이미지 (권장 크기: 370x150)"
-                name="mUrl"
-                id="mUrl"
-                onChange={(file) => {
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                      setCurrentBanner({ ...currentBanner, mUrl: reader.result as string });
-                    };
-                    reader.readAsDataURL(file);
-                    setMobileImageFile(file);
-                  } else {
-                    setMobileImageFile(null);
-                  }
-                }}
-                value={currentBanner.mUrl}
-                required
-                disabled={isSaving}
+            {/* 배너 제목 */}
+            <div>
+              <Input
+                label="배너 제목"
+                value={currentBanner.title || ""}
+                onChange={(e) => handleInputChange("title", e.target.value)}
+                placeholder="배너 제목을 입력하세요"
               />
             </div>
 
-            {/* Link URLs - 수정 */}
+            {/* PC/모바일 상세 설명 */}
+            <div>
+              <Input
+                label="배너 상세(PC)"
+                value={currentBanner.pDescription || ""}
+                onChange={(e) => handleInputChange("pDescription", e.target.value)}
+                placeholder="PC용 상세 설명을 입력하세요"
+              />
+            </div>
+            <div>
+              <Input
+                label="배너 상세(MO)"
+                value={currentBanner.mDescription || ""}
+                onChange={(e) => handleInputChange("mDescription", e.target.value)}
+                placeholder="모바일용 상세 설명을 입력하세요"
+              />
+            </div>
+
+            {/* 버튼 설정 */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="showButton"
+                  checked={currentBanner.showButton || false}
+                  onChange={(e) => handleInputChange("showButton", e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="showButton" className="text-sm font-medium text-gray-700">
+                  버튼 노출
+                </label>
+              </div>
+
+              {currentBanner.showButton && (
+                <div className="space-y-4 pl-8">
+                  <div className="flex items-center space-x-2">
+                    <label className="block text-sm font-medium text-gray-700 w-20">
+                      버튼 문구
+                    </label>
+                    <Input
+                      value={currentBanner.buttonText || ""}
+                      onChange={(e) => handleInputChange("buttonText", e.target.value)}
+                      placeholder="버튼에 표시할 텍스트"
+                      className="flex-1"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <label className="block text-sm font-medium text-gray-700 w-20">
+                      버튼 색상
+                    </label>
+                    <div className="flex flex-1 items-center space-x-2">
+                      <Input
+                        value={currentBanner.buttonColor || "#000000"}
+                        onChange={(e) => handleInputChange("buttonColor", e.target.value)}
+                        placeholder="#000000"
+                        className="flex-1"
+                      />
+                      <input
+                        type="color"
+                        value={currentBanner.buttonColor || "#000000"}
+                        className="h-9 w-9 p-0 rounded-md border-gray-300 cursor-default"
+                        readOnly
+                        disabled
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 이미지 업로드 영역 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">PC 이미지</label>
+                <FileUpload
+                  onFileSelect={(file) => handleFileSelect("pcImage", file)}
+                  initialPreview={currentBanner.pcImage}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  모바일 이미지
+                </label>
+                <FileUpload
+                  onFileSelect={(file) => handleFileSelect("mobileImage", file)}
+                  initialPreview={currentBanner.mobileImage}
+                />
+              </div>
+            </div>
+
+            {/* 링크 URL */}
             <div>
               <Input
                 label="링크 URL"
-                name="linkUrl"
                 value={currentBanner.linkUrl || ""}
-                onChange={(e) => setCurrentBanner({ ...currentBanner, linkUrl: e.target.value })}
+                onChange={(e) => handleInputChange("linkUrl", e.target.value)}
                 placeholder="https://example.com"
-                disabled={isSaving}
               />
             </div>
 
-            {/* Start and End Dates */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 시작일/종료일 */}
+            <div className="grid grid-cols-2 gap-4">
               <DatePicker
                 label="시작일"
                 value={currentBanner.startDate || ""}
-                onChange={(date) => setCurrentBanner({ ...currentBanner, startDate: date })}
-                disabled={isSaving}
+                onChange={(date) => handleInputChange("startDate", date)}
               />
               <DatePicker
                 label="종료일"
                 value={currentBanner.endDate || ""}
-                onChange={(date) => setCurrentBanner({ ...currentBanner, endDate: date })}
-                disabled={isSaving}
+                onChange={(date) => handleInputChange("endDate", date)}
               />
             </div>
           </div>
