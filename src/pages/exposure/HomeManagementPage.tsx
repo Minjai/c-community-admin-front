@@ -1,4 +1,4 @@
-import React, { useState, useEffect, ReactNode } from "react";
+import React, { useState, useEffect, ReactNode, useRef } from "react";
 import axios from "@/api/axios";
 import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
@@ -8,35 +8,58 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import SearchInput from "@/components/SearchInput";
+import ActionButton from "@/components/ActionButton";
+import { getSportRecommendations } from "@/api";
+import { toast } from "react-hot-toast";
+import { DragManager } from "../data/components/drag/DragManager";
 
 interface HomeTemplate {
   id: number;
   name: string;
-  type: "forum" | "crypto" | "sports" | "casino";
+  type: "FORUMS" | "CRYPTO_TRANSFER" | "SPORTS_MATCHES" | "CASINO_GAMES";
   description?: string;
 }
 
-interface CasinoCategory {
+interface CasinoRecommendation {
   id: number;
   title: string;
+  isMainDisplay: boolean;
+  games: any[];
+  startDate: string;
+  endDate: string;
   isPublic: number;
-  subCategories: {
-    id: number;
-    title: string;
-    isPublic: number;
-  }[];
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface SportRecommendation {
+  id: number;
+  title: string;
+  description?: string;
+  isPublic: number;
+  displayOrder: number;
+  startTime: string;
+  endTime: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface SelectedItem {
+  id: number;
+  title: string;
+  type: string;
 }
 
 interface HomeSection {
   id: number;
   title: string;
-  isPublic: number;
+  type: string;
+  isPublic: boolean;
   displayOrder: number;
   createdAt: string;
   updatedAt: string;
-  templateId: number;
-  template: HomeTemplate;
-  selectedItems: any[]; // API 응답에 따라 타입 구체화 필요
+  selectedItems?: SelectedItem[];
 }
 
 interface Column {
@@ -48,9 +71,10 @@ interface Column {
 
 const HomeManagementPage: React.FC = () => {
   const [sections, setSections] = useState<HomeSection[]>([]);
-  const [templates, setTemplates] = useState<HomeTemplate[]>([]);
-  const [casinoCategories, setCasinoCategories] = useState<CasinoCategory[]>([]);
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
+  const [sectionTypes, setSectionTypes] = useState<string[]>([]);
+  const [casinoRecommendations, setCasinoRecommendations] = useState<CasinoRecommendation[]>([]);
+  const [sportRecommendations, setSportRecommendations] = useState<SportRecommendation[]>([]);
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -60,6 +84,12 @@ const HomeManagementPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [searchValue, setSearchValue] = useState<string>("");
 
+  // 아코디언 상태 추가
+  const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
+    casino: false,
+    sports: false,
+  });
+
   // 페이지네이션 상태
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(0);
@@ -68,6 +98,9 @@ const HomeManagementPage: React.FC = () => {
 
   // 선택된 섹션 ID 상태
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  // 드래그 앤 드롭 관리자
+  const dragManagerRef = useRef<DragManager | null>(null);
 
   const fetchSections = async (page: number = 1, limit: number = pageSize, search?: string) => {
     setLoading(true);
@@ -103,39 +136,86 @@ const HomeManagementPage: React.FC = () => {
     }
   };
 
-  const fetchTemplates = async () => {
+  const fetchSectionTypes = async () => {
     try {
-      const response = await axios.get("/admin/home/section-templates");
+      const response = await axios.get("/admin/home/section-types");
       if (response.data) {
-        setTemplates(response.data);
+        setSectionTypes(response.data);
       }
     } catch (err) {
-      console.error("Error fetching templates:", err);
-      setError("템플릿 목록을 불러오는데 실패했습니다.");
+      console.error("Error fetching section types:", err);
+      setError("섹션 타입 목록을 불러오는데 실패했습니다.");
     }
   };
 
-  const fetchCasinoCategories = async () => {
+  const fetchCasinoRecommendations = async () => {
     try {
-      const response = await axios.get("/casino-filter/categories");
-      if (response.data) {
-        setCasinoCategories(response.data);
+      const response = await axios.get("/casino-recommends");
+      if (response.data && response.data.success && Array.isArray(response.data.data)) {
+        const transformedRecommendations = response.data.data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          isMainDisplay: item.isMainDisplay === 1 || item.isMainDisplay === true,
+          games: item.games || [],
+          startDate: item.startDate || item.start_date || "",
+          endDate: item.endDate || item.end_date || "",
+          isPublic: item.isPublic === 1 || item.isPublic === true ? 1 : 0,
+          displayOrder: item.displayOrder || item.position || 0,
+          createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+          updatedAt:
+            item.updatedAt || item.updated_at || item.createdAt || new Date().toISOString(),
+        }));
+        setCasinoRecommendations(transformedRecommendations);
       }
     } catch (err) {
-      console.error("Error fetching casino categories:", err);
+      console.error("Error fetching casino recommendations:", err);
+    }
+  };
+
+  const fetchSportRecommendations = async () => {
+    try {
+      const result = await getSportRecommendations({});
+      if (result.data) {
+        const transformedRecommendations = result.data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          description: item.description || "",
+          isPublic: item.isPublic === 1 || item.isPublic === true ? 1 : 0,
+          displayOrder: item.displayOrder || 0,
+          startTime: item.startTime || "",
+          endTime: item.endTime || "",
+          createdAt: item.createdAt || new Date().toISOString(),
+          updatedAt: item.updatedAt || new Date().toISOString(),
+        }));
+        setSportRecommendations(transformedRecommendations);
+      }
+    } catch (err) {
+      console.error("Error fetching sport recommendations:", err);
     }
   };
 
   useEffect(() => {
     fetchSections(currentPage);
-    fetchTemplates();
+    fetchSectionTypes();
   }, [currentPage]);
 
   useEffect(() => {
-    if (currentSection?.template?.type === "casino") {
-      fetchCasinoCategories();
+    if (showModal) {
+      fetchCasinoRecommendations();
+      fetchSportRecommendations();
     }
-  }, [currentSection?.template?.type]);
+  }, [showModal]);
+
+  useEffect(() => {
+    if (selectedItems.length > 0) {
+      dragManagerRef.current = new DragManager((from, to) => {
+        const tempSelectedItems = [...selectedItems];
+        const items = [...tempSelectedItems.slice(0, from), ...tempSelectedItems.slice(from + 1)];
+        const newItems = [...items.slice(0, to), selectedItems[from], ...items.slice(to)];
+        setSelectedItems(newItems);
+      });
+    }
+  }, [selectedItems]);
 
   const handleSearch = (type: string, value: string) => {
     if (type === "title") {
@@ -156,14 +236,14 @@ const HomeManagementPage: React.FC = () => {
     setCurrentSection({
       id: 0,
       title: "",
-      isPublic: 1,
+      type: "FORUMS",
+      isPublic: true,
       displayOrder: 0,
       createdAt: "",
       updatedAt: "",
-      templateId: 0,
-      template: { id: 0, name: "", type: "forum" },
       selectedItems: [],
     });
+    setSelectedItems([]);
     setShowModal(true);
     setIsEditing(false);
   };
@@ -171,6 +251,7 @@ const HomeManagementPage: React.FC = () => {
   const handleEdit = (section: HomeSection) => {
     setModalError(null);
     setCurrentSection(section);
+    setSelectedItems(section.selectedItems || []);
     setShowModal(true);
     setIsEditing(true);
   };
@@ -178,41 +259,67 @@ const HomeManagementPage: React.FC = () => {
   const handleCloseModal = () => {
     setShowModal(false);
     setCurrentSection(null);
+    setSelectedItems([]);
     setModalError(null);
   };
 
   const handleSaveSection = async () => {
     if (!currentSection) return;
 
-    setIsSaving(true);
-    setModalError(null);
-
     try {
-      const data = {
+      if (!currentSection.title) {
+        setModalError("제목은 필수 항목입니다.");
+        return;
+      }
+
+      setIsSaving(true);
+      setModalError(null);
+
+      const dataToSend = {
         title: currentSection.title,
+        type: getTypeFromSelectedItems() || "FORUMS",
         isPublic: currentSection.isPublic,
-        templateId: currentSection.templateId,
-        selectedItems: currentSection.template?.type === "casino" ? selectedCategoryIds : [],
+        selectedItems: selectedItems,
       };
 
-      let response;
-      if (isEditing) {
-        response = await axios.put(`/admin/home/sections/${currentSection.id}`, data);
+      if (isEditing && currentSection.id) {
+        // 공개로 변경하는 경우, 다른 섹션들의 상태를 확인
+        if (currentSection.isPublic) {
+          const otherPublicSection = sections.find(
+            (section) => section.id !== currentSection.id && section.isPublic
+          );
+          if (otherPublicSection) {
+            if (
+              !window.confirm("다른 공개된 섹션이 있습니다. 해당 섹션을 비공개로 전환하시겠습니까?")
+            ) {
+              setIsSaving(false);
+              return;
+            }
+          }
+        }
+        await axios.put(`/admin/home/sections/${currentSection.id}`, dataToSend);
       } else {
-        response = await axios.post("/admin/home/sections", data);
+        // 새로운 섹션을 공개로 생성하는 경우
+        if (currentSection.isPublic) {
+          const hasPublicSection = sections.some((section) => section.isPublic);
+          if (hasPublicSection) {
+            if (
+              !window.confirm("이미 공개된 섹션이 있습니다. 해당 섹션을 비공개로 전환하시겠습니까?")
+            ) {
+              setIsSaving(false);
+              return;
+            }
+          }
+        }
+        await axios.post("/admin/home/sections", dataToSend);
       }
 
-      if (response.data) {
-        handleCloseModal();
-        fetchSections(currentPage);
-      } else {
-        throw new Error(
-          response.data?.message || `섹션 ${isEditing ? "수정" : "추가"} 중 오류가 발생했습니다.`
-        );
-      }
-    } catch (err) {
+      setShowModal(false);
+      fetchSections(currentPage);
+      toast.success(isEditing ? "섹션이 수정되었습니다." : "새 섹션이 추가되었습니다.");
+    } catch (err: any) {
       console.error("Error saving section:", err);
-      setModalError(`섹션 ${isEditing ? "수정" : "추가"} 중 오류가 발생했습니다.`);
+      setModalError(err.response?.data?.message || "섹션 저장 중 오류가 발생했습니다.");
     } finally {
       setIsSaving(false);
     }
@@ -230,7 +337,7 @@ const HomeManagementPage: React.FC = () => {
     setIsSaving(true);
     try {
       const response = await axios.delete(`/admin/home/sections/${id}`);
-      if (response.data?.success) {
+      if (response.data?.message) {
         setSelectedIds((prev) => {
           const newSelected = new Set(prev);
           newSelected.delete(id);
@@ -238,7 +345,7 @@ const HomeManagementPage: React.FC = () => {
         });
         fetchSections(currentPage);
       } else {
-        throw new Error(response.data?.message || "삭제 중 오류가 발생했습니다.");
+        throw new Error("삭제 중 오류가 발생했습니다.");
       }
     } catch (err) {
       console.error("Error deleting section:", err);
@@ -291,6 +398,39 @@ const HomeManagementPage: React.FC = () => {
     });
   };
 
+  const handleItemSelect = (item: any, type: string) => {
+    const itemWithType = { ...item, type };
+    const isSelected = selectedItems.some(
+      (selected) => selected.id === item.id && selected.type === type
+    );
+
+    if (isSelected) {
+      setSelectedItems(
+        selectedItems.filter((selected) => !(selected.id === item.id && selected.type === type))
+      );
+    } else {
+      setSelectedItems([...selectedItems, itemWithType]);
+    }
+  };
+
+  const handleRemoveSelectedItem = (itemId: number, type: string) => {
+    setSelectedItems(selectedItems.filter((item) => !(item.id === itemId && item.type === type)));
+  };
+
+  const toggleSection = (sectionType: string) => {
+    setExpandedSections((prev) => ({
+      ...prev,
+      [sectionType]: !prev[sectionType],
+    }));
+  };
+
+  const getTypeFromSelectedItems = () => {
+    if (selectedItems.length === 0) return null;
+
+    // 선택된 첫 번째 항목의 타입을 반환
+    return selectedItems[0].type;
+  };
+
   const isAllSelected = sections.length > 0 && selectedIds.size === sections.length;
 
   const columns: Column[] = [
@@ -318,107 +458,249 @@ const HomeManagementPage: React.FC = () => {
     {
       header: "제목",
       accessor: "title",
-    },
-    {
-      header: "순서",
-      accessor: "displayOrder",
-    },
-    {
-      header: "공개여부",
-      accessor: "isPublic",
-      cell: (value: number) => (value === 1 ? "공개" : "비공개"),
+      cell: (value: string, row: HomeSection) => (
+        <div
+          className="max-w-md truncate text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          title={value}
+          onClick={() => handleEdit(row)}
+        >
+          {value}
+        </div>
+      ),
+      className: "w-80",
     },
     {
       header: "등록일시",
       accessor: "createdAt",
-      cell: (value: string) => formatDate(value),
+      cell: (value: string) => {
+        return value ? formatDate(value) : "-";
+      },
+    },
+    {
+      header: "공개여부",
+      accessor: "isPublic",
+      cell: (value: boolean) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            value ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+          }`}
+        >
+          {value ? "공개" : "비공개"}
+        </span>
+      ),
     },
     {
       header: "관리",
       accessor: (item: HomeSection) => (
-        <div className="flex gap-2">
-          <Button onClick={() => handleEdit(item)} className="px-2 py-1 text-sm">
-            수정
-          </Button>
-          <Button
+        <div className="flex space-x-1">
+          <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEdit(item)} />
+          <ActionButton
+            label="삭제"
+            action="delete"
+            size="sm"
             onClick={() => handleDelete(item.id)}
-            className="px-2 py-1 text-sm bg-red-500 hover:bg-red-600"
-          >
-            삭제
-          </Button>
+          />
         </div>
       ),
     },
   ];
 
-  const renderTemplateSelectionUI = () => {
-    if (!currentSection) return null;
-
-    switch (currentSection.template?.type) {
-      case "casino":
-        return (
-          <div className="space-y-4">
-            <h4 className="font-medium">카테고리 선택</h4>
-            <div className="max-h-[400px] overflow-y-auto">
-              {casinoCategories.map((category) => (
-                <div key={category.id} className="mb-4">
-                  <div className="flex items-center mb-2">
-                    <input
-                      type="checkbox"
-                      id={`category-${category.id}`}
-                      checked={selectedCategoryIds.includes(category.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedCategoryIds([...selectedCategoryIds, category.id]);
-                        } else {
-                          setSelectedCategoryIds(
-                            selectedCategoryIds.filter((id) => id !== category.id)
-                          );
-                        }
-                      }}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor={`category-${category.id}`} className="ml-2 font-medium">
-                      {category.title}
-                    </label>
-                  </div>
-                  <div className="ml-6 space-y-2">
-                    {category.subCategories.map((sub) => (
-                      <div key={sub.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`sub-${sub.id}`}
-                          checked={selectedCategoryIds.includes(sub.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedCategoryIds([...selectedCategoryIds, sub.id]);
-                            } else {
-                              setSelectedCategoryIds(
-                                selectedCategoryIds.filter((id) => id !== sub.id)
-                              );
-                            }
-                          }}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`sub-${sub.id}`} className="ml-2">
-                          {sub.title}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
+  const renderTemplateContent = () => {
+    return (
+      <div className="space-y-2">
+        {/* 카지노 게임 추천 */}
+        <div className="border rounded-lg">
+          <div
+            className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50"
+            onClick={() => toggleSection("casino")}
+          >
+            <div className="font-medium">카지노 게임 추천</div>
+            <svg
+              className={`w-5 h-5 transform transition-transform ${
+                expandedSections.casino ? "rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </div>
+          {expandedSections.casino && (
+            <div className="border-t max-h-[300px] overflow-y-auto">
+              {casinoRecommendations.map((recommendation) => (
+                <div
+                  key={`casino-${recommendation.id}`}
+                  className="flex items-center p-3 border-b hover:bg-gray-50"
+                >
+                  <input
+                    type="checkbox"
+                    id={`casino-${recommendation.id}`}
+                    checked={selectedItems.some(
+                      (item) => item.id === recommendation.id && item.type === "CASINO_GAMES"
+                    )}
+                    onChange={() => handleItemSelect(recommendation, "CASINO_GAMES")}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor={`casino-${recommendation.id}`}
+                    className="ml-3 flex-1 cursor-pointer"
+                  >
+                    <div className="font-medium">{recommendation.title}</div>
+                  </label>
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        {/* 스포츠 종목 추천 */}
+        <div className="border rounded-lg">
+          <div
+            className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50"
+            onClick={() => toggleSection("sports")}
+          >
+            <div className="font-medium">스포츠 종목 추천</div>
+            <svg
+              className={`w-5 h-5 transform transition-transform ${
+                expandedSections.sports ? "rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
           </div>
-        );
+          {expandedSections.sports && (
+            <div className="border-t max-h-[300px] overflow-y-auto">
+              {sportRecommendations.map((recommendation) => (
+                <div
+                  key={`sports-${recommendation.id}`}
+                  className="flex items-center p-3 border-b hover:bg-gray-50"
+                >
+                  <input
+                    type="checkbox"
+                    id={`sports-${recommendation.id}`}
+                    checked={selectedItems.some(
+                      (item) => item.id === recommendation.id && item.type === "SPORTS_MATCHES"
+                    )}
+                    onChange={() => handleItemSelect(recommendation, "SPORTS_MATCHES")}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor={`sports-${recommendation.id}`}
+                    className="ml-3 flex-1 cursor-pointer"
+                  >
+                    <div className="font-medium">{recommendation.title}</div>
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-      case "sports":
-        // 스포츠 카테고리 선택 UI 구현 필요
-        return <div>스포츠 카테고리 선택 UI</div>;
+        {/* Forums */}
+        <div className="flex items-center p-3 border rounded-lg hover:bg-gray-50">
+          <input
+            type="checkbox"
+            id="forum-item"
+            checked={selectedItems.some((item) => item.type === "FORUMS")}
+            onChange={() => handleItemSelect({ id: 1, title: "Forums" }, "FORUMS")}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label htmlFor="forum-item" className="ml-3 flex-1 cursor-pointer">
+            <div className="font-medium">Forums</div>
+          </label>
+        </div>
 
-      default:
-        return null;
-    }
+        {/* Crypto Transfer */}
+        <div className="flex items-center p-3 border rounded-lg hover:bg-gray-50">
+          <input
+            type="checkbox"
+            id="crypto-item"
+            checked={selectedItems.some((item) => item.type === "CRYPTO_TRANSFER")}
+            onChange={() =>
+              handleItemSelect({ id: 1, title: "Crypto Transfer" }, "CRYPTO_TRANSFER")
+            }
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+          />
+          <label htmlFor="crypto-item" className="ml-3 flex-1 cursor-pointer">
+            <div className="font-medium">Crypto Transfer</div>
+          </label>
+        </div>
+      </div>
+    );
+  };
+
+  // 드래그 이벤트 핸들러
+  const handleDragStart = (index: number) => {
+    if (!dragManagerRef.current) return;
+    dragManagerRef.current.startDrag(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (index: number) => {
+    if (!dragManagerRef.current) return;
+    dragManagerRef.current.drop(index);
+  };
+
+  const renderSelectedItems = () => {
+    return (
+      <div className="border rounded-lg p-4 min-h-[400px] max-h-[500px] overflow-y-auto">
+        {selectedItems.length === 0 ? (
+          <div className="text-center text-gray-500 py-8">선택된 항목이 없습니다.</div>
+        ) : (
+          <div className="space-y-2">
+            {selectedItems.map((item, index) => (
+              <div
+                key={`${item.type}-${item.id}`}
+                className="flex items-center justify-between p-3 bg-gray-50 rounded border hover:bg-gray-100"
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={handleDragOver}
+                onDrop={() => handleDrop(index)}
+                style={{ cursor: "grab" }}
+              >
+                <div className="flex items-center space-x-3">
+                  <span className="text-sm font-medium text-gray-500">{index + 1}</span>
+                  <div>
+                    <div className="font-medium">{item.title}</div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleRemoveSelectedItem(item.id, item.type)}
+                  className="text-red-500 hover:text-red-700 p-1"
+                  disabled={isSaving}
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -470,7 +752,7 @@ const HomeManagementPage: React.FC = () => {
           isOpen={showModal}
           onClose={handleCloseModal}
           title={isEditing ? "홈 화면 수정" : "홈 화면 추가"}
-          size="lg"
+          size="xl"
         >
           {modalError && (
             <div className="mb-4">
@@ -478,7 +760,7 @@ const HomeManagementPage: React.FC = () => {
             </div>
           )}
 
-          <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-4">
+          <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
             <div className="flex space-x-2">
               <Button onClick={handleSaveSection} disabled={isSaving}>
                 {isSaving ? "저장 중..." : isEditing ? "저장" : "추가"}
@@ -492,11 +774,11 @@ const HomeManagementPage: React.FC = () => {
               <input
                 type="checkbox"
                 id="isPublic"
-                checked={currentSection.isPublic === 1}
+                checked={currentSection.isPublic}
                 onChange={(e) =>
                   setCurrentSection({
                     ...currentSection,
-                    isPublic: e.target.checked ? 1 : 0,
+                    isPublic: e.target.checked,
                   })
                 }
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
@@ -508,7 +790,7 @@ const HomeManagementPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">제목</label>
               <Input
@@ -524,40 +806,19 @@ const HomeManagementPage: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* 홈 화면 편성 */}
               <div>
-                <h3 className="text-lg font-medium mb-4">홈 화면 템플릿</h3>
-                <div className="border rounded-lg p-4 min-h-[200px]">
-                  {templates.map((template) => (
-                    <div
-                      key={template.id}
-                      className={`p-2 mb-2 rounded cursor-pointer ${
-                        currentSection?.templateId === template.id
-                          ? "bg-blue-100"
-                          : "hover:bg-gray-100"
-                      }`}
-                      onClick={() =>
-                        setCurrentSection(
-                          currentSection
-                            ? { ...currentSection, templateId: template.id, template }
-                            : null
-                        )
-                      }
-                    >
-                      <div className="font-medium">{template.name}</div>
-                      {template.description && (
-                        <div className="text-sm text-gray-600">{template.description}</div>
-                      )}
-                    </div>
-                  ))}
+                <h3 className="text-lg font-medium mb-4">홈 화면 편성</h3>
+                <div className="border rounded-lg p-4 min-h-[400px] max-h-[500px] overflow-y-auto">
+                  {renderTemplateContent()}
                 </div>
               </div>
 
+              {/* 선택된 홈 화면 항목 */}
               <div>
-                <h3 className="text-lg font-medium mb-4">템플릿 설정</h3>
-                <div className="border rounded-lg p-4 min-h-[200px]">
-                  {renderTemplateSelectionUI()}
-                </div>
+                <h3 className="text-lg font-medium mb-4">선택된 홈 화면 항목</h3>
+                {renderSelectedItems()}
               </div>
             </div>
           </div>

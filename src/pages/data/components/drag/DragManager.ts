@@ -8,14 +8,11 @@ export class DragManager {
   }
 
   startDrag(index: number) {
-    this.draggedIndex = index; 
+    this.draggedIndex = index;
   }
 
   drop(index: number) {
-    if (
-      this.draggedIndex !== null &&
-      this.draggedIndex !== index
-    ) {
+    if (this.draggedIndex !== null && this.draggedIndex !== index) {
       this.onMove(this.draggedIndex, index);
     }
     this.draggedIndex = null;
