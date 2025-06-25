@@ -16,6 +16,10 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import Input from "@/components/forms/Input";
 import Select from "@/components/forms/Select";
 import SearchInput from "@components/SearchInput.tsx";
+import DatePicker from "@/components/forms/DatePicker";
+import FileUpload from "@/components/forms/FileUpload";
+import { DragManager } from "./components/drag/DragManager";
+import axios from "axios";
 
 // 스포츠 이름 매핑 객체 추가
 const sportNameMapping: Record<string, string> = {
@@ -86,6 +90,23 @@ const swapDisplayOrder = async (catA: SportCategory, catB: SportCategory) => {
 
 const PAGE_SIZE = 30;
 
+// 스포츠 게임 상세 정보 타입
+interface SportGameDetail {
+  id?: number;
+  home: string;
+  away: string;
+  league: string;
+  time: string;
+  icon?: string;
+}
+
+// 수동 등록 폼 데이터 타입
+interface ManualRegistrationForm {
+  displayName: string;
+  selectedGames: SportGameDetail[];
+  isPublic: number;
+}
+
 export default function SportsManagement() {
   // allCategories 제거, categories는 현재 페이지 데이터만 저장
   const [categories, setCategories] = useState<SportCategory[]>([]);
@@ -120,6 +141,24 @@ export default function SportsManagement() {
 
   // 선택된 종목 경기
   const [selectedSport, setSelectedSport] = useState<string>("");
+
+  // 수동 등록 관련 상태
+  const [showManualModal, setShowManualModal] = useState(false);
+  const [manualForm, setManualForm] = useState<ManualRegistrationForm>({
+    displayName: "",
+    selectedGames: [],
+    isPublic: 1,
+  });
+  const [currentGameDetail, setCurrentGameDetail] = useState<SportGameDetail>({
+    home: "",
+    away: "",
+    league: "",
+    time: "",
+  });
+  const [gameDetailError, setGameDetailError] = useState<string | null>(null);
+
+  // 드래그 앤 드롭 관련 상태
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const handleSearch = (type: string, value: string) => {
     // if (type === 'displayName') {
@@ -284,8 +323,8 @@ export default function SportsManagement() {
       );
       setShowModal(false);
       fetchSportCategories(currentPage, PAGE_SIZE);
-    } catch (err) {
-      setError("스포츠 카테고리 저장 중 오류가 발생했습니다.");
+    } catch (error: any) {
+      setError(error.response?.data?.message || "저장 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -522,6 +561,143 @@ export default function SportsManagement() {
     [loading, categories, selectedCategoryIds, currentPage, pageSize, totalPages]
   );
 
+  // 수동 등록 모달 열기
+  const handleOpenManualModal = () => {
+    setShowManualModal(true);
+    setManualForm({
+      displayName: "",
+      selectedGames: [],
+      isPublic: 1,
+    });
+    setCurrentGameDetail({
+      home: "",
+      away: "",
+      league: "",
+      time: "",
+    });
+    setGameDetailError(null);
+  };
+
+  // 수동 등록 모달 닫기
+  const handleCloseManualModal = () => {
+    setShowManualModal(false);
+    setGameDetailError(null);
+  };
+
+  // 게임 상세 정보 입력 핸들러
+  const handleGameDetailChange = (field: keyof SportGameDetail, value: string) => {
+    setCurrentGameDetail((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // 게임 상세 정보를 선택된 게임 목록에 추가하는 핸들러
+  const handleAddGameDetail = () => {
+    if (
+      !currentGameDetail.home ||
+      !currentGameDetail.away ||
+      !currentGameDetail.league ||
+      !currentGameDetail.time
+    ) {
+      setGameDetailError("모든 필드를 입력해주세요.");
+      return;
+    }
+
+    // 새로운 게임 객체 생성
+    const newGame = {
+      id: Date.now(), // 임시 ID
+      ...currentGameDetail,
+      displayOrder: manualForm.selectedGames.length + 1,
+    };
+
+    // 선택된 게임 목록에 추가
+    setManualForm((prev) => ({
+      ...prev,
+      selectedGames: [...prev.selectedGames, newGame],
+    }));
+
+    // 입력 필드 초기화
+    setCurrentGameDetail({
+      home: "",
+      away: "",
+      league: "",
+      time: "",
+      icon: "",
+    });
+    setGameDetailError(null);
+  };
+
+  // 게임 상세 정보 삭제
+  const handleRemoveGameDetail = (id: number) => {
+    setManualForm((prev) => ({
+      ...prev,
+      selectedGames: prev.selectedGames.filter((game) => game.id !== id),
+    }));
+  };
+
+  // 드래그 시작
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index);
+  };
+
+  // 드롭
+  const handleDrop = (index: number) => {
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const items = Array.from(manualForm.selectedGames);
+    const [reorderedItem] = items.splice(draggedIndex, 1);
+    items.splice(index, 0, reorderedItem);
+
+    setManualForm((prev) => ({
+      ...prev,
+      selectedGames: items,
+    }));
+    setDraggedIndex(null);
+  };
+
+  // 최종 저장 핸들러
+  const handleSaveManualRegistration = async () => {
+    if (!manualForm.displayName) {
+      setGameDetailError("표시 이름을 입력해주세요.");
+      return;
+    }
+    if (manualForm.selectedGames.length === 0) {
+      setGameDetailError("최소 한 개의 스포츠 경기를 등록해주세요.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      // 서버에 데이터 전송
+      const response = await axios.post("/api/sports/admin/games/manual", {
+        displayName: manualForm.displayName,
+        isPublic: manualForm.isPublic,
+        games: manualForm.selectedGames.map((game, index) => ({
+          home: game.home,
+          away: game.away,
+          league: game.league,
+          time: game.time,
+          icon: game.icon,
+          displayOrder: index + 1,
+        })),
+      });
+
+      if (response.data.success) {
+        // 성공 시 모달 닫고 목록 새로고침
+        handleCloseManualModal();
+        fetchSportCategories(currentPage, pageSize);
+      } else {
+        setError(response.data.message || "저장 중 오류가 발생했습니다.");
+      }
+    } catch (error: any) {
+      setError(error.response?.data?.message || "저장 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-semibold mb-6">스포츠 종목 관리</h1>
@@ -538,9 +714,7 @@ export default function SportsManagement() {
           setSearchValue={setSearchValue}
           onSearch={handleSearch}
         />
-        <Button onClick={handleBulkDisplayOrderSave} disabled={loading}>
-          순서 저장
-        </Button>
+        <Button onClick={handleBulkDisplayOrderSave}>순서 저장</Button>
         <Button
           onClick={handleBulkDelete}
           variant="danger"
@@ -652,6 +826,233 @@ export default function SportsManagement() {
           {/* 모달 내 에러 메시지 */}
           {error && (
             <Alert type="error" message={error} onClose={() => setError(null)} className="mt-4" />
+          )}
+        </div>
+      </Modal>
+
+      {/* 수동 등록 모달 */}
+      <Modal
+        isOpen={showManualModal}
+        onClose={handleCloseManualModal}
+        title="스포츠 게임 수동 등록"
+        size="xl"
+      >
+        <div className="space-y-6">
+          {/* 1. 최상단 라인: 버튼(좌) + 공개여부 체크박스(우) */}
+          <div className="flex justify-between items-center border-b pb-4">
+            {/* 왼쪽: 저장/취소 버튼 */}
+            <div className="flex space-x-2">
+              <Button onClick={handleSaveManualRegistration} disabled={loading}>
+                {loading ? "저장 중..." : "저장"}
+              </Button>
+              <Button variant="secondary" onClick={handleCloseManualModal} disabled={loading}>
+                취소
+              </Button>
+            </div>
+            {/* 오른쪽: 공개 여부 체크박스 */}
+            <div className="flex items-center">
+              <input
+                id="isPublicCheckbox"
+                type="checkbox"
+                checked={manualForm.isPublic === 1}
+                onChange={(e) =>
+                  setManualForm((prev) => ({ ...prev, isPublic: e.target.checked ? 1 : 0 }))
+                }
+                className="form-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                disabled={loading}
+              />
+              <label
+                htmlFor="isPublicCheckbox"
+                className="ml-2 block text-sm font-medium text-gray-700"
+              >
+                공개 여부
+              </label>
+            </div>
+          </div>
+
+          {/* 2. 표시 이름 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">표시 이름</label>
+            <Input
+              type="text"
+              value={manualForm.displayName}
+              onChange={(e) => setManualForm((prev) => ({ ...prev, displayName: e.target.value }))}
+              placeholder="표시 이름을 입력하세요"
+              disabled={loading}
+            />
+          </div>
+
+          {/* 3. 선택된 스포츠 게임 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              선택된 스포츠 게임
+            </label>
+            <div className="border rounded-lg p-4 min-h-[100px] bg-gray-50">
+              <div className="space-y-2">
+                {manualForm.selectedGames.map((game, index) => (
+                  <div
+                    key={game.id}
+                    className="flex items-center bg-white p-3 rounded border"
+                    draggable
+                    onDragStart={() => handleDragStart(index)}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleDrop(index);
+                    }}
+                  >
+                    <div className="flex-1 grid grid-cols-4 gap-4">
+                      <div className="flex items-center">
+                        <span className="font-medium">{game.home}</span>
+                        <span className="mx-2">vs</span>
+                        <span className="font-medium">{game.away}</span>
+                      </div>
+                      <div>{game.league}</div>
+                      <div>{formatDate(game.time)}</div>
+                      <div className="flex items-center">
+                        {game.icon && <img src={game.icon} alt="icon" className="w-6 h-6 mr-2" />}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveGameDetail(game.id!)}
+                      className="ml-4 text-red-600 hover:text-red-800"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 4. 스포츠 게임 상세 */}
+          <div className="border-t pt-4">
+            <h3 className="text-lg font-medium mb-4">스포츠 게임 상세</h3>
+            <div className="space-y-4">
+              {/* Home */}
+              <div className="flex items-center">
+                <label className="block text-sm font-medium text-gray-700 w-24">Home</label>
+                <div className="flex-1">
+                  <Input
+                    type="text"
+                    value={currentGameDetail.home}
+                    onChange={(e) => handleGameDetailChange("home", e.target.value)}
+                    placeholder="홈 팀"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Away */}
+              <div className="flex items-center">
+                <label className="block text-sm font-medium text-gray-700 w-24">Away</label>
+                <div className="flex-1">
+                  <Input
+                    type="text"
+                    value={currentGameDetail.away}
+                    onChange={(e) => handleGameDetailChange("away", e.target.value)}
+                    placeholder="어웨이 팀"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* League */}
+              <div className="flex items-center">
+                <label className="block text-sm font-medium text-gray-700 w-24">League</label>
+                <div className="flex-1">
+                  <Input
+                    type="text"
+                    value={currentGameDetail.league}
+                    onChange={(e) => handleGameDetailChange("league", e.target.value)}
+                    placeholder="리그"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Time */}
+              <div className="flex items-center">
+                <label className="block text-sm font-medium text-gray-700 w-24">Time</label>
+                <div className="flex-1">
+                  <input
+                    type="datetime-local"
+                    value={currentGameDetail.time}
+                    onChange={(e) => handleGameDetailChange("time", e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Icon */}
+              <div className="flex items-center">
+                <label className="block text-sm font-medium text-gray-700 w-24">Icon</label>
+                <div className="flex-1 flex items-center space-x-4">
+                  {/* 왼쪽: 아이콘 미리보기 */}
+                  <div className="h-[42px] w-[42px] flex-shrink-0 border rounded-md overflow-hidden bg-gray-50">
+                    {currentGameDetail.icon ? (
+                      <img
+                        src={currentGameDetail.icon}
+                        alt="Icon Preview"
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <svg
+                          className="w-6 h-6"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                          />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+                  {/* 오른쪽: 파일 업로드 영역 */}
+                  <div className="flex-1 h-[42px]">
+                    <FileUpload
+                      onFileSelect={(file) =>
+                        handleGameDetailChange("icon", file ? URL.createObjectURL(file) : "")
+                      }
+                      accept="image/*"
+                      disabled={loading}
+                      className="h-full"
+                      preview={false}
+                      value=""
+                      description=""
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-center">
+              <Button
+                onClick={handleAddGameDetail}
+                disabled={loading}
+                className="bg-green-600 hover:bg-green-700 text-white px-12 py-2.5 rounded-md w-2/3 text-lg font-medium"
+              >
+                스포츠 경기 등록
+              </Button>
+            </div>
+          </div>
+
+          {gameDetailError && (
+            <Alert
+              type="error"
+              message={gameDetailError}
+              onClose={() => setGameDetailError(null)}
+            />
           )}
         </div>
       </Modal>
