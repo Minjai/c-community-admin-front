@@ -116,42 +116,7 @@ export default function SportsManagement() {
   });
 
   // 종목 경기 편성 옵션들
-  const sportOptions = [
-    "e스포츠",
-    "겨울스포츠",
-    "경마",
-    "골프",
-    "권투",
-    "넷볼",
-    "농구",
-    "다트",
-    "럭비",
-    "럭비 리그",
-    "모터스포츠",
-    "미식 축구",
-    "배구",
-    "배드민턴",
-    "밴디",
-    "비치 발리볼",
-    "비치 사커",
-    "뻬사발로",
-    "사이클",
-    "수구",
-    "스누커",
-    "야구",
-    "이종 격투기",
-    "축구",
-    "카바디",
-    "크리켓",
-    "탁구",
-    "테니스",
-    "풋살",
-    "플로어볼",
-    "필드 하키",
-    "하키",
-    "핸드볼",
-    "호주식 축구",
-  ];
+  const sportOptions = ["축구", "농구", "야구", "하키", "테니스", "배구", "럭비", "핸드볼"];
 
   // 선택된 종목 경기
   const [selectedSport, setSelectedSport] = useState<string>("");
@@ -160,52 +125,55 @@ export default function SportsManagement() {
     // if (type === 'displayName') {
     //   fetchSportCategories(1, PAGE_SIZE, value);
     // }
-  }
+  };
 
   // fetchSportCategories: 서버 측 페이지네이션 적용
-  const fetchSportCategories = useCallback(async (page: number, limit: number, searchValue: string = '') => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await getAllSportCategoriesAdmin(page, limit, searchValue);
-      console.log("Fetched categories:", response.data);
-      const fetchedCategories = response.data || [];
-      const pagination: any = response.pagination || {
-        totalItems: 0,
-        totalPages: 0,
-        currentPage: page,
-        pageSize: limit,
-      };
-      const processedData = fetchedCategories.map((category: SportCategory) => ({
-        ...category,
-        displayName: category.displayName || getKoreanSportName(category.sportName),
-      }));
-      // displayOrder 오름차순, 같으면 createdAt 내림차순
-      const sortedData = processedData.sort((a: SportCategory, b: SportCategory) => {
-        if ((a.displayOrder || 0) !== (b.displayOrder || 0)) {
-          return (a.displayOrder || 0) - (b.displayOrder || 0);
-        }
-        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      });
-      setCategories(sortedData);
-      setOriginalCategories(sortedData.map((cat) => ({ ...cat })));
-      setTotalItems(pagination.totalItems);
-      setTotalPages(pagination.totalPages);
-      setCurrentPage(pagination.currentPage);
-      setPageSize(pagination.pageSize);
-      setSelectedCategoryIds([]);
-    } catch (err: any) {
-      setError("스포츠 카테고리를 불러오는 중 오류가 발생했습니다.");
-      setCategories([]);
-      setOriginalCategories([]);
-      setTotalItems(0);
-      setTotalPages(0);
-      setCurrentPage(1);
-      setSelectedCategoryIds([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchSportCategories = useCallback(
+    async (page: number, limit: number, searchValue: string = "") => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await getAllSportCategoriesAdmin(page, limit, searchValue);
+        console.log("Fetched categories:", response.data);
+        const fetchedCategories = response.data || [];
+        const pagination: any = response.pagination || {
+          totalItems: 0,
+          totalPages: 0,
+          currentPage: page,
+          pageSize: limit,
+        };
+        const processedData = fetchedCategories.map((category: SportCategory) => ({
+          ...category,
+          displayName: category.displayName || getKoreanSportName(category.sportName),
+        }));
+        // displayOrder 오름차순, 같으면 createdAt 내림차순
+        const sortedData = processedData.sort((a: SportCategory, b: SportCategory) => {
+          if ((a.displayOrder || 0) !== (b.displayOrder || 0)) {
+            return (a.displayOrder || 0) - (b.displayOrder || 0);
+          }
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        });
+        setCategories(sortedData);
+        setOriginalCategories(sortedData.map((cat) => ({ ...cat })));
+        setTotalItems(pagination.totalItems);
+        setTotalPages(pagination.totalPages);
+        setCurrentPage(pagination.currentPage);
+        setPageSize(pagination.pageSize);
+        setSelectedCategoryIds([]);
+      } catch (err: any) {
+        setError("스포츠 카테고리를 불러오는 중 오류가 발생했습니다.");
+        setCategories([]);
+        setOriginalCategories([]);
+        setTotalItems(0);
+        setTotalPages(0);
+        setCurrentPage(1);
+        setSelectedCategoryIds([]);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   // useEffect: currentPage, pageSize 변경 시 데이터 로드
   useEffect(() => {
@@ -565,7 +533,11 @@ export default function SportsManagement() {
       <LoadingOverlay isLoading={loading} />
       {/* 상단 버튼 영역 */}
       <div className="flex justify-end space-x-2 mb-4">
-        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch}/>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <Button onClick={handleBulkDisplayOrderSave} disabled={loading}>
           순서 저장
         </Button>
