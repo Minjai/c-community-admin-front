@@ -137,7 +137,30 @@ export default function SportsManagement() {
   });
 
   // 종목 경기 편성 옵션들
-  const sportOptions = ["축구", "농구", "야구", "하키", "테니스", "배구", "럭비", "핸드볼"];
+  const sportOptions = [
+    "축구",
+    "야구",
+    "농구",
+    "미식 축구",
+    "아이스 하키",
+    "골프",
+    "테니스",
+    "크리켓",
+    "럭비 유니온",
+    "럭비 리그",
+    "배구",
+    "핸드볼",
+    "복싱",
+    "MMA",
+    "모터 스포츠",
+    "E스포츠",
+    "스누커",
+    "다트",
+    "경마",
+    "올림픽",
+    "풋살",
+    "탁구",
+  ];
 
   // 선택된 종목 경기
   const [selectedSport, setSelectedSport] = useState<string>("");
@@ -714,7 +737,12 @@ export default function SportsManagement() {
           setSearchValue={setSearchValue}
           onSearch={handleSearch}
         />
-        <Button onClick={handleBulkDisplayOrderSave}>순서 저장</Button>
+        {/* <Button onClick={handleOpenManualModal} disabled={loading}>
+          수동 등록
+        </Button> */}
+        <Button onClick={handleBulkDisplayOrderSave} disabled={loading}>
+          순서 저장
+        </Button>
         <Button
           onClick={handleBulkDelete}
           variant="danger"
