@@ -30,8 +30,11 @@ const SportsAnalysisDetail: React.FC = () => {
   const [awayTeam, setAwayTeam] = useState<string>("");
   const [homeTeamImage, setHomeTeamImage] = useState<File | null>(null);
   const [awayTeamImage, setAwayTeamImage] = useState<File | null>(null);
+  const [homeTeamImageUrl, setHomeTeamImageUrl] = useState<string>("");
+  const [awayTeamImageUrl, setAwayTeamImageUrl] = useState<string>("");
   const [matchDate, setMatchDate] = useState<string>("");
-  const [league, setLeague] = useState<string>("");
+  const [leagueName, setLeagueName] = useState<string>("");
+  const [displayOrder, setDisplayOrder] = useState(0);
   const [sportCategories, setSportCategories] = useState<SportCategory[]>([]);
 
   useEffect(() => {
@@ -59,12 +62,15 @@ const SportsAnalysisDetail: React.FC = () => {
           setSport(String(analysis.categoryId));
           setHomeTeam(analysis.homeTeam);
           setAwayTeam(analysis.awayTeam);
+          setLeagueName(analysis.leagueName || "");
           setMatchDate(analysis.gameDate);
           setContent(analysis.content);
           setStartDate(analysis.startTime);
           setEndDate(analysis.endTime);
           setIsPublic(analysis.isPublic);
-          setLeague(analysis.leagueName || "");
+          setDisplayOrder(analysis.displayOrder);
+          setHomeTeamImageUrl(analysis.homeTeamImageUrl || "");
+          setAwayTeamImageUrl(analysis.awayTeamImageUrl || "");
         }
       } catch (err) {
         setError("데이터를 불러오는 중 오류가 발생했습니다.");
@@ -75,6 +81,21 @@ const SportsAnalysisDetail: React.FC = () => {
 
     fetchAnalysis();
   }, [id]);
+
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        if (typeof reader.result === "string") {
+          resolve(reader.result);
+        } else {
+          reject(new Error("Failed to convert file to base64"));
+        }
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
 
   const handleSubmit = async () => {
     try {
@@ -120,25 +141,30 @@ const SportsAnalysisDetail: React.FC = () => {
       formData.append("categoryId", sport);
       formData.append("homeTeam", homeTeam);
       formData.append("awayTeam", awayTeam);
-      if (homeTeamImage) formData.append("homeTeamImage", homeTeamImage);
-      if (awayTeamImage) formData.append("awayTeamImage", awayTeamImage);
+      formData.append("leagueName", leagueName);
       formData.append("gameDate", matchDate);
       formData.append("content", content);
       formData.append("startTime", startDate);
       formData.append("endTime", endDate);
       formData.append("isPublic", String(isPublic));
-      formData.append("displayOrder", "0");
-      formData.append("leagueName", league);
+      formData.append("displayOrder", String(displayOrder));
 
-      const response = id
-        ? await updateSportGameAnalysis(parseInt(id), formData)
-        : await createSportGameAnalysis(formData);
-
-      if (response.success) {
-        navigate(-1);
-      } else {
-        setError(response.message || "저장 중 오류가 발생했습니다.");
+      if (homeTeamImage instanceof File) {
+        const homeTeamBase64 = await convertFileToBase64(homeTeamImage);
+        formData.append("homeTeamImage", homeTeamBase64);
       }
+      if (awayTeamImage instanceof File) {
+        const awayTeamBase64 = await convertFileToBase64(awayTeamImage);
+        formData.append("awayTeamImage", awayTeamBase64);
+      }
+
+      if (id) {
+        await updateSportGameAnalysis(parseInt(id), formData);
+      } else {
+        await createSportGameAnalysis(formData);
+      }
+
+      navigate("/data/sports-analysis");
     } catch (err) {
       setError("저장 중 오류가 발생했습니다.");
     } finally {
@@ -226,7 +252,15 @@ const SportsAnalysisDetail: React.FC = () => {
               className="w-full"
             />
           </div>
-          <FileUpload onChange={(file) => setHomeTeamImage(file)} value="" className="w-32" />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Home 팀 이미지</label>
+            <FileUpload
+              accept="image/*"
+              onChange={(file) => setHomeTeamImage(file)}
+              disabled={saving}
+              preview={homeTeamImageUrl}
+            />
+          </div>
         </div>
         <div className="flex items-start space-x-4">
           <div className="flex-1">
@@ -238,7 +272,15 @@ const SportsAnalysisDetail: React.FC = () => {
               className="w-full"
             />
           </div>
-          <FileUpload onChange={(file) => setAwayTeamImage(file)} value="" className="w-32" />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Away 팀 이미지</label>
+            <FileUpload
+              accept="image/*"
+              onChange={(file) => setAwayTeamImage(file)}
+              disabled={saving}
+              preview={awayTeamImageUrl}
+            />
+          </div>
         </div>
       </div>
 
@@ -256,10 +298,11 @@ const SportsAnalysisDetail: React.FC = () => {
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">대회(리그)명</label>
           <Input
-            value={league}
-            onChange={(e) => setLeague(e.target.value)}
+            value={leagueName}
+            onChange={(e) => setLeagueName(e.target.value)}
             placeholder="대회(리그)명"
             className="w-full"
+            disabled={saving}
           />
         </div>
       </div>
