@@ -217,7 +217,7 @@ export interface SportGameAnalysis {
   category?: {
     displayName: string;
   };
-  leagueName?: string;
+  league?: string;
 }
 
 export interface SportGameAnalysisFormData {

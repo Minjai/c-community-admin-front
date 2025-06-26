@@ -62,7 +62,7 @@ const SportsAnalysisDetail: React.FC = () => {
           setSport(String(analysis.categoryId));
           setHomeTeam(analysis.homeTeam);
           setAwayTeam(analysis.awayTeam);
-          setLeagueName(analysis.leagueName || "");
+          setLeagueName(analysis.league || "");
           setMatchDate(analysis.gameDate);
           setContent(analysis.content);
           setStartDate(analysis.startTime);
@@ -141,7 +141,7 @@ const SportsAnalysisDetail: React.FC = () => {
       formData.append("categoryId", sport);
       formData.append("homeTeam", homeTeam);
       formData.append("awayTeam", awayTeam);
-      formData.append("leagueName", leagueName);
+      formData.append("league", leagueName);
       formData.append("gameDate", matchDate);
       formData.append("content", content);
       formData.append("startTime", startDate);
@@ -259,6 +259,7 @@ const SportsAnalysisDetail: React.FC = () => {
               onChange={(file) => setHomeTeamImage(file)}
               disabled={saving}
               preview={homeTeamImageUrl}
+              initialPreview={homeTeamImageUrl}
             />
           </div>
         </div>
@@ -279,6 +280,7 @@ const SportsAnalysisDetail: React.FC = () => {
               onChange={(file) => setAwayTeamImage(file)}
               disabled={saving}
               preview={awayTeamImageUrl}
+              initialPreview={awayTeamImageUrl}
             />
           </div>
         </div>
