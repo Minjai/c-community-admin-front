@@ -7,12 +7,11 @@ import DatePicker from "@/components/forms/DatePicker";
 import FileUpload from "@/components/forms/FileUpload";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
-import ActionButton from "@/components/ActionButton";
 import {
   createSportGameAnalysis,
   updateSportGameAnalysis,
   getAllSportCategoriesAdmin,
-  deleteSportGameAnalysis,
+  getSportGameAnalysisById,
 } from "@/api";
 import { SportGameAnalysisFormData, SportCategory } from "@/types";
 
@@ -47,6 +46,35 @@ const SportsAnalysisDetail: React.FC = () => {
 
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    const fetchAnalysis = async () => {
+      if (!id) return;
+
+      try {
+        setSaving(true);
+        const response = await getSportGameAnalysisById(parseInt(id));
+        if (response.success && response.data) {
+          const analysis = response.data;
+          setSport(String(analysis.categoryId));
+          setHomeTeam(analysis.homeTeam);
+          setAwayTeam(analysis.awayTeam);
+          setMatchDate(analysis.gameDate);
+          setContent(analysis.content);
+          setStartDate(analysis.startTime);
+          setEndDate(analysis.endTime);
+          setIsPublic(analysis.isPublic);
+          setLeague(analysis.leagueName || "");
+        }
+      } catch (err) {
+        setError("데이터를 불러오는 중 오류가 발생했습니다.");
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    fetchAnalysis();
+  }, [id]);
 
   const handleSubmit = async () => {
     try {
@@ -88,19 +116,19 @@ const SportsAnalysisDetail: React.FC = () => {
         return;
       }
 
-      const formData: SportGameAnalysisFormData = {
-        categoryId: sport,
-        homeTeam,
-        awayTeam,
-        homeTeamImage: homeTeamImage,
-        awayTeamImage: awayTeamImage,
-        gameDate: matchDate,
-        content,
-        startTime: startDate,
-        endTime: endDate,
-        isPublic,
-        displayOrder: 0,
-      };
+      const formData = new FormData();
+      formData.append("categoryId", sport);
+      formData.append("homeTeam", homeTeam);
+      formData.append("awayTeam", awayTeam);
+      if (homeTeamImage) formData.append("homeTeamImage", homeTeamImage);
+      if (awayTeamImage) formData.append("awayTeamImage", awayTeamImage);
+      formData.append("gameDate", matchDate);
+      formData.append("content", content);
+      formData.append("startTime", startDate);
+      formData.append("endTime", endDate);
+      formData.append("isPublic", String(isPublic));
+      formData.append("displayOrder", "0");
+      formData.append("leagueName", league);
 
       const response = id
         ? await updateSportGameAnalysis(parseInt(id), formData)
@@ -118,27 +146,6 @@ const SportsAnalysisDetail: React.FC = () => {
     }
   };
 
-  const handleDelete = async () => {
-    if (!id) return;
-
-    try {
-      setSaving(true);
-      setError(null);
-
-      const response = await deleteSportGameAnalysis(parseInt(id));
-
-      if (response.success) {
-        navigate(-1);
-      } else {
-        setError(response.message || "삭제 중 오류가 발생했습니다.");
-      }
-    } catch (err) {
-      setError("삭제 중 오류가 발생했습니다.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
     <div className="container mx-auto px-4 py-4">
       {error && (
@@ -151,10 +158,9 @@ const SportsAnalysisDetail: React.FC = () => {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center space-x-4">
           {id ? (
-            <>
-              <ActionButton label="수정" action="edit" onClick={handleSubmit} disabled={saving} />
-              <ActionButton label="삭제" action="delete" onClick={handleDelete} disabled={saving} />
-            </>
+            <Button variant="primary" onClick={handleSubmit} disabled={saving}>
+              수정
+            </Button>
           ) : (
             <Button variant="primary" onClick={handleSubmit} disabled={saving}>
               추가

@@ -29,6 +29,7 @@ interface Column {
 const SportsAnalysisManagement = () => {
   const navigate = useNavigate();
   const [analyses, setAnalyses] = useState<SportGameAnalysis[]>([]);
+  const [originalAnalyses, setOriginalAnalyses] = useState<SportGameAnalysis[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -46,14 +47,17 @@ const SportsAnalysisManagement = () => {
       const response = await getAllSportGameAnalyses();
       if (response.success) {
         setAnalyses(response.data || []);
+        setOriginalAnalyses(response.data ? [...response.data] : []);
         setError(null);
       } else if (!response.success && response.message) {
         setError(response.message);
         setAnalyses([]);
+        setOriginalAnalyses([]);
       }
     } catch (err) {
       setError("서버 오류가 발생했습니다.");
       setAnalyses([]);
+      setOriginalAnalyses([]);
     } finally {
       setLoading(false);
     }
@@ -62,16 +66,25 @@ const SportsAnalysisManagement = () => {
   const handleSaveOrder = async () => {
     setLoading(true);
     try {
-      const changed = analyses.filter((a, index) => {
-        const original = analyses.find((o) => o.id === a.id);
-        return original && original.displayOrder !== a.displayOrder;
+      // 변경된 항목만 필터링
+      const changed = analyses.filter((analysis) => {
+        const original = originalAnalyses.find((o) => o.id === analysis.id);
+        return original && analysis.displayOrder !== original.displayOrder;
       });
 
-      for (const item of changed) {
-        await updateSportGameAnalysisDisplayOrder(item.id, item.displayOrder);
+      if (changed.length === 0) {
+        setSuccess("변경된 순서가 없습니다.");
+        return;
       }
 
-      setSuccess("순서가 저장되었습니다.");
+      // 변경된 항목들만 업데이트
+      await Promise.all(
+        changed.map((analysis) =>
+          updateSportGameAnalysisDisplayOrder(analysis.id, analysis.displayOrder)
+        )
+      );
+
+      setSuccess(`${changed.length}개 항목의 순서가 저장되었습니다.`);
       fetchAnalyses();
     } catch (err) {
       setError("순서 저장 중 오류가 발생했습니다.");
@@ -225,7 +238,15 @@ const SportsAnalysisManagement = () => {
       header: "공개 여부",
       accessor: "isPublic",
       className: "text-center w-[100px]",
-      cell: (value: unknown, row: SportGameAnalysis) => (row.isPublic ? "공개" : "비공개"),
+      cell: (value: unknown, row: SportGameAnalysis) => (
+        <span
+          className={`px-2 py-1 rounded-full text-xs font-medium ${
+            row.isPublic ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+          }`}
+        >
+          {row.isPublic ? "공개" : "비공개"}
+        </span>
+      ),
     },
     {
       header: "순서",
@@ -324,7 +345,7 @@ const SportsAnalysisManagement = () => {
             {`선택 삭제 (${selectedIds.length})`}
           </Button>
           <Button variant="primary" onClick={() => handleOpenModal("add")} disabled={loading}>
-            분석글 추가
+            분석 분석 추가
           </Button>
         </div>
       </div>

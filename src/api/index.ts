@@ -361,21 +361,23 @@ export const getSportGameAnalysisById = async (
 };
 
 export const createSportGameAnalysis = async (
-  formData: SportGameAnalysisFormData
+  formData: FormData | SportGameAnalysisFormData
 ): Promise<ApiResponse<SportGameAnalysis>> => {
   try {
-    const data = new FormData();
-    Object.entries(formData).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        if (key === "homeTeamImage" || key === "awayTeamImage") {
-          if (value instanceof File) {
-            data.append(key, value);
+    const data = formData instanceof FormData ? formData : new FormData();
+    if (!(formData instanceof FormData)) {
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          if (key === "homeTeamImage" || key === "awayTeamImage") {
+            if (value instanceof File) {
+              data.append(key, value);
+            }
+          } else {
+            data.append(key, String(value));
           }
-        } else {
-          data.append(key, String(value));
         }
-      }
-    });
+      });
+    }
 
     const response = await axios.post("/sport-analyses", data, {
       headers: {
@@ -391,21 +393,23 @@ export const createSportGameAnalysis = async (
 
 export const updateSportGameAnalysis = async (
   id: number,
-  formData: Partial<SportGameAnalysisFormData>
+  formData: FormData | Partial<SportGameAnalysisFormData>
 ): Promise<ApiResponse<SportGameAnalysis>> => {
   try {
-    const data = new FormData();
-    Object.entries(formData).forEach(([key, value]) => {
-      if (value !== null && value !== undefined) {
-        if (key === "homeTeamImage" || key === "awayTeamImage") {
-          if (value instanceof File) {
-            data.append(key, value);
+    const data = formData instanceof FormData ? formData : new FormData();
+    if (!(formData instanceof FormData)) {
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          if (key === "homeTeamImage" || key === "awayTeamImage") {
+            if (value instanceof File) {
+              data.append(key, value);
+            }
+          } else {
+            data.append(key, String(value));
           }
-        } else {
-          data.append(key, String(value));
         }
-      }
-    });
+      });
+    }
 
     const response = await axios.put(`/sport-analyses/${id}`, data, {
       headers: {
