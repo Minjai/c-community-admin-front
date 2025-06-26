@@ -198,6 +198,42 @@ export interface SportCategory {
   updatedAt: string;
 }
 
+// 스포츠 경기 분석 관련 타입
+export interface SportGameAnalysis {
+  id: number;
+  categoryId: number;
+  homeTeam: string;
+  awayTeam: string;
+  homeTeamImageUrl?: string;
+  awayTeamImageUrl?: string;
+  gameDate: string;
+  content: string;
+  startTime: string;
+  endTime: string;
+  isPublic: number;
+  displayOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+  category?: {
+    displayName: string;
+  };
+  leagueName?: string;
+}
+
+export interface SportGameAnalysisFormData {
+  categoryId: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeTeamImage: File | null;
+  awayTeamImage: File | null;
+  gameDate: string;
+  content: string;
+  startTime: string;
+  endTime: string;
+  isPublic: number;
+  displayOrder: number;
+}
+
 // 송금 배너(암호화폐 송금) 관련 타입
 export interface RemittanceBanner {
   id: number;

@@ -1,5 +1,11 @@
 import axios from "@/api/axios";
-import { SportCategory } from "@/types";
+import {
+  SportCategory,
+  ApiResponse,
+  PaginatedData,
+  SportGameAnalysis,
+  SportGameAnalysisFormData,
+} from "@/types";
 
 // 통계 관련 API 함수
 
@@ -115,7 +121,7 @@ export const getSportCategories = async (): Promise<any[]> => {
 export const getAllSportCategoriesAdmin = async (
   page: number = 1,
   limit: number = 10,
-  searchValue: any = "",
+  searchValue: any = ""
 ): Promise<{ data: SportCategory[]; pagination: any }> => {
   try {
     const response = await axios.get(`/sport-categories/admin?page=${page}&limit=${limit}`);
@@ -327,6 +333,111 @@ export const bulkUpdateSportRecommendations = async (data: {
     return response.data && response.data.success ? response.data : null;
   } catch (error) {
     console.error("Error bulk updating sport recommendations:", error);
+    throw error;
+  }
+};
+
+// 스포츠 경기 분석 관련 API 함수
+export const getAllSportGameAnalyses = async (): Promise<ApiResponse<SportGameAnalysis[]>> => {
+  try {
+    const response = await axios.get("/sport-analyses");
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching sport game analyses:", error);
+    throw error;
+  }
+};
+
+export const getSportGameAnalysisById = async (
+  id: number
+): Promise<ApiResponse<SportGameAnalysis>> => {
+  try {
+    const response = await axios.get(`/sport-analyses/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching sport game analysis with id ${id}:`, error);
+    throw error;
+  }
+};
+
+export const createSportGameAnalysis = async (
+  formData: SportGameAnalysisFormData
+): Promise<ApiResponse<SportGameAnalysis>> => {
+  try {
+    const data = new FormData();
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        if (key === "homeTeamImage" || key === "awayTeamImage") {
+          if (value instanceof File) {
+            data.append(key, value);
+          }
+        } else {
+          data.append(key, String(value));
+        }
+      }
+    });
+
+    const response = await axios.post("/sport-analyses", data, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error creating sport game analysis:", error);
+    throw error;
+  }
+};
+
+export const updateSportGameAnalysis = async (
+  id: number,
+  formData: Partial<SportGameAnalysisFormData>
+): Promise<ApiResponse<SportGameAnalysis>> => {
+  try {
+    const data = new FormData();
+    Object.entries(formData).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        if (key === "homeTeamImage" || key === "awayTeamImage") {
+          if (value instanceof File) {
+            data.append(key, value);
+          }
+        } else {
+          data.append(key, String(value));
+        }
+      }
+    });
+
+    const response = await axios.put(`/sport-analyses/${id}`, data, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating sport game analysis with id ${id}:`, error);
+    throw error;
+  }
+};
+
+export const deleteSportGameAnalysis = async (id: number): Promise<ApiResponse<boolean>> => {
+  try {
+    const response = await axios.delete(`/sport-analyses/${id}`);
+    return response.data;
+  } catch (error) {
+    console.error(`Error deleting sport game analysis with id ${id}:`, error);
+    throw error;
+  }
+};
+
+export const updateSportGameAnalysisDisplayOrder = async (
+  id: number,
+  displayOrder: number
+): Promise<ApiResponse<SportGameAnalysis>> => {
+  try {
+    const response = await axios.put(`/sport-analyses/${id}/display-order`, { displayOrder });
+    return response.data;
+  } catch (error) {
+    console.error(`Error updating sport game analysis display order with id ${id}:`, error);
     throw error;
   }
 };

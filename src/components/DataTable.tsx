@@ -3,9 +3,9 @@ import React, { ReactNode } from "react";
 export interface TableProps<T> {
   columns: {
     header: string | ReactNode;
-    accessor: keyof T | ((item: T) => ReactNode);
+    accessor: keyof T | "id";
     className?: string;
-    cell?: (value: any, row: T, index: number) => ReactNode;
+    cell?: (value: unknown, row: T, index: number) => ReactNode;
   }[];
   data: T[];
   loading?: boolean;
@@ -17,6 +17,9 @@ export interface TableProps<T> {
     onPageChange: (page: number) => void;
   };
   rowClassName?: (row: T, index: number) => string;
+  selectedIds?: number[];
+  onSelectIds?: (ids: number[]) => void;
+  onOrderChange?: (draggedId: number, targetId: number) => void;
 }
 
 const DataTable = <T extends Record<string, any>>({
@@ -26,6 +29,9 @@ const DataTable = <T extends Record<string, any>>({
   emptyMessage = "데이터가 없습니다.",
   pagination,
   rowClassName,
+  selectedIds = [],
+  onSelectIds,
+  onOrderChange,
 }: TableProps<T>) => {
   // 페이지네이션 계산
   const totalPages = pagination ? Math.ceil(pagination.totalItems / pagination.pageSize) : 1;
@@ -68,11 +74,45 @@ const DataTable = <T extends Record<string, any>>({
   };
 
   // 셀 값 가져오기
-  const getCellValue = (row: T, accessor: keyof T | ((item: T) => ReactNode)) => {
-    if (typeof accessor === "function") {
-      return accessor(row);
+  const getCellValue = (row: T, accessor: keyof T | "id") => {
+    if (accessor === "id") {
+      return row.id;
     }
     return row[accessor];
+  };
+
+  // 드래그 앤 드롭 핸들러
+  const handleDragStart = (e: React.DragEvent<HTMLTableRowElement>, id: number) => {
+    e.dataTransfer.setData("text/plain", String(id));
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLTableRowElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLTableRowElement>, targetId: number) => {
+    e.preventDefault();
+    const draggedId = Number(e.dataTransfer.getData("text/plain"));
+    if (draggedId !== targetId && onOrderChange) {
+      onOrderChange(draggedId, targetId);
+    }
+  };
+
+  // 체크박스 핸들러
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (onSelectIds) {
+      onSelectIds(e.target.checked ? data.map((row) => row.id) : []);
+    }
+  };
+
+  const handleSelectRow = (e: React.ChangeEvent<HTMLInputElement>, id: number) => {
+    if (onSelectIds) {
+      onSelectIds(
+        e.target.checked
+          ? [...selectedIds, id]
+          : selectedIds.filter((selectedId) => selectedId !== id)
+      );
+    }
   };
 
   return (
@@ -80,6 +120,16 @@ const DataTable = <T extends Record<string, any>>({
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
+            {onSelectIds && (
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  checked={data.length > 0 && selectedIds.length === data.length}
+                  onChange={handleSelectAll}
+                />
+              </th>
+            )}
             {columns.map((column, index) => (
               <th
                 key={index}
@@ -96,7 +146,10 @@ const DataTable = <T extends Record<string, any>>({
         <tbody className="bg-white">
           {loading ? (
             <tr>
-              <td colSpan={columns.length} className="px-6 py-4 text-center">
+              <td
+                colSpan={columns.length + (onSelectIds ? 1 : 0)}
+                className="px-6 py-4 text-center"
+              >
                 <div className="flex justify-center items-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
                   <span className="ml-2">로딩 중...</span>
@@ -105,7 +158,10 @@ const DataTable = <T extends Record<string, any>>({
             </tr>
           ) : data.length === 0 ? (
             <tr>
-              <td colSpan={columns.length} className="px-6 py-4 text-center text-gray-500">
+              <td
+                colSpan={columns.length + (onSelectIds ? 1 : 0)}
+                className="px-6 py-4 text-center text-gray-500"
+              >
                 {emptyMessage}
               </td>
             </tr>
@@ -114,7 +170,21 @@ const DataTable = <T extends Record<string, any>>({
               <tr
                 key={rowIndex}
                 className={`${rowClassName ? rowClassName(row, rowIndex) : "hover:bg-gray-50"}`}
+                draggable={!!onOrderChange}
+                onDragStart={(e) => handleDragStart(e, row.id)}
+                onDragOver={handleDragOver}
+                onDrop={(e) => handleDrop(e, row.id)}
               >
+                {onSelectIds && (
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      checked={selectedIds.includes(row.id)}
+                      onChange={(e) => handleSelectRow(e, row.id)}
+                    />
+                  </td>
+                )}
                 {columns.map((column, colIndex) => (
                   <td
                     key={colIndex}
@@ -198,24 +268,18 @@ const DataTable = <T extends Record<string, any>>({
                   </svg>
                 </button>
                 {getPageNumbers().map((page, index) => (
-                  <React.Fragment key={index}>
-                    {page === "..." ? (
-                      <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                        ...
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => pagination.onPageChange(page as number)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          page === pagination.currentPage
-                            ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
-                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                        }`}
-                      >
-                        {page}
-                      </button>
-                    )}
-                  </React.Fragment>
+                  <button
+                    key={index}
+                    onClick={() => typeof page === "number" && pagination.onPageChange(page)}
+                    disabled={typeof page !== "number"}
+                    className={`relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium ${
+                      page === pagination.currentPage
+                        ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
+                        : "text-gray-500 hover:bg-gray-50"
+                    } ${typeof page !== "number" ? "cursor-default" : ""}`}
+                  >
+                    {page}
+                  </button>
                 ))}
                 <button
                   onClick={() => pagination.onPageChange(pagination.currentPage + 1)}

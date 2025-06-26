@@ -13,7 +13,7 @@ interface FileUploadProps {
   disabled?: boolean;
   className?: string;
   accept?: string;
-  preview?: boolean;
+  preview?: string;
   value?: string;
   description?: string;
   initialPreview?: string;

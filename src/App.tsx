@@ -25,6 +25,7 @@ import CasinoGameManagement from "./pages/data/CasinoGameManagement";
 import CasinoRecommendationManagement from "./pages/data/CasinoRecommendationManagement";
 import SportsManagement from "./pages/data/SportsManagement";
 import SportRecommendationsManagement from "./pages/data/SportRecommendationsManagement";
+import SportsAnalysisManagement from "./pages/data/SportsAnalysisManagement";
 import UserManagement from "./pages/users/UserManagement";
 import UserRankManagement from "./pages/users/UserRankManagement";
 import AdminManagement from "./pages/users/AdminManagement";
@@ -35,6 +36,7 @@ import RemittanceBannerPage from "./pages/remittance/RemittanceBannerPage";
 import FooterManagementPage from "./pages/footer/FooterManagementPage";
 import NewsSportsPage from "@pages/news/news-sports/NewsSportsPage.tsx";
 import HomeManagementPage from "./pages/exposure/HomeManagementPage";
+import SportsAnalysisDetail from "./pages/data/SportsAnalysisDetail";
 
 // 추후 구현할 페이지들을 위한 임시 컴포넌트
 const NotImplemented = ({ pageName }: { pageName: string }) => (
@@ -176,6 +178,30 @@ function App() {
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
                     <SportsManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="data/sports-analysis"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <SportsAnalysisManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="data/sports-analysis/new"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <SportsAnalysisDetail />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="data/sports-analysis/:id"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <SportsAnalysisDetail />
                   </RoleBasedRoute>
                 }
               />
