@@ -307,13 +307,73 @@ export default function SportRecommendationsManagement() {
 
     try {
       const detailData = await getSportRecommendationById(recommendation.id);
-      const gameIds = detailData.games ? detailData.games.map((game: SportGame) => game.id) : [];
-      const games = detailData.games || [];
-      setSelectedGames(games);
+
+      // 서버에서 제공하는 games 배열을 직접 사용
+      let selectedGamesData: SportGame[] = [];
+      let gameIds: (string | number)[] = [];
+
+      if (detailData.games && Array.isArray(detailData.games)) {
+        // games 배열에서 null이 아닌 게임들만 필터링하고 타입 변환
+        selectedGamesData = detailData.games
+          .filter((game: any) => game !== null)
+          .map((game: any) => {
+            // goalserve 데이터인지 확인
+            const isGoalserve = game.source === "goalserve" || String(game.id).startsWith("0.");
+
+            return {
+              ...game,
+              id: typeof game.id === "string" ? game.id : game.id, // 문자열 ID도 그대로 유지
+              // goalserve 데이터의 경우 실제 데이터 사용 (서버에서 제공하는 대로)
+              matchName: game.matchName || game.sport || "Unknown Game",
+              homeTeam: game.homeTeam || "Unknown",
+              awayTeam: game.awayTeam || "Unknown",
+              league: game.league || "Unknown League",
+              sport: game.sport || "Unknown Sport",
+              dateTime: game.dateTime || new Date().toISOString(),
+              iconUrl: game.iconUrl || "",
+              createdAt: game.createdAt || new Date().toISOString(),
+              updatedAt: game.updatedAt || new Date().toISOString(),
+              // goalserve 데이터임을 표시하기 위한 추가 정보
+              isGoalserve: isGoalserve,
+            };
+          });
+        gameIds = selectedGamesData.map((game: any) => game.id);
+      } else if (detailData.sportGames && Array.isArray(detailData.sportGames)) {
+        // fallback: sportGames 배열 사용 (이전 로직)
+        detailData.sportGames.forEach((sportGameItem: any) => {
+          if (sportGameItem.sportGameId) {
+            // 데이터베이스 게임인 경우
+            const dbGame = detailData.games?.find(
+              (game: any) => game && game.id === sportGameItem.sportGameId
+            );
+            if (dbGame) {
+              selectedGamesData.push(dbGame);
+              gameIds.push(dbGame.id);
+            }
+          } else if (sportGameItem.goalserveId) {
+            // goalserve 게임인 경우 - 임시 객체 생성
+            const tempGame: SportGame = {
+              id: sportGameItem.goalserveId as any, // string을 number로 캐스팅
+              matchName: `Goalserve Game (${sportGameItem.goalserveId})`,
+              homeTeam: "Home Team",
+              awayTeam: "Away Team",
+              league: "League",
+              sport: "Sport",
+              dateTime: new Date().toISOString(),
+              createdAt: sportGameItem.createdAt,
+              updatedAt: sportGameItem.updatedAt,
+            };
+            selectedGamesData.push(tempGame);
+            gameIds.push(sportGameItem.goalserveId);
+          }
+        });
+      }
+
+      setSelectedGames(selectedGamesData);
 
       setFormData({
         title: detailData.title || "",
-        sportGameIds: gameIds,
+        sportGameIds: gameIds as number[], // 타입 캐스팅
         startTime: formatISODateToDateTimeLocal(detailData.startTime),
         endTime: formatISODateToDateTimeLocal(detailData.endTime),
         isPublic: detailData.isPublic === 1 ? 1 : 0,
@@ -462,9 +522,38 @@ export default function SportRecommendationsManagement() {
     setError(null);
     setSuccess(null);
 
+    // ID가 "0."으로 시작하는지 확인하는 함수
+    const isGoalserveData = (id: string | number): boolean => {
+      return String(id).startsWith("0.");
+    };
+
+    // games 배열 구성
+    const games = selectedGames.map((game) => {
+      if (isGoalserveData(game.id)) {
+        // goalserve 게임인 경우 상세 정보 포함
+        return {
+          id: game.id,
+          source: "goalserve" as const,
+          sport: game.sport || "Unknown",
+          dateTime: game.dateTime || new Date().toISOString(),
+          league: game.league || "Unknown League",
+          matchName: game.matchName || "Unknown Game",
+          homeTeam: game.homeTeam || "Unknown",
+          awayTeam: game.awayTeam || "Unknown",
+        };
+      } else {
+        // 데이터베이스 게임인 경우 id만 포함 (이미 숫자 ID이므로 그대로 사용)
+        return {
+          id: game.id,
+          source: "database" as const,
+        };
+      }
+    });
+
     const payload = {
       ...formData,
-      sportGameIds: selectedGames.map((g) => g.id), // Use selectedGames state
+      games, // games 배열 추가
+      sportGameIds: selectedGames.map((g) => g.id), // 기존 호환성을 위해 유지
       startTime: convertDateTimeLocalToISOUTC(formData.startTime),
       endTime: convertDateTimeLocalToISOUTC(formData.endTime),
       displayOrder: formData.displayOrder || 0, // Ensure displayOrder is a number
@@ -511,48 +600,40 @@ export default function SportRecommendationsManagement() {
     setSelectedGames((prevSelected) => prevSelected.filter((game) => game.id !== gameId));
   };
 
+  // === 드래그 앤 드롭 시작 ===
+  // DragManager 인스턴스 보관
+  const dragManagerRef = useRef<DragManager | null>(null);
 
-    // === 드래그 앤 드롭 시작 ===
-    // DragManager 인스턴스 보관
-    const dragManagerRef = useRef<DragManager | null>(null);
-
-    useEffect(() => {
-      if (selectedGames.length > 0) {
-        dragManagerRef.current = new DragManager((from, to) => {
+  useEffect(() => {
+    if (selectedGames.length > 0) {
+      dragManagerRef.current = new DragManager((from, to) => {
         const tempSelectedGames = [...selectedGames];
 
-          // 원본을 건드리지 않고 새로운 배열 생성
-        const games = [
-          ...tempSelectedGames.slice(0, from),
-          ...tempSelectedGames.slice(from + 1)
-        ];
+        // 원본을 건드리지 않고 새로운 배열 생성
+        const games = [...tempSelectedGames.slice(0, from), ...tempSelectedGames.slice(from + 1)];
 
-        const newGames = [
-          ...games.slice(0, to),
-          selectedGames[from],
-          ...games.slice(to)
-        ];
+        const newGames = [...games.slice(0, to), selectedGames[from], ...games.slice(to)];
 
         setSelectedGames(newGames);
-        });
-      }
-    }, [selectedGames]);
+      });
+    }
+  }, [selectedGames]);
 
-    // 드래그 이벤트 핸들러
-    const handleDragStart = (index: number) => {
-      if(!dragManagerRef.current)return;
-      dragManagerRef.current.startDrag(index);
-    };
-  
-    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-    };
-  
-    const handleDrop = (index: number) => {
-      if(!dragManagerRef.current)return;
-      dragManagerRef.current.drop(index);
-    };
-    // === 드래그 앤 드롭 종료 ===
+  // 드래그 이벤트 핸들러
+  const handleDragStart = (index: number) => {
+    if (!dragManagerRef.current) return;
+    dragManagerRef.current.startDrag(index);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (index: number) => {
+    if (!dragManagerRef.current) return;
+    dragManagerRef.current.drop(index);
+  };
+  // === 드래그 앤 드롭 종료 ===
 
   // 게임 수 표시 렌더링 함수
   const renderGameCount = (gameIds: number[]) => {
@@ -637,7 +718,7 @@ export default function SportRecommendationsManagement() {
                     onDragStart={() => handleDragStart(index)}
                     onDragOver={handleDragOver}
                     onDrop={() => handleDrop(index)}
-                    style={{ cursor: 'grab' }}
+                    style={{ cursor: "grab" }}
                   >
                     <div>
                       <div className="font-medium text-sm">{game.matchName}</div>
@@ -848,40 +929,28 @@ export default function SportRecommendationsManagement() {
         const now = new Date();
         const startTime = row.startTime ? new Date(row.startTime) : null;
         const endTime = row.endTime ? new Date(row.endTime) : null;
-        
+
         // 비공개 상태
         if (value !== 1) {
-          return (
-            <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">
-              비공개
-            </span>
-          );
+          return <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">비공개</span>;
         }
-        
+
         // 공개 상태이지만 시작 시간이 미래인 경우 (공개 전)
         if (startTime && startTime > now) {
           return (
-            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
-              공개 전
-            </span>
+            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">공개 전</span>
           );
         }
-        
+
         // 공개 상태이지만 종료 시간이 과거인 경우 (공개 종료)
         if (endTime && endTime < now) {
           return (
-            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
-              공개 종료
-            </span>
+            <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">공개 종료</span>
           );
         }
-        
+
         // 현재 공개 중인 상태
-        return (
-          <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">
-            공개
-          </span>
-        );
+        return <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">공개</span>;
       },
     },
     {

@@ -265,6 +265,7 @@ export const createSportRecommendation = async (data: {
   title: string;
   sportGameId?: number;
   sportGameIds?: number[];
+  games?: Array<{ id: string | number; source: "database" | "goalserve" }>;
   description?: string;
   startTime?: string;
   endTime?: string;
@@ -290,6 +291,7 @@ export const updateSportRecommendation = async (
   data: {
     sportGameId?: number;
     sportGameIds?: number[];
+    games?: Array<{ id: string | number; source: "database" | "goalserve" }>;
     title?: string;
     description?: string;
     startTime?: string;
