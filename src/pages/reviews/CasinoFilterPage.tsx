@@ -826,7 +826,8 @@ const CasinoFilterPage: React.FC = () => {
           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
         />
       ),
-      accessor: (row: any) => {
+      accessor: "id" as keyof (CasinoFilterCategory | CasinoFilterSubCategory),
+      cell: (value: any, row: any) => {
         if (row.isSubCategory) {
           // 소분류: 체크박스 표시
           return (

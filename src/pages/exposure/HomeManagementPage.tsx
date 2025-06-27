@@ -64,7 +64,7 @@ interface HomeSection {
 
 interface Column {
   header: string | ReactNode;
-  accessor: keyof HomeSection | ((item: HomeSection) => ReactNode);
+  accessor: keyof HomeSection;
   className?: string;
   cell?: (value: any, row: HomeSection, index: number) => ReactNode;
 }
@@ -98,6 +98,9 @@ const HomeManagementPage: React.FC = () => {
 
   // 선택된 섹션 ID 상태
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+
+  // 전체 선택 상태 계산
+  const isAllSelected = sections.length > 0 && selectedIds.size === sections.length;
 
   // 드래그 앤 드롭 관리자
   const dragManagerRef = useRef<DragManager | null>(null);
@@ -431,8 +434,6 @@ const HomeManagementPage: React.FC = () => {
     return selectedItems[0].type;
   };
 
-  const isAllSelected = sections.length > 0 && selectedIds.size === sections.length;
-
   const columns: Column[] = [
     {
       header: (
@@ -444,12 +445,13 @@ const HomeManagementPage: React.FC = () => {
           disabled={loading || sections.length === 0}
         />
       ),
-      accessor: (item: HomeSection) => (
+      accessor: "id",
+      cell: (value: any, row: HomeSection) => (
         <input
           type="checkbox"
           className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-          checked={selectedIds.has(item.id)}
-          onChange={() => handleSelect(item.id)}
+          checked={selectedIds.has(row.id)}
+          onChange={() => handleSelect(row.id)}
           disabled={loading}
         />
       ),
@@ -491,14 +493,15 @@ const HomeManagementPage: React.FC = () => {
     },
     {
       header: "관리",
-      accessor: (item: HomeSection) => (
+      accessor: "id",
+      cell: (value: any, row: HomeSection) => (
         <div className="flex space-x-1">
-          <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEdit(item)} />
+          <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEdit(row)} />
           <ActionButton
             label="삭제"
             action="delete"
             size="sm"
-            onClick={() => handleDelete(item.id)}
+            onClick={() => handleDelete(row.id)}
           />
         </div>
       ),
