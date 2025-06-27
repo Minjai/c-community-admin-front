@@ -191,6 +191,7 @@ export interface SportCategory {
   id: number;
   sportName: string;
   displayName?: string;
+  category?: string; // goalserve 또는 sport
   icon?: string;
   isPublic: number;
   displayOrder: number;

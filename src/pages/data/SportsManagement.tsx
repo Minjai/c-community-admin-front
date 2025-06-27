@@ -4,6 +4,7 @@ import {
   createSportCategory,
   updateSportCategory,
   deleteSportCategory,
+  getManualRegistrationDetail,
 } from "@/api";
 import { SportCategory } from "@/types";
 import Alert from "@/components/Alert";
@@ -262,16 +263,48 @@ export default function SportsManagement() {
     setShowModal(true);
   };
 
-  // handleEditCategory: formData 타입 유지
-  const handleEditCategory = (category: SportCategory) => {
-    setModalType("edit");
-    setCurrentCategory(category);
-    setFormData({
-      displayName: category.displayName || getKoreanSportName(category.sportName),
-      isPublic: category.isPublic,
-    });
-    setSelectedSport(getKoreanSportName(category.sportName));
-    setShowModal(true);
+  // handleEditCategory: 수동 등록된 데이터인지 확인 (category가 "sport"이면 수동 등록)
+  const handleEditCategory = async (category: SportCategory) => {
+    // 수동 등록된 데이터인지 확인 (category가 "sport"이면 수동 등록)
+    const isManualRegistration = category.category === "sport";
+
+    if (isManualRegistration) {
+      // 수동 등록된 데이터는 수동 등록 모달로 편집
+      setLoading(true);
+      try {
+        // 서버에서 상세 데이터 가져오기
+        const detailData = await getManualRegistrationDetail(category.id);
+
+        setManualForm({
+          displayName: category.displayName || "",
+          selectedGames: (detailData?.games || []).map((game: any, index: number) => ({
+            id: game.id || Date.now() + index,
+            home: game.homeTeam || game.home || "",
+            away: game.awayTeam || game.away || "",
+            league: game.league || "",
+            time: game.dateTime || game.time || "",
+            icon: game.iconUrl || game.icon || "", // iconUrl을 icon으로 매핑
+          })),
+          isPublic: category.isPublic,
+        });
+        setCurrentCategory(category); // 편집 모드로 설정
+        setShowManualModal(true);
+      } catch (error: any) {
+        setError(error.response?.data?.message || "상세 데이터를 불러오는 중 오류가 발생했습니다.");
+      } finally {
+        setLoading(false);
+      }
+    } else {
+      // 일반 카테고리는 기존 모달로 편집
+      setModalType("edit");
+      setCurrentCategory(category);
+      setFormData({
+        displayName: category.displayName || getKoreanSportName(category.sportName),
+        isPublic: category.isPublic,
+      });
+      setSelectedSport(getKoreanSportName(category.sportName));
+      setShowModal(true);
+    }
   };
 
   // handleDeleteCategory: 삭제 후 페이지 조정 및 데이터 리프레시
@@ -330,6 +363,7 @@ export default function SportsManagement() {
       const payload = {
         sportName: sportNameMapping[selectedSport.trim()] || selectedSport.trim(),
         displayName: formData.displayName.trim(),
+        category: "goalserve", // 카테고리 추가는 goalserve
         isPublic: formData.isPublic,
         displayOrder,
       };
@@ -485,19 +519,19 @@ export default function SportsManagement() {
                   selectedCategoryIds.length > 0 &&
                   selectedCategoryIds.length < categories.length &&
                   categories.some((cat) => selectedCategoryIds.includes(cat.id));
-                input.indeterminate = someSelected;
+                (input as HTMLInputElement).indeterminate = someSelected;
               }
             }}
             disabled={loading || categories.length === 0}
           />
         ),
         accessor: "id" as keyof SportCategory,
-        cell: (id: number) => (
+        cell: (value: unknown, row: SportCategory) => (
           <input
             type="checkbox"
             className="form-checkbox h-4 w-4 text-blue-600"
-            checked={selectedCategoryIds.includes(id)}
-            onChange={() => handleSelectCategory(id)}
+            checked={selectedCategoryIds.includes(row.id)}
+            onChange={() => handleSelectCategory(row.id)}
           />
         ),
         className: "w-px px-4",
@@ -505,31 +539,31 @@ export default function SportsManagement() {
       {
         header: "표시 이름",
         accessor: "displayName" as keyof SportCategory,
-        cell: (displayName: string, row: SportCategory) => (
+        cell: (value: unknown, row: SportCategory) => (
           <button
             type="button"
             className="text-blue-600 hover:text-blue-800 hover:underline focus:outline-none"
             onClick={() => handleEditCategory(row)}
           >
-            {displayName}
+            {row.displayName}
           </button>
         ),
       },
       {
         header: "종목 명",
         accessor: "sportName" as keyof SportCategory,
-        cell: (sportName: string) => getKoreanSportName(sportName),
+        cell: (value: unknown) => getKoreanSportName(value as string),
       },
       {
         header: "공개 여부",
         accessor: "isPublic" as keyof SportCategory,
-        cell: (isPublic: number) => (
+        cell: (value: unknown) => (
           <span
             className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-              isPublic === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+              value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
             }`}
           >
-            {isPublic === 1 ? "공개" : "비공개"}
+            {value === 1 ? "공개" : "비공개"}
           </span>
         ),
         className: "text-center",
@@ -537,22 +571,22 @@ export default function SportsManagement() {
       {
         header: "생성일",
         accessor: "createdAt" as keyof SportCategory,
-        cell: (date: string) => formatDate(date),
+        cell: (value: unknown) => formatDate(value as string),
       },
       {
         header: "수정일",
         accessor: "updatedAt" as keyof SportCategory,
-        cell: (date: string) => formatDate(date),
+        cell: (value: unknown) => formatDate(value as string),
       },
       {
         header: "순서",
         accessor: "displayOrder" as keyof SportCategory,
-        cell: (displayOrder: number, row: SportCategory, index: number) => (
+        cell: (value: unknown, row: SportCategory, index: number) => (
           <input
             type="number"
             min={1}
             className="w-16 text-center border rounded"
-            value={displayOrder}
+            value={value as number}
             onChange={(e) => handleDisplayOrderInputChange(index, Number(e.target.value))}
             disabled={loading}
           />
@@ -562,7 +596,7 @@ export default function SportsManagement() {
       {
         header: "관리",
         accessor: "id" as keyof SportCategory,
-        cell: (id: number, row: SportCategory) => (
+        cell: (value: unknown, row: SportCategory) => (
           <div className="flex space-x-1 justify-center">
             <ActionButton
               label="수정"
@@ -574,7 +608,7 @@ export default function SportsManagement() {
               label="삭제"
               action="delete"
               size="sm"
-              onClick={() => handleDeleteCategory(id)}
+              onClick={() => handleDeleteCategory(row.id)}
             />
           </div>
         ),
@@ -597,8 +631,10 @@ export default function SportsManagement() {
       away: "",
       league: "",
       time: "",
+      icon: "",
     });
     setGameDetailError(null);
+    setCurrentCategory(null); // 새로 생성 모드로 초기화
   };
 
   // 수동 등록 모달 닫기
@@ -693,26 +729,44 @@ export default function SportsManagement() {
     setLoading(true);
     setError(null);
     try {
-      // 서버에 데이터 전송
-      const response = await axios.post("/api/sports/admin/games/manual", {
-        displayName: manualForm.displayName,
-        isPublic: manualForm.isPublic,
-        games: manualForm.selectedGames.map((game, index) => ({
-          home: game.home,
-          away: game.away,
-          league: game.league,
-          time: game.time,
-          icon: game.icon,
-          displayOrder: index + 1,
-        })),
-      });
+      // 디버깅: 실제 데이터 확인
+      console.log("manualForm.selectedGames:", manualForm.selectedGames);
 
-      if (response.data.success) {
+      const categoryData = {
+        displayName: manualForm.displayName,
+        sportName: manualForm.displayName, // 표시이름을 스포츠 네임으로 사용
+        category: "sport", // 수동 등록은 sport
+        isPublic: manualForm.isPublic,
+        games: manualForm.selectedGames.map((game) => {
+          console.log("Processing game:", game); // 각 게임 객체 확인
+          return {
+            home: game.home,
+            away: game.away,
+            league: game.league,
+            time: game.time,
+            icon: game.icon || "", // 원래대로 복원
+          };
+        }),
+      };
+
+      console.log("Final categoryData:", categoryData); // 최종 데이터 확인
+
+      let response;
+      // 편집 모드인지 확인 (currentCategory가 있고 category가 sport이면 편집)
+      if (currentCategory && currentCategory.category === "sport") {
+        response = await updateSportCategory(currentCategory.id, categoryData);
+      } else {
+        response = await createSportCategory(categoryData);
+      }
+
+      if (response) {
         // 성공 시 모달 닫고 목록 새로고침
         handleCloseManualModal();
         fetchSportCategories(currentPage, pageSize);
+        setSuccess(currentCategory ? "수동 등록이 수정되었습니다." : "수동 등록이 완료되었습니다.");
+        setCurrentCategory(null); // 편집 모드 초기화
       } else {
-        setError(response.data.message || "저장 중 오류가 발생했습니다.");
+        setError("저장 중 오류가 발생했습니다.");
       }
     } catch (error: any) {
       setError(error.response?.data?.message || "저장 중 오류가 발생했습니다.");
@@ -737,9 +791,9 @@ export default function SportsManagement() {
           setSearchValue={setSearchValue}
           onSearch={handleSearch}
         />
-        {/* <Button onClick={handleOpenManualModal} disabled={loading}>
+        <Button onClick={handleOpenManualModal} disabled={loading}>
           수동 등록
-        </Button> */}
+        </Button>
         <Button onClick={handleBulkDisplayOrderSave} disabled={loading}>
           순서 저장
         </Button>
@@ -797,7 +851,7 @@ export default function SportsManagement() {
                 id="isPublicCheckbox"
                 type="checkbox"
                 name="isPublic"
-                checked={formData.isPublic === 1}
+                checked={Boolean(formData.isPublic === 1)}
                 onChange={handleChange}
                 className="form-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                 disabled={loading}
@@ -862,10 +916,10 @@ export default function SportsManagement() {
       <Modal
         isOpen={showManualModal}
         onClose={handleCloseManualModal}
-        title="스포츠 게임 수동 등록"
+        title={currentCategory ? "스포츠 게임 수동 등록 수정" : "스포츠 게임 수동 등록"}
         size="xl"
       >
-        <div className="space-y-6">
+        <div className="max-h-[80vh] overflow-y-auto space-y-6">
           {/* 1. 최상단 라인: 버튼(좌) + 공개여부 체크박스(우) */}
           <div className="flex justify-between items-center border-b pb-4">
             {/* 왼쪽: 저장/취소 버튼 */}
@@ -882,7 +936,7 @@ export default function SportsManagement() {
               <input
                 id="isPublicCheckbox"
                 type="checkbox"
-                checked={manualForm.isPublic === 1}
+                checked={Boolean(manualForm.isPublic === 1)}
                 onChange={(e) =>
                   setManualForm((prev) => ({ ...prev, isPublic: e.target.checked ? 1 : 0 }))
                 }
@@ -932,18 +986,45 @@ export default function SportsManagement() {
                       handleDrop(index);
                     }}
                   >
-                    <div className="flex-1 grid grid-cols-4 gap-4">
-                      <div className="flex items-center">
-                        <span className="font-medium">{game.home}</span>
-                        <span className="mx-2">vs</span>
-                        <span className="font-medium">{game.away}</span>
+                    <div className="flex items-center space-x-3 flex-1">
+                      {/* 이미지 */}
+                      <div className="w-8 h-8 flex-shrink-0">
+                        {game.icon ? (
+                          <img
+                            src={game.icon}
+                            alt="icon"
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gray-200 rounded flex items-center justify-center">
+                            <svg
+                              className="w-4 h-4 text-gray-400"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                          </div>
+                        )}
                       </div>
-                      <div>{game.league}</div>
-                      <div>{formatDate(game.time)}</div>
-                      <div className="flex items-center">
-                        {game.icon && <img src={game.icon} alt="icon" className="w-6 h-6 mr-2" />}
+
+                      {/* 텍스트 정보 */}
+                      <div className="flex-1">
+                        <div className="font-medium">
+                          {game.home} vs {game.away}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {game.league} | {formatDate(game.time)}
+                        </div>
                       </div>
                     </div>
+
                     <button
                       onClick={() => handleRemoveGameDetail(game.id!)}
                       className="ml-4 text-red-600 hover:text-red-800"
@@ -1019,47 +1100,23 @@ export default function SportsManagement() {
               {/* Icon */}
               <div className="flex items-center">
                 <label className="block text-sm font-medium text-gray-700 w-24">Icon</label>
-                <div className="flex-1 flex items-center space-x-4">
-                  {/* 왼쪽: 아이콘 미리보기 */}
-                  <div className="h-[42px] w-[42px] flex-shrink-0 border rounded-md overflow-hidden bg-gray-50">
-                    {currentGameDetail.icon ? (
-                      <img
-                        src={currentGameDetail.icon}
-                        alt="Icon Preview"
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <svg
-                          className="w-6 h-6"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                          />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-                  {/* 오른쪽: 파일 업로드 영역 */}
-                  <div className="flex-1 h-[42px]">
-                    <FileUpload
-                      onFileSelect={(file) =>
-                        handleGameDetailChange("icon", file ? URL.createObjectURL(file) : "")
+                <div className="flex-1">
+                  <FileUpload
+                    onFileSelect={(file) => {
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          handleGameDetailChange("icon", reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      } else {
+                        handleGameDetailChange("icon", "");
                       }
-                      accept="image/*"
-                      disabled={loading}
-                      className="h-full"
-                      preview={false}
-                      value=""
-                      description=""
-                    />
-                  </div>
+                    }}
+                    accept="image/*"
+                    disabled={loading}
+                    initialPreview={currentGameDetail.icon}
+                  />
                 </div>
               </div>
             </div>

@@ -445,3 +445,19 @@ export const updateSportGameAnalysisDisplayOrder = async (
     throw error;
   }
 };
+
+// 수동 등록 상세 데이터 조회
+export const getManualRegistrationDetail = async (id: number): Promise<any> => {
+  try {
+    const response = await axios.get(`/sport-categories/admin/${id}`);
+
+    if (response.data && response.data.success) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Error fetching manual registration detail with id ${id}:`, error);
+    throw error;
+  }
+};
