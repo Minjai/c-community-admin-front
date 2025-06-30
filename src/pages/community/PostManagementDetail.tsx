@@ -771,81 +771,83 @@ const PostDetail = () => {
         <TextEditor content={content} setContent={setContent} height="400px" />
       </div>
 
-      {/* 댓글 작성 영역 */}
-      <div className="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">댓글 ({comments.length})</h3>
+      {/* 댓글 작성 영역 (편집 모드에서만 표시) */}
+      {isEditMode && post && (
+        <div className="mb-4 p-3 border border-gray-200 rounded-md bg-gray-50">
+          <h3 className="text-lg font-medium text-gray-900 mb-3">댓글 ({comments.length})</h3>
 
-        <div className="flex gap-4 mb-4">
-          {/* 닉네임 입력란 */}
-          <div className="w-1/3">
-            <input
-              type="text"
-              placeholder="닉네임"
-              value={commentTempUser.nickname}
-              onChange={(e) => handleCommentTempUserChange("nickname", e.target.value)}
-              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-            />
+          <div className="flex gap-3 mb-3">
+            {/* 닉네임 입력란 */}
+            <div className="w-1/3">
+              <input
+                type="text"
+                placeholder="닉네임"
+                value={commentTempUser.nickname}
+                onChange={(e) => handleCommentTempUserChange("nickname", e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+
+            {/* 프로필 이미지 */}
+            <div className="w-20">
+              <FileUpload
+                onChange={handleCommentProfileImageChange}
+                accept="image/*"
+                className="w-full h-10"
+                showText={false}
+              />
+            </div>
+
+            {/* 등급 선택 */}
+            <div className="flex-1">
+              <div className="grid grid-cols-3 gap-1 max-h-16 overflow-y-auto">
+                {userRanks.map((rank) => (
+                  <label
+                    key={rank.id}
+                    className="flex items-center p-1 border border-gray-200 rounded hover:bg-gray-100 text-xs"
+                  >
+                    <input
+                      type="radio"
+                      name="commentUserRank"
+                      value={rank.rankName}
+                      checked={commentTempUser.rank === rank.rankName}
+                      onChange={(e) => handleCommentTempUserChange("rank", e.target.value)}
+                      className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    />
+                    <span className="ml-1">{rank.rankName}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* 프로필 이미지 */}
-          <div className="w-20">
-            <FileUpload
-              onChange={handleCommentProfileImageChange}
-              accept="image/*"
-              className="w-full h-10"
-              showText={false}
-            />
-          </div>
-
-          {/* 등급 선택 */}
-          <div className="flex-1">
-            <div className="grid grid-cols-3 gap-2 max-h-20 overflow-y-auto">
-              {userRanks.map((rank) => (
-                <label
-                  key={rank.id}
-                  className="flex items-center p-1 border border-gray-200 rounded hover:bg-gray-100 text-xs"
-                >
-                  <input
-                    type="radio"
-                    name="commentUserRank"
-                    value={rank.rankName}
-                    checked={commentTempUser.rank === rank.rankName}
-                    onChange={(e) => handleCommentTempUserChange("rank", e.target.value)}
-                    className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300"
-                  />
-                  <span className="ml-1">{rank.rankName}</span>
-                </label>
-              ))}
+          {/* 댓글 입력란과 등록 버튼 */}
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <textarea
+                placeholder="댓글을 입력하세요..."
+                value={commentContent}
+                onChange={(e) => setCommentContent(e.target.value)}
+                rows={2}
+                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <div className="flex items-end">
+              <Button variant="primary" size="sm" onClick={handleCommentSubmit}>
+                댓글 등록
+              </Button>
             </div>
           </div>
         </div>
+      )}
 
-        {/* 댓글 입력란과 등록 버튼 */}
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <textarea
-              placeholder="댓글을 입력하세요..."
-              value={commentContent}
-              onChange={(e) => setCommentContent(e.target.value)}
-              rows={3}
-              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div className="flex items-end">
-            <Button variant="primary" size="sm" onClick={handleCommentSubmit}>
-              댓글 등록
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Comments Section (only in edit mode) */}
-      {isEditMode && post && (
-        <div className="mt-12">
+      {/* Comments Section (only in edit mode and when comments exist) */}
+      {isEditMode && post && comments.length > 0 && (
+        <div className="mt-4">
           {/* Comments list */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             {comments.map((comment) => (
-              <div key={comment.id} className="bg-gray-50 p-4 rounded-md shadow-sm">
+              <div key={comment.id} className="bg-gray-50 p-3 rounded-md shadow-sm">
                 {editingCommentId === comment.id ? (
                   <div>
                     <textarea
@@ -872,7 +874,7 @@ const PostDetail = () => {
                   <div>
                     <div className="flex justify-between items-center mb-2">
                       <p className="text-sm font-semibold text-gray-800">
-                        {comment.author?.nickname || "익명"}
+                        {comment.tempUser?.nickname || comment.author?.nickname || "익명"}
                       </p>
                       <span className="text-xs text-gray-500">{formatDate(comment.createdAt)}</span>
                     </div>
@@ -896,9 +898,6 @@ const PostDetail = () => {
                 )}
               </div>
             ))}
-            {comments.length === 0 && (
-              <p className="text-center text-gray-500">등록된 댓글이 없습니다.</p>
-            )}
           </div>
         </div>
       )}

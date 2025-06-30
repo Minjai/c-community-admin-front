@@ -46,6 +46,12 @@ export interface Comment {
   createdAt: string;
   depth: number;
   author?: User;
+  tempUser?: {
+    id: number;
+    nickname: string;
+    profileImageUrl?: string;
+    rank: string;
+  };
   children?: Comment[];
 }
 
