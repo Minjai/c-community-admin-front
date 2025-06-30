@@ -1,8 +1,17 @@
 import axios from "@/api/axios";
-import { useEffect, useState } from "react";
+import { useEffect, useState, ReactNode } from "react";
 import { Post } from "@/types/index";
 import { useNavigate } from "react-router-dom";
 import ActionButton from "@/components/ActionButton";
+import DataTable from "@/components/DataTable";
+
+// Define column type based on DataTable.tsx
+interface PostColumnDef {
+  header: string;
+  accessor: keyof Post | ((item: Post) => ReactNode);
+  cell?: (value: any, row: Post, index?: number) => React.ReactNode;
+  className?: string;
+}
 
 const PostManagement = () => {
   const [loading, setLoading] = useState<boolean>(false);
@@ -139,31 +148,71 @@ const PostManagement = () => {
     }
   };
 
-  // 체크박스 선택 처리
-  const handleSelectPost = (id: number) => {
-    setSelectedPosts((prev) => {
-      if (prev.includes(id)) {
-        return prev.filter((postId) => postId !== id);
-      } else {
-        return [...prev, id];
-      }
-    });
-  };
-
-  // 전체 선택/해제 처리
-  const handleSelectAll = () => {
-    if (selectedPosts.length === posts.length) {
-      setSelectedPosts([]);
-    } else {
-      setSelectedPosts(posts.map((post) => post.id));
-    }
-  };
-
   // 게시물 수정 페이지로 이동
   const handleEdit = (id: number, e: React.MouseEvent) => {
     e.stopPropagation(); // 이벤트 버블링 방지
     navigate(`/community/posts/${id}`);
   };
+
+  // 테이블 컬럼 정의
+  const columns = [
+    {
+      header: "제목",
+      accessor: "title" as keyof Post,
+      cell: (value: unknown, row: Post) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          onClick={() => handleClick(row.id)}
+        >
+          <div className="truncate max-w-xs" title={value as string}>
+            {value as string}
+          </div>
+        </span>
+      ),
+    },
+    {
+      header: "작성자",
+      accessor: "id" as keyof Post,
+      cell: (value: unknown, row: Post) =>
+        row.author?.nickname || row.tempUser?.nickname || "알 수 없음",
+    },
+    {
+      header: "작성일",
+      accessor: "createdAt" as keyof Post,
+      cell: (value: unknown) => new Date(value as string).toLocaleDateString(),
+    },
+    {
+      header: "조회/댓글/추천",
+      accessor: "id" as keyof Post,
+      cell: (value: unknown, row: Post) => (
+        <span className="text-center">
+          {`${row.viewCount || 0}/${row._count?.comments || 0}/${row._count?.likes || 0}`}
+        </span>
+      ),
+      className: "text-center",
+    },
+    {
+      header: "관리",
+      accessor: "id" as keyof Post,
+      cell: (value: unknown, row: Post) => (
+        <div className="flex space-x-1 justify-end">
+          <ActionButton
+            label="수정"
+            action="edit"
+            size="sm"
+            onClick={(e) => handleEdit(row.id, e)}
+          />
+          <ActionButton
+            label="삭제"
+            action="delete"
+            size="sm"
+            onClick={(e) => handleDelete(row.id, e)}
+          />
+        </div>
+      ),
+      className: "text-right",
+    },
+  ];
 
   useEffect(() => {
     getAllPost();
@@ -204,124 +253,21 @@ const PostManagement = () => {
         </button>
       </div>
 
-      <div className="overflow-x-auto rounded-lg">
-        <table className="min-w-full text-sm text-left border border-gray-200">
-          <thead className="bg-gray-100 text-gray-600 uppercase text-xs font-semibold">
-            <tr>
-              <th className="px-4 py-3 w-12">
-                <input
-                  type="checkbox"
-                  checked={selectedPosts.length === posts.length && posts.length > 0}
-                  onChange={handleSelectAll}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-              </th>
-              <th className="px-4 py-3">제목</th>
-              <th className="px-4 py-3">작성자</th>
-              <th className="px-4 py-3">작성일</th>
-              <th className="px-4 py-3 text-center">조회/댓글/추천</th>
-              <th className="px-4 py-3 text-right">관리</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {posts.length > 0 ? (
-              posts.map((post) => (
-                <tr key={post.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedPosts.includes(post.id)}
-                      onChange={() => handleSelectPost(post.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                  </td>
-                  <td
-                    className="px-4 py-3 font-medium text-blue-600 cursor-pointer"
-                    onClick={() => handleClick(post.id)}
-                  >
-                    <div className="truncate max-w-xs" title={post.title}>
-                      {post.title}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    {post.author?.nickname || post.tempUser?.nickname || "알 수 없음"}
-                  </td>
-                  <td className="px-4 py-3">{new Date(post.createdAt).toLocaleDateString()}</td>
-                  <td className="px-4 py-3 text-center">
-                    {post.viewCount || 0}/{post._count?.comments || 0}/{post._count?.likes || 0}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex space-x-1 justify-end">
-                      <ActionButton
-                        label="수정"
-                        action="edit"
-                        size="sm"
-                        onClick={(e) => handleEdit(post.id, e)}
-                      />
-                      <ActionButton
-                        label="삭제"
-                        action="delete"
-                        size="sm"
-                        onClick={(e) => handleDelete(post.id, e)}
-                      />
-                    </div>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                  게시물이 없습니다.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-
-        <div className="flex items-center justify-between mt-4">
-          <p className="text-sm text-gray-500">
-            총 <span className="font-semibold text-gray-700">{pagination.total || 0}</span>건 중
-            {pagination.page * pagination.limit - pagination.limit + 1}–
-            {Math.min(pagination.page * pagination.limit, pagination.total || 0)}
-          </p>
-          <div className="inline-flex items-center space-x-1">
-            <button
-              className="px-3 py-1 text-sm text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40"
-              disabled={pagination.page <= 1}
-              onClick={() => handlePageChange(pagination.page - 1)}
-            >
-              이전
-            </button>
-
-            {/* 페이지네이션 버튼 생성 */}
-            {Array.from(
-              { length: Math.ceil((pagination.total || 0) / pagination.limit) },
-              (_, i) => (
-                <button
-                  key={i}
-                  className={`px-3 py-1 text-sm border border-gray-300 rounded hover:bg-gray-100 
-                  ${
-                    pagination.page === i + 1
-                      ? "bg-blue-100 text-blue-700"
-                      : "bg-white text-gray-700"
-                  }`}
-                  onClick={() => handlePageChange(i + 1)}
-                >
-                  {i + 1}
-                </button>
-              )
-            )}
-
-            <button
-              className="px-3 py-1 text-sm text-gray-600 bg-white border border-gray-300 rounded hover:bg-gray-100 disabled:opacity-40"
-              disabled={pagination.page >= Math.ceil((pagination.total || 0) / pagination.limit)}
-              onClick={() => handlePageChange(pagination.page + 1)}
-            >
-              다음
-            </button>
-          </div>
-        </div>
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={posts}
+          loading={loading}
+          emptyMessage="게시물이 없습니다."
+          pagination={{
+            currentPage: pagination.page,
+            pageSize: pagination.limit,
+            totalItems: pagination.total,
+            onPageChange: handlePageChange,
+          }}
+          selectedIds={selectedPosts}
+          onSelectIds={setSelectedPosts}
+        />
       </div>
     </div>
   );

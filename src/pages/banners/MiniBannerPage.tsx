@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import BannerApiService from "../../services/BannerApiService";
 import { Banner } from "../../types";
 import DataTable from "../../components/DataTable";
@@ -24,7 +24,7 @@ const MiniBannerPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [currentBanner, setCurrentBanner] = useState<Partial<Banner> | null>(null);
+  const [currentBanner, setCurrentBanner] = useState<Banner | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [modalError, setModalError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -42,6 +42,9 @@ const MiniBannerPage: React.FC = () => {
 
   // 선택된 배너 ID 상태 추가
   const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
+
+  // 원본 배너 데이터 참조 (순서 변경 시 비교용)
+  const originalBannersRef = useRef<Banner[]>([]);
 
   const handleSearch = (type: string, value: string) => {
     if (type === "title") {
@@ -124,7 +127,12 @@ const MiniBannerPage: React.FC = () => {
       isPublic: 1,
       position: 0, // 새 배너는 항상 0번 순서
       bannerType: "mini",
-      linkUrl: "",
+      pDescription: null,
+      mDescription: null,
+      linkUrl: null,
+      showButton: false,
+      buttonText: "",
+      buttonColor: "#000000",
     });
     setPcImageFile(null);
     setMobileImageFile(null);
@@ -147,6 +155,12 @@ const MiniBannerPage: React.FC = () => {
       startDate: formattedStartDate,
       endDate: formattedEndDate,
       isPublic: banner.isPublic === 1 ? 1 : 0,
+      pDescription: banner.pDescription || null,
+      mDescription: banner.mDescription || null,
+      linkUrl: banner.linkUrl || null,
+      showButton: banner.showButton || false,
+      buttonText: banner.buttonText || "",
+      buttonColor: banner.buttonColor || "#000000",
     });
 
     setPcImageFile(null);
@@ -186,7 +200,12 @@ const MiniBannerPage: React.FC = () => {
               isPublic: currentBanner.isPublic,
               position: currentBanner.position,
               bannerType: "mini",
+              pDescription: currentBanner.pDescription,
+              mDescription: currentBanner.mDescription,
               linkUrl: currentBanner.linkUrl,
+              showButton: currentBanner.showButton,
+              buttonText: currentBanner.buttonText,
+              buttonColor: currentBanner.buttonColor,
             },
             pcImageFile || undefined,
             mobileImageFile || undefined
@@ -222,7 +241,12 @@ const MiniBannerPage: React.FC = () => {
               isPublic: currentBanner.isPublic,
               position: 0, // 새 배너는 항상 0번 순서
               bannerType: "mini",
+              pDescription: currentBanner.pDescription,
+              mDescription: currentBanner.mDescription,
               linkUrl: currentBanner.linkUrl,
+              showButton: currentBanner.showButton,
+              buttonText: currentBanner.buttonText,
+              buttonColor: currentBanner.buttonColor,
             },
             pcImageFile,
             mobileImageFile
@@ -352,9 +376,6 @@ const MiniBannerPage: React.FC = () => {
     }
   };
 
-  // 원본 position 값 저장용 ref
-  const originalBannersRef = React.useRef<Banner[]>([]);
-
   // 테이블 컬럼 정의
   const columns = [
     {
@@ -381,12 +402,12 @@ const MiniBannerPage: React.FC = () => {
         />
       ),
       accessor: "id" as keyof Banner,
-      cell: (id: number) => (
+      cell: (value: unknown, row: Banner) => (
         <input
           type="checkbox"
           className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedBannerIds.includes(id)}
-          onChange={() => handleSelectBanner(id)}
+          checked={selectedBannerIds.includes(row.id)}
+          onChange={() => handleSelectBanner(row.id)}
         />
       ),
       className: "w-px px-4",
@@ -394,22 +415,26 @@ const MiniBannerPage: React.FC = () => {
     {
       header: "제목",
       accessor: "title" as keyof Banner,
-      cell: (value: string, row: Banner) => (
+      cell: (value: unknown, row: Banner) => (
         <span
           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
           onClick={() => handleEditBanner(row)}
         >
-          {value}
+          {value as string}
         </span>
       ),
     },
     {
       header: "이미지",
       accessor: "pUrl" as keyof Banner,
-      cell: (value: string) => (
+      cell: (value: unknown) => (
         <div className="w-20 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
           {value ? (
-            <img src={value} alt="PC 배너" className="max-w-full max-h-full object-contain" />
+            <img
+              src={value as string}
+              alt="PC 배너"
+              className="max-w-full max-h-full object-contain"
+            />
           ) : (
             <span className="text-xs text-gray-500">이미지 없음</span>
           )}
@@ -419,10 +444,14 @@ const MiniBannerPage: React.FC = () => {
     {
       header: "모바일 이미지",
       accessor: "mUrl" as keyof Banner,
-      cell: (value: string) => (
+      cell: (value: unknown) => (
         <div className="w-16 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
           {value ? (
-            <img src={value} alt="모바일 배너" className="max-w-full max-h-full object-contain" />
+            <img
+              src={value as string}
+              alt="모바일 배너"
+              className="max-w-full max-h-full object-contain"
+            />
           ) : (
             <span className="text-xs text-gray-500">이미지 없음</span>
           )}
@@ -432,17 +461,17 @@ const MiniBannerPage: React.FC = () => {
     {
       header: "시작일",
       accessor: "startDate" as keyof Banner,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: unknown) => formatDateForDisplay(value as string),
     },
     {
       header: "종료일",
       accessor: "endDate" as keyof Banner,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: unknown) => formatDateForDisplay(value as string),
     },
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof Banner,
-      cell: (value: number, row: Banner) => {
+      cell: (value: unknown, row: Banner) => {
         const isCurrentlyPublic = value === 1;
         if (!isCurrentlyPublic) {
           return (
@@ -473,12 +502,12 @@ const MiniBannerPage: React.FC = () => {
     {
       header: "순서",
       accessor: "position" as keyof Banner,
-      cell: (value: number, row: Banner, index: number) => (
+      cell: (value: unknown, row: Banner, index: number) => (
         <input
           type="number"
           min={1}
           className="w-16 border rounded px-2 py-1 text-center"
-          value={value}
+          value={value as number}
           onChange={(e) => handlePositionInputChange(index, Number(e.target.value))}
           style={{ background: "#fff" }}
         />
@@ -488,7 +517,7 @@ const MiniBannerPage: React.FC = () => {
     {
       header: "관리",
       accessor: "id" as keyof Banner,
-      cell: (id: number, row: Banner, index: number) => (
+      cell: (value: unknown, row: Banner, index: number) => (
         <div className="flex space-x-2">
           <ActionButton
             label="수정"
@@ -509,8 +538,9 @@ const MiniBannerPage: React.FC = () => {
 
   // 입력 필드 변경 처리
   const handleInputChange = (name: string, value: any) => {
-    if (!currentBanner) return;
-    setCurrentBanner({ ...currentBanner, [name]: value });
+    if (currentBanner) {
+      setCurrentBanner({ ...currentBanner, [name]: value });
+    }
   };
 
   const handleFileSelect = (field: "pcImage" | "mobileImage", file: File | null) => {
@@ -518,11 +548,15 @@ const MiniBannerPage: React.FC = () => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
-        setCurrentBanner((prev) => ({
-          ...prev,
-          [field]: result,
-          [field === "pcImage" ? "pUrl" : "mUrl"]: result,
-        }));
+        setCurrentBanner((prev) =>
+          prev
+            ? {
+                ...prev,
+                [field]: result,
+                [field === "pcImage" ? "pUrl" : "mUrl"]: result,
+              }
+            : null
+        );
       };
       reader.readAsDataURL(file);
       if (field === "pcImage") {
@@ -531,11 +565,15 @@ const MiniBannerPage: React.FC = () => {
         setMobileImageFile(file);
       }
     } else {
-      setCurrentBanner((prev) => ({
-        ...prev,
-        [field]: "",
-        [field === "pcImage" ? "pUrl" : "mUrl"]: "",
-      }));
+      setCurrentBanner((prev) =>
+        prev
+          ? {
+              ...prev,
+              [field]: "",
+              [field === "pcImage" ? "pUrl" : "mUrl"]: "",
+            }
+          : null
+      );
       if (field === "pcImage") {
         setPcImageFile(null);
       } else {
@@ -614,81 +652,121 @@ const MiniBannerPage: React.FC = () => {
             </div>
           )}
 
-          {/* Container for top controls */}
-          <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-4">
-            <div className="flex space-x-2">
-              <Button onClick={handleSaveBanner} disabled={isSaving}>
-                {isSaving ? "저장 중..." : isEditing ? "저장" : "추가"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setModalError(null);
-                  setShowModal(false);
-                  setPcImageFile(null);
-                  setMobileImageFile(null);
-                }}
-                disabled={isSaving}
-              >
-                취소
-              </Button>
+          <div className="space-y-6">
+            {/* 상단 버튼 영역 */}
+            <div className="flex justify-between items-center">
+              <div className="flex space-x-2">
+                <Button onClick={handleSaveBanner} disabled={isSaving}>
+                  저장
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setModalError(null);
+                    setShowModal(false);
+                    setPcImageFile(null);
+                    setMobileImageFile(null);
+                  }}
+                  disabled={isSaving}
+                >
+                  취소
+                </Button>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isPublic"
+                  checked={currentBanner.isPublic === 1}
+                  onChange={(e) => handleInputChange("isPublic", e.target.checked ? 1 : 0)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  disabled={isSaving}
+                />
+                <label htmlFor="isPublic" className="text-sm font-medium text-gray-700">
+                  공개 여부
+                </label>
+              </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="isPublic"
-                checked={currentBanner.isPublic === 1}
-                onChange={(e) => handleInputChange("isPublic", e.target.checked ? 1 : 0)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                disabled={isSaving}
+            {/* 배너 제목 */}
+            <div>
+              <Input
+                label="배너 제목"
+                value={currentBanner.title || ""}
+                onChange={(e) => handleInputChange("title", e.target.value)}
+                placeholder="배너 제목을 입력하세요"
               />
-              <label htmlFor="isPublic" className="text-sm font-medium text-gray-700">
-                공개 여부
-              </label>
             </div>
-          </div>
 
-          <div className="space-y-4">
-            <Input
-              label="배너 제목"
-              name="title"
-              value={currentBanner.title || ""}
-              onChange={(e) => handleInputChange("title", e.target.value)}
-              required
-            />
+            {/* PC/모바일 상세 설명 */}
+            <div>
+              <Input
+                label="배너 상세(PC)"
+                value={currentBanner.pDescription || ""}
+                onChange={(e) => handleInputChange("pDescription", e.target.value)}
+                placeholder="PC용 상세 설명을 입력하세요"
+              />
+            </div>
+            <div>
+              <Input
+                label="배너 상세(MO)"
+                value={currentBanner.mDescription || ""}
+                onChange={(e) => handleInputChange("mDescription", e.target.value)}
+                placeholder="모바일용 상세 설명을 입력하세요"
+              />
+            </div>
 
-            {currentBanner.showButton && (
-              <div className="space-y-4 pl-8">
-                <div className="flex items-center space-x-2">
-                  <label className="block text-sm font-medium text-gray-700 w-20">버튼 문구</label>
-                  <Input
-                    value={currentBanner.buttonText || ""}
-                    onChange={(e) => handleInputChange("buttonText", e.target.value)}
-                    placeholder="버튼에 표시할 텍스트"
-                    className="flex-1"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <label className="block text-sm font-medium text-gray-700 w-20">버튼 색상</label>
-                  <div className="flex flex-1 items-center space-x-2">
+            {/* 버튼 설정 */}
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="showButton"
+                  checked={currentBanner.showButton || false}
+                  onChange={(e) => handleInputChange("showButton", e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="showButton" className="text-sm font-medium text-gray-700">
+                  버튼 노출
+                </label>
+              </div>
+
+              {currentBanner.showButton && (
+                <div className="space-y-4 pl-8">
+                  <div className="flex items-center space-x-2">
+                    <label className="block text-sm font-medium text-gray-700 w-20">
+                      버튼 문구
+                    </label>
                     <Input
-                      value={currentBanner.buttonColor || "#000000"}
-                      onChange={(e) => handleInputChange("buttonColor", e.target.value)}
-                      placeholder="#000000"
+                      value={currentBanner.buttonText || ""}
+                      onChange={(e) => handleInputChange("buttonText", e.target.value)}
+                      placeholder="버튼에 표시할 텍스트"
                       className="flex-1"
                     />
-                    <input
-                      type="color"
-                      value={currentBanner.buttonColor || "#000000"}
-                      className="h-9 w-9 p-0 rounded-md border-gray-300 cursor-default"
-                      readOnly
-                      disabled
-                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <label className="block text-sm font-medium text-gray-700 w-20">
+                      버튼 색상
+                    </label>
+                    <div className="flex flex-1 items-center space-x-2">
+                      <Input
+                        value={currentBanner.buttonColor || "#000000"}
+                        onChange={(e) => handleInputChange("buttonColor", e.target.value)}
+                        placeholder="#000000"
+                        className="flex-1"
+                      />
+                      <input
+                        type="color"
+                        value={currentBanner.buttonColor || "#000000"}
+                        className="h-9 w-9 p-0 rounded-md border-gray-300 cursor-default"
+                        readOnly
+                        disabled
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* 이미지 업로드 영역 */}
             <div className="grid grid-cols-2 gap-4">
@@ -710,17 +788,18 @@ const MiniBannerPage: React.FC = () => {
               </div>
             </div>
 
+            {/* 링크 URL */}
             <div>
               <Input
                 label="링크 URL"
-                name="linkUrl"
                 value={currentBanner.linkUrl || ""}
                 onChange={(e) => handleInputChange("linkUrl", e.target.value)}
                 placeholder="https://example.com"
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 시작일/종료일 */}
+            <div className="grid grid-cols-2 gap-4">
               <DatePicker
                 label="시작일"
                 value={currentBanner.startDate || ""}
@@ -730,7 +809,6 @@ const MiniBannerPage: React.FC = () => {
                 label="종료일"
                 value={currentBanner.endDate || ""}
                 onChange={(date) => handleInputChange("endDate", date)}
-                disabled={isSaving}
               />
             </div>
           </div>

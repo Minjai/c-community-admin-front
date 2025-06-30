@@ -93,7 +93,6 @@ export interface Banner {
   pDescription?: string | null;
   mDescription?: string | null;
   linkUrl?: string | null;
-  linkUrl2?: string | null;
   isPublic: number;
   displayOrder?: number;
   position: number;

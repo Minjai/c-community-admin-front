@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import BannerApiService from "../../services/BannerApiService";
 import { Banner } from "../../types";
 import DataTable from "../../components/DataTable";
@@ -19,7 +19,7 @@ const CompanyBannerPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [currentBanner, setCurrentBanner] = useState<Partial<Banner> | null>(null);
+  const [currentBanner, setCurrentBanner] = useState<Banner | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -37,6 +37,9 @@ const CompanyBannerPage: React.FC = () => {
 
   // 선택된 배너 ID 상태 추가
   const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
+
+  // 원본 배너 데이터 참조 (순서 변경 시 비교용)
+  const originalBannersRef = useRef<Banner[]>([]);
 
   const handleSearch = (type: string, value: string) => {
     if (type === "title") {
@@ -117,9 +120,14 @@ const CompanyBannerPage: React.FC = () => {
       startDate: "",
       endDate: "",
       isPublic: 1,
-      position: 1, // 새 배너는 항상 1번 순서
+      position: 0, // 새 배너는 항상 0번 순서
       bannerType: "company",
-      linkUrl: "",
+      pDescription: null,
+      mDescription: null,
+      linkUrl: null,
+      showButton: false,
+      buttonText: "",
+      buttonColor: "#000000",
     });
     setPcImageFile(null);
     setMobileImageFile(null);
@@ -142,6 +150,12 @@ const CompanyBannerPage: React.FC = () => {
       startDate: formattedStartDate,
       endDate: formattedEndDate,
       isPublic: banner.isPublic === 1 ? 1 : 0,
+      pDescription: banner.pDescription || null,
+      mDescription: banner.mDescription || null,
+      linkUrl: banner.linkUrl || null,
+      showButton: banner.showButton || false,
+      buttonText: banner.buttonText || "",
+      buttonColor: banner.buttonColor || "#000000",
     });
 
     setPcImageFile(null);
@@ -181,7 +195,12 @@ const CompanyBannerPage: React.FC = () => {
               isPublic: currentBanner.isPublic,
               position: currentBanner.position,
               bannerType: "company",
+              pDescription: currentBanner.pDescription,
+              mDescription: currentBanner.mDescription,
               linkUrl: currentBanner.linkUrl,
+              showButton: currentBanner.showButton,
+              buttonText: currentBanner.buttonText,
+              buttonColor: currentBanner.buttonColor,
             },
             pcImageFile || undefined,
             mobileImageFile || undefined
@@ -217,7 +236,12 @@ const CompanyBannerPage: React.FC = () => {
               isPublic: currentBanner.isPublic,
               position: 0, // 새 배너는 항상 0번 순서
               bannerType: "company",
+              pDescription: currentBanner.pDescription,
+              mDescription: currentBanner.mDescription,
               linkUrl: currentBanner.linkUrl,
+              showButton: currentBanner.showButton,
+              buttonText: currentBanner.buttonText,
+              buttonColor: currentBanner.buttonColor,
             },
             pcImageFile,
             mobileImageFile
@@ -348,9 +372,6 @@ const CompanyBannerPage: React.FC = () => {
     }
   };
 
-  // 원본 position 값 저장용 ref
-  const originalBannersRef = React.useRef<Banner[]>([]);
-
   // 모달 닫기 핸들러
   const handleCloseModal = () => {
     setModalError(null);
@@ -361,8 +382,9 @@ const CompanyBannerPage: React.FC = () => {
 
   // 입력 필드 변경 처리
   const handleInputChange = (name: string, value: any) => {
-    if (!currentBanner) return;
-    setCurrentBanner({ ...currentBanner, [name]: value });
+    if (currentBanner) {
+      setCurrentBanner({ ...currentBanner, [name]: value });
+    }
   };
 
   const handleFileSelect = (field: "pcImage" | "mobileImage", file: File | null) => {
@@ -370,11 +392,15 @@ const CompanyBannerPage: React.FC = () => {
       const reader = new FileReader();
       reader.onloadend = () => {
         const result = reader.result as string;
-        setCurrentBanner((prev) => ({
-          ...prev,
-          [field]: result,
-          [field === "pcImage" ? "pUrl" : "mUrl"]: result,
-        }));
+        setCurrentBanner((prev) =>
+          prev
+            ? {
+                ...prev,
+                [field]: result,
+                [field === "pcImage" ? "pUrl" : "mUrl"]: result,
+              }
+            : null
+        );
       };
       reader.readAsDataURL(file);
       if (field === "pcImage") {
@@ -383,11 +409,15 @@ const CompanyBannerPage: React.FC = () => {
         setMobileImageFile(file);
       }
     } else {
-      setCurrentBanner((prev) => ({
-        ...prev,
-        [field]: "",
-        [field === "pcImage" ? "pUrl" : "mUrl"]: "",
-      }));
+      setCurrentBanner((prev) =>
+        prev
+          ? {
+              ...prev,
+              [field]: "",
+              [field === "pcImage" ? "pUrl" : "mUrl"]: "",
+            }
+          : null
+      );
       if (field === "pcImage") {
         setPcImageFile(null);
       } else {
@@ -422,12 +452,12 @@ const CompanyBannerPage: React.FC = () => {
         />
       ),
       accessor: "id" as keyof Banner,
-      cell: (id: number) => (
+      cell: (value: unknown, row: Banner) => (
         <input
           type="checkbox"
           className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedBannerIds.includes(id)}
-          onChange={() => handleSelectBanner(id)}
+          checked={selectedBannerIds.includes(row.id)}
+          onChange={() => handleSelectBanner(row.id)}
         />
       ),
       className: "w-px px-4",
@@ -436,12 +466,12 @@ const CompanyBannerPage: React.FC = () => {
     {
       header: "제목",
       accessor: "title" as keyof Banner,
-      cell: (value: string, row: Banner) => (
+      cell: (value: unknown, row: Banner) => (
         <span
           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
           onClick={() => handleEditBanner(row)}
         >
-          {value}
+          {value as string}
         </span>
       ),
     },
@@ -449,10 +479,14 @@ const CompanyBannerPage: React.FC = () => {
     {
       header: "이미지",
       accessor: "pUrl" as keyof Banner,
-      cell: (value: string) => (
+      cell: (value: unknown) => (
         <div className="w-20 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
           {value ? (
-            <img src={value} alt="PC 배너" className="max-w-full max-h-full object-contain" />
+            <img
+              src={value as string}
+              alt="PC 배너"
+              className="max-w-full max-h-full object-contain"
+            />
           ) : (
             <span className="text-xs text-gray-500">이미지 없음</span>
           )}
@@ -463,10 +497,14 @@ const CompanyBannerPage: React.FC = () => {
     {
       header: "모바일 이미지",
       accessor: "mUrl" as keyof Banner,
-      cell: (value: string) => (
+      cell: (value: unknown) => (
         <div className="w-16 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
           {value ? (
-            <img src={value} alt="모바일 배너" className="max-w-full max-h-full object-contain" />
+            <img
+              src={value as string}
+              alt="모바일 배너"
+              className="max-w-full max-h-full object-contain"
+            />
           ) : (
             <span className="text-xs text-gray-500">이미지 없음</span>
           )}
@@ -477,19 +515,19 @@ const CompanyBannerPage: React.FC = () => {
     {
       header: "시작일자",
       accessor: "startDate" as keyof Banner,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: unknown) => formatDateForDisplay(value as string),
     },
     // 5. 종료일자
     {
       header: "종료일자",
       accessor: "endDate" as keyof Banner,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: unknown) => formatDateForDisplay(value as string),
     },
     // 6. 공개 여부
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof Banner,
-      cell: (value: number | boolean, row: Banner) => {
+      cell: (value: unknown, row: Banner) => {
         const isCurrentlyPublic = value === 1 || value === true;
 
         if (!isCurrentlyPublic) {
@@ -525,12 +563,12 @@ const CompanyBannerPage: React.FC = () => {
     {
       header: "순서",
       accessor: "position" as keyof Banner,
-      cell: (value: number, row: Banner, index: number) => (
+      cell: (value: unknown, row: Banner, index: number) => (
         <input
           type="number"
           min={1}
           className="w-16 border rounded px-2 py-1 text-center"
-          value={value}
+          value={value as number}
           onChange={(e) => handlePositionInputChange(index, Number(e.target.value))}
           style={{ background: "#fff" }}
         />
@@ -540,7 +578,7 @@ const CompanyBannerPage: React.FC = () => {
     {
       header: "관리",
       accessor: "id" as keyof Banner,
-      cell: (id: number, row: Banner, index: number) => (
+      cell: (value: unknown, row: Banner, index: number) => (
         <div className="flex space-x-2">
           <ActionButton
             label="수정"

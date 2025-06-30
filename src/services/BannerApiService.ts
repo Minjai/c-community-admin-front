@@ -4,7 +4,11 @@ import { Banner, ApiResponse, PaginationInfo } from "../types";
 // 배너 API 서비스
 const BannerApiService = {
   // 메인 배너 목록 조회 (페이지네이션 적용)
-  getMainBanners: async (page = 1, limit = 10, searchValue = ""): Promise<ApiResponse<Banner[]>> => {
+  getMainBanners: async (
+    page = 1,
+    limit = 10,
+    searchValue = ""
+  ): Promise<ApiResponse<Banner[]>> => {
     try {
       // API 요청 시 page와 limit 파라미터 추가
       const response = await axios.get("/banner/main", {
@@ -25,7 +29,11 @@ const BannerApiService = {
   },
 
   // 업체 배너 목록 조회
-  getCompanyBanners: async (page = 1, limit = 10, searchValue = ''): Promise<ApiResponse<Banner[]>> => {
+  getCompanyBanners: async (
+    page = 1,
+    limit = 10,
+    searchValue = ""
+  ): Promise<ApiResponse<Banner[]>> => {
     try {
       const response = await axios.get("/banner/company", {
         params: { page, limit, title: searchValue },
@@ -43,7 +51,11 @@ const BannerApiService = {
   },
 
   // 하단 배너 목록 조회
-  getBottomBanners: async (page = 1, limit = 10, searchValue = ''): Promise<ApiResponse<Banner[]>> => {
+  getBottomBanners: async (
+    page = 1,
+    limit = 10,
+    searchValue = ""
+  ): Promise<ApiResponse<Banner[]>> => {
     try {
       const response = await axios.get("/banner/bottom", {
         params: { page, limit, title: searchValue },
@@ -91,7 +103,11 @@ const BannerApiService = {
   },
 
   // 미니 배너 목록 조회
-  getMiniBanners: async (page = 1, limit = 10 , searchValue = ''): Promise<ApiResponse<Banner[]>> => {
+  getMiniBanners: async (
+    page = 1,
+    limit = 10,
+    searchValue = ""
+  ): Promise<ApiResponse<Banner[]>> => {
     try {
       const response = await axios.get("/banner/mini", {
         params: { page, limit, title: searchValue },
@@ -173,8 +189,20 @@ const BannerApiService = {
     // 텍스트 데이터 추가
     Object.keys(bannerData).forEach((key) => {
       if (bannerData[key] !== undefined && bannerData[key] !== null) {
+        // 날짜 필드 처리
+        if (key === "startDate" || key === "endDate") {
+          try {
+            // ISO 형식으로 변환
+            const dateValue = new Date(bannerData[key]).toISOString();
+            formData.append(key, dateValue);
+            console.log(`변환된 ${key} (업체):`, dateValue);
+          } catch (e) {
+            console.error(`${key} 형식 오류 (업체):`, e);
+            formData.append(key, bannerData[key]); // 오류 시 원본 값 사용
+          }
+        }
         // position 값은 문자열로 변환하여 전송
-        if (key === "position") {
+        else if (key === "position") {
           formData.append(key, String(bannerData[key]));
         } else {
           formData.append(key, bannerData[key]);
@@ -401,8 +429,20 @@ const BannerApiService = {
       // 텍스트 데이터 추가
       Object.keys(bannerData).forEach((key) => {
         if (bannerData[key] !== undefined && bannerData[key] !== null) {
+          // 날짜 필드 처리
+          if (key === "startDate" || key === "endDate") {
+            try {
+              // ISO 형식으로 변환
+              const dateValue = new Date(bannerData[key]).toISOString();
+              formData.append(key, dateValue);
+              console.log(`변환된 ${key} (업체 멀티파트):`, dateValue);
+            } catch (e) {
+              console.error(`${key} 형식 오류 (업체 멀티파트):`, e);
+              formData.append(key, bannerData[key]); // 오류 시 원본 값 사용
+            }
+          }
           // position 값은 문자열로 변환하여 전송
-          if (key === "position") {
+          else if (key === "position") {
             formData.append(key, String(bannerData[key]));
           } else {
             formData.append(key, bannerData[key]);

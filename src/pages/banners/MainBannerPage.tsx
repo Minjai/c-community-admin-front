@@ -137,12 +137,11 @@ const MainBannerPage: React.FC = () => {
       startDate: "",
       endDate: "",
       isPublic: 1,
-      position: 1, // 새 배너는 항상 1번 순서
+      position: 0, // 새 배너는 항상 0번 순서
       bannerType: "main",
       pDescription: null,
       mDescription: null,
       linkUrl: null,
-      linkUrl2: null,
       showButton: false,
       buttonText: "",
       buttonColor: "#000000",
@@ -169,7 +168,6 @@ const MainBannerPage: React.FC = () => {
       pDescription: banner.pDescription || null,
       mDescription: banner.mDescription || null,
       linkUrl: banner.linkUrl || null,
-      linkUrl2: banner.linkUrl2 || null,
       showButton: banner.showButton || false,
       buttonText: banner.buttonText || "",
       buttonColor: banner.buttonColor || "#000000",
@@ -217,7 +215,6 @@ const MainBannerPage: React.FC = () => {
             pDescription: currentBanner.pDescription,
             mDescription: currentBanner.mDescription,
             linkUrl: currentBanner.linkUrl,
-            linkUrl2: currentBanner.linkUrl2,
             startDate: startDate,
             endDate: endDate,
             isPublic: currentBanner.isPublic,
@@ -237,7 +234,6 @@ const MainBannerPage: React.FC = () => {
               pDescription: currentBanner.pDescription,
               mDescription: currentBanner.mDescription,
               linkUrl: currentBanner.linkUrl,
-              linkUrl2: currentBanner.linkUrl2,
               startDate: startDate,
               endDate: endDate,
               isPublic: currentBanner.isPublic,
@@ -277,7 +273,6 @@ const MainBannerPage: React.FC = () => {
               pDescription: currentBanner.pDescription,
               mDescription: currentBanner.mDescription,
               linkUrl: currentBanner.linkUrl,
-              linkUrl2: currentBanner.linkUrl2,
               startDate: startDate,
               endDate: endDate,
               isPublic: currentBanner.isPublic,
@@ -470,12 +465,12 @@ const MainBannerPage: React.FC = () => {
         />
       ),
       accessor: "id" as keyof Banner,
-      cell: (id: number) => (
+      cell: (value: unknown, row: Banner) => (
         <input
           type="checkbox"
           className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedBannerIds.includes(id)}
-          onChange={() => handleSelectBanner(id)}
+          checked={selectedBannerIds.includes(row.id)}
+          onChange={() => handleSelectBanner(row.id)}
         />
       ),
       // className 조절하여 너비 최소화
@@ -484,22 +479,26 @@ const MainBannerPage: React.FC = () => {
     {
       header: "제목",
       accessor: "title" as keyof Banner,
-      cell: (value: string, row: Banner) => (
+      cell: (value: unknown, row: Banner) => (
         <span
           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
           onClick={() => handleEditBanner(row)}
         >
-          {value}
+          {value as string}
         </span>
       ),
     },
     {
       header: "이미지",
       accessor: "pUrl" as keyof Banner,
-      cell: (value: string) => (
+      cell: (value: unknown) => (
         <div className="w-20 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
           {value ? (
-            <img src={value} alt="PC 배너" className="max-w-full max-h-full object-contain" />
+            <img
+              src={value as string}
+              alt="PC 배너"
+              className="max-w-full max-h-full object-contain"
+            />
           ) : (
             <span className="text-xs text-gray-500">이미지 없음</span>
           )}
@@ -509,10 +508,14 @@ const MainBannerPage: React.FC = () => {
     {
       header: "모바일 이미지",
       accessor: "mUrl" as keyof Banner,
-      cell: (value: string) => (
+      cell: (value: unknown) => (
         <div className="w-16 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
           {value ? (
-            <img src={value} alt="모바일 배너" className="max-w-full max-h-full object-contain" />
+            <img
+              src={value as string}
+              alt="모바일 배너"
+              className="max-w-full max-h-full object-contain"
+            />
           ) : (
             <span className="text-xs text-gray-500">이미지 없음</span>
           )}
@@ -522,17 +525,17 @@ const MainBannerPage: React.FC = () => {
     {
       header: "시작일",
       accessor: "startDate" as keyof Banner,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: unknown) => formatDateForDisplay(value as string),
     },
     {
       header: "종료일",
       accessor: "endDate" as keyof Banner,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: unknown) => formatDateForDisplay(value as string),
     },
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof Banner,
-      cell: (value: number | boolean, row: Banner) => {
+      cell: (value: unknown, row: Banner) => {
         const isCurrentlyPublic = value === 1 || value === true;
         if (!isCurrentlyPublic) {
           return (
@@ -563,12 +566,12 @@ const MainBannerPage: React.FC = () => {
     {
       header: "순서",
       accessor: "position" as keyof Banner,
-      cell: (value: number, row: Banner, index: number) => (
+      cell: (value: unknown, row: Banner, index: number) => (
         <input
           type="number"
           min={1}
           className="w-16 border rounded px-2 py-1 text-center"
-          value={value}
+          value={value as number}
           onChange={(e) => handlePositionInputChange(index, Number(e.target.value))}
           style={{ background: "#fff" }}
         />
@@ -578,7 +581,7 @@ const MainBannerPage: React.FC = () => {
     {
       header: "관리",
       accessor: "id" as keyof Banner,
-      cell: (value: number, row: Banner, index: number) => (
+      cell: (value: unknown, row: Banner, index: number) => (
         <div className="flex space-x-1">
           <ActionButton
             label="수정"
@@ -590,7 +593,7 @@ const MainBannerPage: React.FC = () => {
             label="삭제"
             action="delete"
             size="sm"
-            onClick={() => handleDeleteBanner(value)}
+            onClick={() => handleDeleteBanner(row.id)}
           />
         </div>
       ),
@@ -639,7 +642,6 @@ const MainBannerPage: React.FC = () => {
             pDescription: banner.pDescription || null,
             mDescription: banner.mDescription || null,
             linkUrl: banner.linkUrl || null,
-            linkUrl2: banner.linkUrl2 || null,
             showButton: banner.showButton || false,
             buttonText: banner.buttonText || "",
             buttonColor: banner.buttonColor || "#000000",
