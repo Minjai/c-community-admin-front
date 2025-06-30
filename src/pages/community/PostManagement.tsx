@@ -244,7 +244,9 @@ const PostManagement = () => {
                       {post.title}
                     </div>
                   </td>
-                  <td className="px-4 py-3">{post.author?.nickname || "알 수 없음"}</td>
+                  <td className="px-4 py-3">
+                    {post.author?.nickname || post.tempUser?.nickname || "알 수 없음"}
+                  </td>
                   <td className="px-4 py-3">{new Date(post.createdAt).toLocaleDateString()}</td>
                   <td className="px-4 py-3 text-center">
                     {post.viewCount || 0}/{post._count?.comments || 0}/{post._count?.likes || 0}

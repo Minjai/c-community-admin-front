@@ -22,6 +22,16 @@ export interface Post {
   imageUrl?: string;
   tags?: string[];
   author?: User;
+  tempUser?: {
+    id: number;
+    nickname: string;
+    profileImageUrl?: string;
+    rank: string;
+  };
+  _count?: {
+    comments: number;
+    likes: number;
+  };
   attachments?: Attachment[];
   comments?: Comment[];
   likes?: PostLike[];

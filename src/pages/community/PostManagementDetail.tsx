@@ -7,6 +7,7 @@ import { AxiosProgressEvent } from "axios";
 import Alert from "@/components/Alert";
 import Button from "@/components/Button";
 import { formatDate } from "@/utils/dateUtils";
+import FileUpload from "@/components/forms/FileUpload";
 
 // replaceAsync 유틸리티 함수 추가
 const replaceAsync = async (
@@ -121,6 +122,23 @@ interface Response {
   error?: string;
 }
 
+// 사용자 등급 타입 정의
+interface UserRank {
+  id: number;
+  rankName: string;
+  image: string;
+  score: number;
+}
+
+// tempUser 타입 정의
+interface TempUser {
+  nickname: string;
+  profileImageUrl: string;
+  rank: string;
+  title: string;
+  content: string;
+}
+
 const PostDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -141,6 +159,71 @@ const PostDetail = () => {
   const isNewPost = id === "new";
   const isEditMode = !isNewPost;
 
+  // tempUser 관련 상태 추가
+  const [tempUser, setTempUser] = useState<TempUser>({
+    nickname: "",
+    profileImageUrl: "",
+    rank: "",
+    title: "",
+    content: "",
+  });
+  const [userRanks, setUserRanks] = useState<UserRank[]>([]);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+
+  // 댓글 작성 관련 상태 추가
+  const [commentTempUser, setCommentTempUser] = useState({
+    nickname: "",
+    rank: "",
+    profileImageFile: null as File | null,
+  });
+  const [commentContent, setCommentContent] = useState("");
+
+  // 사용자 등급 목록 조회
+  const fetchUserRanks = async () => {
+    try {
+      const response = await axios.get("/admin/ranks");
+      if (response.data && response.data.ranks && Array.isArray(response.data.ranks)) {
+        setUserRanks(response.data.ranks);
+      } else if (Array.isArray(response.data)) {
+        setUserRanks(response.data);
+      } else {
+        setUserRanks([]);
+      }
+    } catch (err) {
+      console.error("Error fetching user ranks:", err);
+      setUserRanks([]);
+    }
+  };
+
+  // tempUser 정보 업데이트
+  const handleTempUserChange = (field: keyof TempUser, value: string) => {
+    setTempUser((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // 댓글 tempUser 정보 업데이트
+  const handleCommentTempUserChange = (field: string, value: string) => {
+    setCommentTempUser((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // 프로필 이미지 파일 변경 처리
+  const handleProfileImageChange = (file: File | null) => {
+    setProfileImageFile(file);
+  };
+
+  // 댓글 프로필 이미지 파일 변경 처리
+  const handleCommentProfileImageChange = (file: File | null) => {
+    setCommentTempUser((prev) => ({
+      ...prev,
+      profileImageFile: file,
+    }));
+  };
+
   const handleSubmit = async (e?: React.FormEvent<HTMLFormElement>) => {
     if (e) e.preventDefault();
     setError(null);
@@ -156,9 +239,6 @@ const PostDetail = () => {
       // 에디터 내용 분석
       const contentAnalysis = analyzeContent(content);
 
-      // **이미지와 콘텐츠를 함께 저장하는 새로운 접근법**
-      console.log("서버 API 명세에 맞춰 이미지와 게시물을 함께 전송합니다.");
-
       // 서버측 요구사항에 맞게 요청 형식 변경
       const formData = new FormData();
       formData.append("title", trimmedTitle);
@@ -167,61 +247,61 @@ const PostDetail = () => {
       formData.append("isPopular", isPopular.toString());
       formData.append("isPublic", isPublic.toString());
 
-      // 이미지 파일 추가 (에디터에서 감지된 이미지)
-      if (contentAnalysis.imgSources.length > 0) {
-        let imageCount = 0;
+      // tempUser 정보가 있는 경우
+      if (tempUser.nickname.trim()) {
+        formData.append("tempUserNickname", tempUser.nickname.trim());
+        formData.append("tempUserRank", tempUser.rank);
+        formData.append("tempUserTitle", tempUser.title);
+        formData.append("tempUserContent", tempUser.content);
 
-        // 이미지 소스를 파일로 변환하여 추가
+        // 프로필 이미지 파일이 있으면 추가
+        if (profileImageFile) {
+          formData.append("images", profileImageFile);
+        }
+      }
+
+      // 에디터에서 감지된 이미지들 추가
+      if (contentAnalysis.imgSources.length > 0) {
         for (const imgSrc of contentAnalysis.imgSources) {
           if (imgSrc.startsWith("data:image/")) {
             const file = base64ToFile(imgSrc);
             if (file) {
               formData.append("images", file);
-              imageCount++;
-              console.log(
-                `Base64 이미지를 File로 변환하여 추가: ${file.name} (${file.size} bytes)`
-              );
             }
           }
         }
-
-        console.log(`총 ${imageCount}개의 이미지가 FormData에 추가됨`);
-      } else {
-        console.log("이미지가 감지되지 않았습니다.");
       }
 
       // 진행률 설정
       setUploadProgress(30);
 
-      console.log("FormData 준비 완료");
-
       const response = await axios({
         method: isEditMode ? "PUT" : "POST",
         url: isEditMode ? `/admin/post/${id}` : "/admin/post",
         data: formData,
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
         onUploadProgress: (progressEvent: AxiosProgressEvent) => {
-          const total = progressEvent.total || 0;
-          const progress = total ? Math.round((progressEvent.loaded * 100) / total) : 0;
-          console.log(`업로드 진행률: ${progress}%`);
-          setUploadProgress(30 + progress * 0.7); // 30%~100% 구간으로 설정
+          if (progressEvent.total) {
+            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadProgress(progress);
+          }
         },
       });
 
-      if (response.data && (response.data.success || response.data.post)) {
-        console.log("게시물 저장 성공:", response.data);
-        setLoading(false);
-        alert(isEditMode ? "게시물이 수정되었습니다." : "게시물이 작성되었습니다.");
+      if (response.status === 200 || response.status === 201) {
+        alert(isEditMode ? "게시물이 수정되었습니다." : "게시물이 등록되었습니다.");
         navigate("/community/posts");
       } else {
-        console.error("게시물 저장 실패:", response.data);
-        setError(
-          response.data?.message ||
-            (isEditMode ? "수정 중 오류가 발생했습니다." : "등록 중 오류가 발생했습니다.")
-        );
+        setError("게시물 저장에 실패했습니다.");
       }
     } catch (error: any) {
-      console.error("처리 중 오류 발생:", error);
-      setError("게시물 처리 중 오류가 발생했습니다.");
+      console.error("게시물 저장 오류:", error);
+      setError(
+        "게시물을 저장하는 중 오류가 발생했습니다: " +
+          (error.response?.data?.error || "알 수 없는 오류")
+      );
     } finally {
       setSaving(false);
       setUploadProgress(0);
@@ -238,17 +318,10 @@ const PostDetail = () => {
 
     setLoading(true);
     try {
-      // API 응답 처리를 위한 로그 추가
-      console.log(`게시물 데이터 요청 중: /post/${id}`);
-      console.log(`댓글 데이터 요청 중: /comment/${id}`);
-
       const [postResponse, commentsResponse] = await Promise.all([
         axios.get(`/post/${id}`),
         axios.get(`/comment/${id}`),
       ]);
-
-      console.log("게시물 API 응답:", postResponse.data);
-      console.log("댓글 API 응답:", commentsResponse.data);
 
       // 게시물 데이터 처리: 다양한 응답 형식 지원
       let postData = null;
@@ -272,27 +345,21 @@ const PostDetail = () => {
       }
 
       if (postData) {
-        console.log("추출된 postData:", postData);
         setPost(postData);
         setTitle(postData.title || "");
         setTimeout(() => {
           setContent(postData.content || "");
         }, 0);
         const popularStatusFromServer = postData.isPopular;
-        console.log("서버에서 받은 isPopular 값:", popularStatusFromServer);
         const newIsPopularState = popularStatusFromServer === 1 ? 1 : 0;
-        console.log("새로 설정될 isPopular 상태 값:", newIsPopularState);
         setIsPopular(newIsPopularState);
 
         const publicStatusFromServer = postData.isPublic;
-        console.log("[DEBUG] 서버에서 받은 isPublic 값:", publicStatusFromServer); // DEBUG 로그
         const newIsPublicState =
           publicStatusFromServer === 1 || publicStatusFromServer === true ? 1 : 0;
-        console.log("[DEBUG] 새로 설정될 isPublic 상태 값:", newIsPublicState); // DEBUG 로그
         setIsPublic(newIsPublicState);
       } else {
         setError("게시물을 찾을 수 없습니다.");
-        console.error("게시물 조회 실패: 데이터 없음");
       }
 
       // 댓글 데이터 처리: 다양한 응답 형식 지원
@@ -319,7 +386,6 @@ const PostDetail = () => {
           for (const key in commentsResponse.data) {
             if (Array.isArray(commentsResponse.data[key])) {
               commentsData = commentsResponse.data[key];
-              console.log(`댓글 데이터를 '${key}' 필드에서 찾음:`, commentsData);
               break;
             }
           }
@@ -363,9 +429,7 @@ const PostDetail = () => {
     }
 
     try {
-      console.log(`댓글 삭제 요청: /comment/${commentId}`);
       const response = await axios.delete(`/comment/${commentId}`);
-      console.log("댓글 삭제 응답:", response.data);
 
       if (response.status === 200 || response.status === 204) {
         alert("댓글이 삭제되었습니다.");
@@ -387,35 +451,52 @@ const PostDetail = () => {
     }
   };
 
-  // 댓글 추가 함수
-  const handleAddComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!newComment.trim()) {
+  // 댓글 등록 처리
+  const handleCommentSubmit = async () => {
+    if (!commentContent.trim()) {
       alert("댓글 내용을 입력해주세요.");
       return;
     }
 
     try {
-      console.log(`댓글 추가 요청: /comment/${id}`);
-      const response = await axios.post(`/comment`, {
-        content: newComment,
-        postId: Number(id),
+      const formData = new FormData();
+      formData.append("content", commentContent.trim());
+      formData.append("postId", id!);
+
+      // tempUser 정보가 있는 경우
+      if (commentTempUser.nickname.trim()) {
+        formData.append("tempUser[nickname]", commentTempUser.nickname.trim());
+        formData.append("tempUser[rank]", commentTempUser.rank);
+        formData.append("tempUser[title]", "");
+        formData.append("tempUser[content]", "");
+
+        if (commentTempUser.profileImageFile) {
+          formData.append("tempUserProfileImage", commentTempUser.profileImageFile);
+        }
+      }
+
+      const response = await axios.post("/comment", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
 
-      console.log("댓글 추가 응답:", response.data);
-
       if (response.status === 201 || response.status === 200) {
-        alert("댓글이 추가되었습니다.");
-        setNewComment("");
+        alert("댓글이 등록되었습니다.");
+        setCommentContent("");
+        setCommentTempUser({
+          nickname: "",
+          rank: "",
+          profileImageFile: null,
+        });
         getPostDetail(); // 댓글 목록 새로고침
       } else {
-        alert("댓글 추가에 실패했습니다.");
+        alert("댓글 등록에 실패했습니다.");
       }
     } catch (error: any) {
-      console.error("댓글 추가 오류:", error);
+      console.error("댓글 등록 오류:", error);
       alert(
-        "댓글을 추가하는 중 오류가 발생했습니다: " +
+        "댓글을 등록하는 중 오류가 발생했습니다: " +
           (error.response?.data?.error || "알 수 없는 오류")
       );
     }
@@ -441,12 +522,9 @@ const PostDetail = () => {
     }
 
     try {
-      console.log(`댓글 수정 요청: /comment/${commentId}`);
       const response = await axios.put(`/comment/${commentId}`, {
         content: editCommentContent,
       });
-
-      console.log("댓글 수정 응답:", response.data);
 
       if (response.status === 200) {
         alert("댓글이 수정되었습니다.");
@@ -467,6 +545,7 @@ const PostDetail = () => {
 
   useEffect(() => {
     getPostDetail();
+    fetchUserRanks();
   }, [id]);
 
   // 에디터 컨테이너 참조가 변경되면 스크롤을 최상단으로 이동
@@ -478,78 +557,37 @@ const PostDetail = () => {
 
   // 데이터 분석 및 콘텐츠 내 이미지 처리
   const analyzeContent = (content: string) => {
-    console.log("전체 에디터 내용:", content);
-
     // 에디터 내용 샘플 출력 (기본값)
-    const contentSample = content;
-    console.log("에디터 내용 샘플:", contentSample);
+    const sampleContent = content.substring(0, 100) + (content.length > 100 ? "..." : "");
 
-    // 이미지 태그 추출 (정규식)
-    const imgTags = content.match(/<img[^>]+>/g) || [];
-    console.log("에디터의 모든 이미지 태그:", imgTags.length ? imgTags : "이미지 태그 없음");
-
-    // 이미지 소스 추출
+    // 이미지 태그 추출
+    const imgRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
     const imgSources: string[] = [];
-    imgTags.forEach((tag) => {
-      const srcMatch = tag.match(/src=["']([^"']+)["']/);
-      if (srcMatch && srcMatch[1]) {
-        imgSources.push(srcMatch[1]);
-      }
-    });
+    let match;
 
-    // 이미지 태그 수와 추출된 이미지 소스 수가 일치하는지 확인
-    console.log(
-      `이미지 태그 개수: ${imgTags.length}, 추출된 이미지 소스 개수: ${imgSources.length}`
-    );
-    if (imgSources.length > 0) {
-      // 첫 번째와 마지막 이미지 소스 미리보기
-      console.log("첫 번째 이미지 소스:", imgSources[0].substring(0, 50) + "...");
-      if (imgSources.length > 1) {
-        console.log(
-          "마지막 이미지 소스:",
-          imgSources[imgSources.length - 1].substring(0, 50) + "..."
-        );
+    while ((match = imgRegex.exec(content)) !== null) {
+      const imgSrc = match[1];
+      if (imgSrc && !imgSrc.startsWith("http")) {
+        imgSources.push(imgSrc);
       }
     }
 
-    // 이미지 감지 여부
-    const hasImgTag = imgTags.length > 0;
-    const hasBase64Image = content.includes("data:image/");
-    const hasEmbeddedImage = imgSources.some((src) => src.startsWith("data:image/"));
-    const hasQuillImage = content.includes('class="ql-image"');
-    const hasGifImage = content.toLowerCase().includes(".gif") || content.includes("image/gif");
-
-    console.log("폼 제출 전 내용 분석:", {
-      hasImgTag,
-      hasBase64Image,
-      hasEmbeddedImage,
-      hasQuillImage,
-      hasGifImage,
-      imgTagCount: imgTags.length,
-      imgSourceCount: imgSources.length,
-    });
-
     return {
-      imgTags,
       imgSources,
-      hasImage: hasImgTag || hasBase64Image || hasEmbeddedImage || hasQuillImage,
-      hasBase64Images: hasBase64Image || hasEmbeddedImage,
+      sampleContent,
     };
   };
 
   // base64 이미지를 File 객체로 변환하는 함수
   const base64ToFile = (base64String: string): File | null => {
     try {
-      // Base64 데이터에서 파일로 변환
       const parts = base64String.split(",");
       if (parts.length !== 2) {
-        console.error("잘못된 base64 형식:", base64String.substring(0, 30) + "...");
         return null;
       }
 
       const mimeMatch = parts[0].match(/:(.*?);/);
       if (!mimeMatch || !mimeMatch[1]) {
-        console.error("MIME 타입을 찾을 수 없음");
         return null;
       }
 
@@ -653,6 +691,65 @@ const PostDetail = () => {
         </div>
       </div>
 
+      {/* TempUser Information Section */}
+      <div className="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* 닉네임 */}
+          <div>
+            <label
+              htmlFor="tempUserNickname"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              닉네임
+            </label>
+            <input
+              type="text"
+              id="tempUserNickname"
+              value={tempUser.nickname}
+              onChange={(e) => handleTempUserChange("nickname", e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              placeholder="닉네임을 입력하세요"
+              disabled={saving}
+            />
+          </div>
+        </div>
+
+        {/* 프로필 이미지와 회원등급 */}
+        <div className="mt-4 flex gap-4">
+          {/* 프로필 이미지 */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              프로필 이미지 (선택사항)
+            </label>
+            <FileUpload onChange={handleProfileImageChange} accept="image/*" />
+          </div>
+
+          {/* 회원등급 */}
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">회원등급</label>
+            <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+              {userRanks.map((rank) => (
+                <label
+                  key={rank.id}
+                  className="flex items-center p-2 border border-gray-200 rounded hover:bg-gray-100"
+                >
+                  <input
+                    type="radio"
+                    name="userRank"
+                    value={rank.rankName}
+                    checked={tempUser.rank === rank.rankName}
+                    onChange={(e) => handleTempUserChange("rank", e.target.value)}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                    disabled={saving}
+                  />
+                  <span className="ml-2 text-sm">{rank.rankName}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Title Input */}
       <div className="mb-4">
         <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
@@ -674,27 +771,77 @@ const PostDetail = () => {
         <TextEditor content={content} setContent={setContent} height="400px" />
       </div>
 
+      {/* 댓글 작성 영역 */}
+      <div className="mb-6 p-4 border border-gray-200 rounded-md bg-gray-50">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">댓글 ({comments.length})</h3>
+
+        <div className="flex gap-4 mb-4">
+          {/* 닉네임 입력란 */}
+          <div className="w-1/3">
+            <input
+              type="text"
+              placeholder="닉네임"
+              value={commentTempUser.nickname}
+              onChange={(e) => handleCommentTempUserChange("nickname", e.target.value)}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+
+          {/* 프로필 이미지 */}
+          <div className="w-20">
+            <FileUpload
+              onChange={handleCommentProfileImageChange}
+              accept="image/*"
+              className="w-full h-10"
+              showText={false}
+            />
+          </div>
+
+          {/* 등급 선택 */}
+          <div className="flex-1">
+            <div className="grid grid-cols-3 gap-2 max-h-20 overflow-y-auto">
+              {userRanks.map((rank) => (
+                <label
+                  key={rank.id}
+                  className="flex items-center p-1 border border-gray-200 rounded hover:bg-gray-100 text-xs"
+                >
+                  <input
+                    type="radio"
+                    name="commentUserRank"
+                    value={rank.rankName}
+                    checked={commentTempUser.rank === rank.rankName}
+                    onChange={(e) => handleCommentTempUserChange("rank", e.target.value)}
+                    className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  />
+                  <span className="ml-1">{rank.rankName}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 댓글 입력란과 등록 버튼 */}
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <textarea
+              placeholder="댓글을 입력하세요..."
+              value={commentContent}
+              onChange={(e) => setCommentContent(e.target.value)}
+              rows={3}
+              className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          <div className="flex items-end">
+            <Button variant="primary" size="sm" onClick={handleCommentSubmit}>
+              댓글 등록
+            </Button>
+          </div>
+        </div>
+      </div>
+
       {/* Comments Section (only in edit mode) */}
       {isEditMode && post && (
         <div className="mt-12">
-          <h2 className="text-2xl font-semibold mb-4">댓글 ({comments.length})</h2>
-          {/* Add comment form */}
-          <form onSubmit={handleAddComment} className="mb-6">
-            <textarea
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="댓글을 입력하세요..."
-              rows={3}
-              className="w-full p-2 border border-gray-300 rounded-md mb-2 focus:ring-indigo-500 focus:border-indigo-500"
-              required
-            />
-            <div className="text-right">
-              <Button type="submit" variant="primary" size="sm">
-                댓글 등록
-              </Button>
-            </div>
-          </form>
-
           {/* Comments list */}
           <div className="space-y-4">
             {comments.map((comment) => (

@@ -17,6 +17,7 @@ interface FileUploadProps {
   value?: string;
   description?: string;
   initialPreview?: string;
+  showText?: boolean;
 }
 
 const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
@@ -37,6 +38,7 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
       value,
       description,
       initialPreview,
+      showText = true,
     },
     ref
   ) => {
@@ -242,20 +244,28 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
             onDrop={handleDrop}
             onClick={handleImageClick}
           >
-            <div className="space-y-1 text-center">
-              <CloudArrowUpIcon className="mx-auto h-12 w-12 text-gray-400" />
-              <div className="flex flex-col text-sm text-gray-600">
-                <span className="font-medium text-primary-600">파일 업로드</span>
-                <p className="text-gray-500">또는 드래그 앤 드롭</p>
+            {showText ? (
+              <div className="space-y-1 text-center">
+                <CloudArrowUpIcon className="mx-auto h-12 w-12 text-gray-400" />
+                <div className="flex flex-col text-sm text-gray-600">
+                  <span className="font-medium text-primary-600">파일 업로드</span>
+                  <p className="text-gray-500">또는 드래그 앤 드롭</p>
+                </div>
+                <p className="text-xs text-gray-500">PNG, JPG, GIF, WEBP 파일 지원</p>
               </div>
-              <p className="text-xs text-gray-500">PNG, JPG, GIF, WEBP 파일 지원</p>
-            </div>
+            ) : (
+              <div className="flex items-center justify-center">
+                <CloudArrowUpIcon className="h-6 w-6 text-gray-400" />
+              </div>
+            )}
           </div>
         )}
 
         {file && (
           <div className="mt-2 flex items-center">
-            <span className="text-sm text-gray-500 truncate max-w-full">{file.name}</span>
+            {showText && (
+              <span className="text-sm text-gray-500 truncate max-w-full">{file.name}</span>
+            )}
           </div>
         )}
 
