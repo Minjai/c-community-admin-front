@@ -28,6 +28,7 @@ interface User {
   rank: UserRank;
   profileImageUrl?: string;
   lastLoginAt?: string;
+  isDeleted: boolean;
 }
 
 const UserManagement = () => {
@@ -140,7 +141,11 @@ const UserManagement = () => {
   };
 
   // 상태에 따른 색상
-  const getStatusClassName = (status: string) => {
+  const getStatusClassName = (status: string, isDeleted: boolean) => {
+    if (isDeleted) {
+      return "bg-red-500 text-white";
+    }
+
     switch (status) {
       case "온라인":
         return "bg-green-100 text-green-800";
@@ -212,18 +217,23 @@ const UserManagement = () => {
     }
   };
 
-  // 회원 삭제 처리
+  // 회원 삭제 처리 (소프트 삭제)
   const handleDeleteUser = async (userId: number) => {
-    if (!window.confirm("정말로 이 회원을 삭제하시겠습니까?")) {
+    const user = users.find((u) => u.id === userId);
+    const nickname = user?.nickname || "알 수 없음";
+
+    if (
+      !window.confirm(`[${nickname}] 회원 삭제하시겠습니까?\n\n삭제된 회원은 복구 불가능합니다.`)
+    ) {
       return;
     }
 
     try {
-      await axios.delete(`/admin/account/${userId}`);
+      await axios.delete(`/admin/users/${userId}/delete`);
 
       setAlertMessage({
         type: "success",
-        message: "회원이 성공적으로 삭제되었습니다.",
+        message: "회원이 성공적으로 삭제 처리되었습니다.",
       });
 
       fetchUsers(currentPage, pageSize, searchValue);
@@ -231,7 +241,7 @@ const UserManagement = () => {
       console.error("Error deleting user:", err);
       setAlertMessage({
         type: "error",
-        message: "회원 삭제 중 오류가 발생했습니다.",
+        message: "회원 삭제 처리 중 오류가 발생했습니다.",
       });
     }
   };
@@ -311,13 +321,15 @@ const UserManagement = () => {
           accessor: "status" as keyof User,
           cell: (value: unknown, row: User) => {
             const status = value as string;
+            const isDeleted = row.isDeleted;
             return (
               <span
                 className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClassName(
-                  status
+                  status,
+                  isDeleted
                 )}`}
               >
-                {status}
+                {isDeleted ? "삭제" : status}
               </span>
             );
           },
