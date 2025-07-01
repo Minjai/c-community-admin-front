@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 스크롤 관련 스타일 */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  scroll-behavior: smooth;
+}
+
+/* 페이지 이동 시 스크롤 초기화 */
+.scroll-to-top {
+  scroll-behavior: auto;
+}
+
+/* 스크롤 컨테이너 초기화 */
+.overflow-auto,
+.overflow-y-auto {
+  scroll-behavior: auto;
+}
+
+/* 강제 스크롤 초기화 */
+html,
+body {
+  scroll-behavior: auto !important;
+}
+
 @layer base {
   body {
     @apply h-screen overflow-hidden bg-gray-50 text-gray-900;

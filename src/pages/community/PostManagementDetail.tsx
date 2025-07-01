@@ -8,6 +8,7 @@ import Alert from "@/components/Alert";
 import Button from "@/components/Button";
 import { formatDate } from "@/utils/dateUtils";
 import FileUpload from "@/components/forms/FileUpload";
+import { useScrollToTop } from "@/hooks/useScrollToTop";
 
 // replaceAsync 유틸리티 함수 추가
 const replaceAsync = async (
@@ -178,6 +179,9 @@ const PostDetail = () => {
   });
   const [commentContent, setCommentContent] = useState("");
 
+  // 스크롤을 맨 위로 이동
+  useScrollToTop();
+
   // 사용자 등급 목록 조회
   const fetchUserRanks = async () => {
     try {
@@ -247,7 +251,7 @@ const PostDetail = () => {
       formData.append("isPopular", isPopular.toString());
       formData.append("isPublic", isPublic.toString());
 
-      // tempUser 정보가 있는 경우
+      // tempUser 정보가 있는 경우 (새로 입력한 경우)
       if (tempUser.nickname.trim()) {
         formData.append("tempUserNickname", tempUser.nickname.trim());
         formData.append("tempUserRank", tempUser.rank);
@@ -258,7 +262,23 @@ const PostDetail = () => {
         if (profileImageFile) {
           formData.append("images", profileImageFile);
         }
+      } else if (isEditMode && post?.tempUser && post.tempUser.nickname) {
+        // 수정 모드이고 기존에 tempUser로 작성된 게시물인 경우
+        // 기존 tempUser 정보를 그대로 유지
+        formData.append("tempUserNickname", post.tempUser.nickname);
+        formData.append("tempUserRank", post.tempUser.rank || "");
+        // tempUser 타입에 title, content가 없으므로 안전하게 처리
+        formData.append("tempUserTitle", "");
+        formData.append("tempUserContent", "");
+      } else if (isEditMode) {
+        // 수정 모드이고 기존에 실제 사용자가 작성한 게시물인 경우
+        // 기존 작성자 정보를 유지하기 위해 authorId를 전송
+        if (post?.authorId) {
+          formData.append("authorId", post.authorId.toString());
+        }
       }
+      // tempUser가 없고 기존 작성자가 실제 사용자인 경우는 별도 처리하지 않음
+      // (서버에서 기존 작성자 정보를 유지)
 
       // 에디터에서 감지된 이미지들 추가
       if (contentAnalysis.imgSources.length > 0) {
@@ -358,6 +378,29 @@ const PostDetail = () => {
         const newIsPublicState =
           publicStatusFromServer === 1 || publicStatusFromServer === true ? 1 : 0;
         setIsPublic(newIsPublicState);
+
+        // 기존 게시물의 작성자 정보 확인
+        // tempUser 정보가 있으면 그 정보를 사용하고, 없으면 기존 작성자 정보를 유지
+        if (postData.tempUser && postData.tempUser.nickname) {
+          // 기존에 tempUser로 작성된 게시물인 경우
+          setTempUser({
+            nickname: postData.tempUser.nickname || "",
+            profileImageUrl: postData.tempUser.profileImageUrl || "",
+            rank: postData.tempUser.rank || "",
+            title: "", // tempUser 타입에 title이 없으므로 빈 문자열
+            content: "", // tempUser 타입에 content가 없으므로 빈 문자열
+          });
+        } else {
+          // tempUser가 null이거나 nickname이 없는 경우
+          // 기존에 실제 사용자가 작성한 게시물이므로 tempUser를 비워둠
+          setTempUser({
+            nickname: "",
+            profileImageUrl: "",
+            rank: "",
+            title: "",
+            content: "",
+          });
+        }
       } else {
         setError("게시물을 찾을 수 없습니다.");
       }

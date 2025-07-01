@@ -10,12 +10,13 @@ import Input from "@/components/forms/Input";
 import Select from "@/components/forms/Select";
 import Alert from "@/components/Alert";
 import SearchInput from "@/components/SearchInput";
+import { useScrollToTop } from "@/hooks/useScrollToTop";
 import type { Post, Board } from "@/types";
 
 // Define column type based on DataTable.tsx
 interface PostColumnDef {
   header: string;
-  accessor: keyof Post | ((item: Post) => ReactNode);
+  accessor: keyof Post;
   cell?: (value: any, row: Post, index?: number) => React.ReactNode;
   className?: string;
 }
@@ -38,6 +39,9 @@ const PostManagementPage: React.FC = () => {
 
   // 검색 value 상태
   const [searchValue, setSearchValue] = useState<string>("");
+
+  // 스크롤을 맨 위로 이동
+  useScrollToTop();
 
   // 게시판 목록 조회
   const fetchBoards = async () => {
@@ -160,8 +164,8 @@ const PostManagementPage: React.FC = () => {
     { header: "제목", accessor: "title" },
     {
       header: "작성자",
-      accessor: (item: Post) => item.author?.nickname || "-",
-      cell: (value: string) => value,
+      accessor: "authorId",
+      cell: (value: any, row: Post) => row.author?.nickname || "-",
     },
     { header: "조회수", accessor: "viewCount" },
     {
@@ -184,7 +188,7 @@ const PostManagementPage: React.FC = () => {
     },
     {
       header: "관리",
-      accessor: (item: Post) => item.id,
+      accessor: "id",
       cell: (value: any, row: Post, index?: number) => (
         <div className="flex space-x-1">
           <ActionButton

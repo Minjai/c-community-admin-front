@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import ActionButton from "@/components/ActionButton";
 import DataTable from "@/components/DataTable";
 import SearchInput from "@/components/SearchInput";
+import { useScrollToTop } from "@/hooks/useScrollToTop";
 
 // Define column type based on DataTable.tsx
 interface PostColumnDef {
@@ -27,6 +28,9 @@ const PostManagement = () => {
 
   // 검색 value 상태
   const [searchValue, setSearchValue] = useState<string>("");
+
+  // 스크롤을 맨 위로 이동
+  useScrollToTop();
 
   // 게시물 상세 페이지로 이동
   const handleClick = (id: number) => {
