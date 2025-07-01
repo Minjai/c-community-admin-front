@@ -115,7 +115,7 @@ const HomeManagementPage: React.FC = () => {
           limit,
           sortBy: "createdAt",
           sortOrder: "desc",
-          ...(search && { title: search }),
+          ...(search && { search }),
         },
       });
 

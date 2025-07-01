@@ -42,10 +42,8 @@ const SportsAnalysisManagement = () => {
   const [total, setTotal] = useState(0);
   const [searchValue, setSearchValue] = useState("");
 
-  const handleSearch = (type: string, value: string) => {
-    if (type === "title" || type === "content" || type === "both") {
-      fetchAnalyses(value);
-    }
+  const handleSearch = (value: string) => {
+    fetchAnalyses(value);
   };
 
   const fetchAnalyses = useCallback(async (searchValue: string = "") => {
@@ -330,6 +328,10 @@ const SportsAnalysisManagement = () => {
       {success && (
         <Alert type="success" message={success} onClose={() => setSuccess(null)} className="mb-4" />
       )}
+
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">스포츠 경기 분석</h1>
+      </div>
 
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center space-x-4">

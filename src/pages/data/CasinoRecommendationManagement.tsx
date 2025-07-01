@@ -134,10 +134,8 @@ const CasinoRecommendationManagement = () => {
   }, [publicSettings]);
 
   // 검색 핸들러
-  const handleSearch = (type: string, value: string) => {
-    if (type === "title") {
-      fetchRecommendations(value);
-    }
+  const handleSearch = (value: string) => {
+    fetchRecommendations(value);
   };
 
   // 게임 추천 목록 조회 (클라이언트 측 페이지네이션 로직 수정)

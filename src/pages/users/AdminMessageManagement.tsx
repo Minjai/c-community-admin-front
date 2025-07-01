@@ -305,7 +305,7 @@ const AdminMessageManagement = () => {
 
   useEffect(() => {
     fetchMessages(currentPage, pageSize, searchValue);
-  }, [fetchMessages, currentPage, pageSize, searchValue]);
+  }, [fetchMessages, currentPage, pageSize]);
 
   // 카테고리 필터 외부 클릭 시 닫기
   useEffect(() => {
@@ -639,11 +639,11 @@ const AdminMessageManagement = () => {
       ),
       accessor: "id" as keyof AdminMessage,
       className: "w-12",
-      cell: (value: any, message: AdminMessage) => (
+      cell: (value: unknown, row: AdminMessage) => (
         <input
           type="checkbox"
-          checked={selectedMessages.includes(message.id)}
-          onChange={() => handleToggleSelect(message.id)}
+          checked={selectedMessages.includes(row.id)}
+          onChange={() => handleToggleSelect(row.id)}
           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
         />
       ),
@@ -705,21 +705,21 @@ const AdminMessageManagement = () => {
       ),
       accessor: "category" as keyof AdminMessage,
       className: "w-24",
-      cell: (value: any, message: AdminMessage) => (
+      cell: (value: unknown, row: AdminMessage) => (
         <span
           className={`px-2 py-1 text-xs font-medium rounded-full ${
-            message.category === "GROUP"
+            row.category === "GROUP"
               ? "bg-blue-100 text-blue-800"
-              : message.category === "INDIVIDUAL"
+              : row.category === "INDIVIDUAL"
               ? "bg-green-100 text-green-800"
               : "bg-gray-100 text-gray-800"
           }`}
         >
-          {message.category === "GROUP"
+          {row.category === "GROUP"
             ? "그룹"
-            : message.category === "INDIVIDUAL"
+            : row.category === "INDIVIDUAL"
             ? "개별"
-            : message.category}
+            : row.category}
         </span>
       ),
     },
@@ -727,13 +727,13 @@ const AdminMessageManagement = () => {
       header: "제목",
       accessor: "title" as keyof AdminMessage,
       className: "w-80",
-      cell: (value: any, message: AdminMessage) => (
+      cell: (value: unknown, row: AdminMessage) => (
         <div
           className="max-w-md truncate text-blue-600 hover:underline cursor-pointer"
-          title={message.title}
-          onClick={() => handleOpenDetailModal(message)}
+          title={row.title}
+          onClick={() => handleOpenDetailModal(row)}
         >
-          {message.title}
+          {row.title}
         </div>
       ),
     },
@@ -741,24 +741,24 @@ const AdminMessageManagement = () => {
       header: "대상자",
       accessor: "recipientId" as keyof AdminMessage,
       className: "w-32",
-      cell: (value: any, message: AdminMessage) => formatRecipients(message),
+      cell: (value: unknown, row: AdminMessage) => formatRecipients(row),
     },
     {
       header: "발송일시",
       accessor: "sentAt" as keyof AdminMessage,
       className: "w-40",
-      cell: (value: any, message: AdminMessage) => formatDate(message.sentAt),
+      cell: (value: unknown, row: AdminMessage) => formatDate(row.sentAt),
     },
     {
       header: "관리",
       accessor: "id" as keyof AdminMessage,
       className: "w-24 text-center",
-      cell: (id: number, message: AdminMessage) => (
+      cell: (value: unknown, row: AdminMessage) => (
         <div className="flex justify-center">
           <ActionButton
             label="삭제"
             action="delete"
-            onClick={() => handleDeleteMessage(message.id)}
+            onClick={() => handleDeleteMessage(row.id)}
             disabled={loading || sending}
           />
         </div>
@@ -771,9 +771,7 @@ const AdminMessageManagement = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">관리자 쪽지 발송</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            회원들에게 쪽지를 발송하고 발송 내역을 관리할 수 있습니다.
-          </p>
+          <p className="mt-2 text-sm text-gray-700"></p>
         </div>
         <SearchInput
           searchValue={searchValue}

@@ -112,7 +112,7 @@ const RemittanceBannerPage: React.FC = () => {
 
   useEffect(() => {
     fetchBanners(currentPage, pageSize, searchValue);
-  }, [fetchBanners, currentPage, pageSize, searchValue]);
+  }, [fetchBanners, currentPage, pageSize]);
 
   // 배너 추가 모달 열기
   const handleAddBanner = () => {

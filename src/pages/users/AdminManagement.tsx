@@ -368,10 +368,8 @@ const AdminManagement: React.FC = () => {
   };
 
   // 검색 핸들러
-  const handleSearch = (type: string, value: string) => {
-    if (type === "nickname" || type === "email") {
-      fetchAdmins(currentPage, pageSize, value);
-    }
+  const handleSearch = (value: string) => {
+    fetchAdmins(currentPage, pageSize, value);
   };
 
   // DataTable 컬럼 정의
@@ -395,12 +393,12 @@ const AdminManagement: React.FC = () => {
           />
         ),
         accessor: "id" as keyof AdminUser,
-        cell: (id: number) => (
+        cell: (value: unknown, row: AdminUser) => (
           <input
             type="checkbox"
             className="form-checkbox h-4 w-4 text-blue-600"
-            checked={selectedAdminIds.includes(id)}
-            onChange={() => handleSelectAdmin(id)}
+            checked={selectedAdminIds.includes(row.id)}
+            onChange={() => handleSelectAdmin(row.id)}
             disabled={loading || saving}
           />
         ),
@@ -410,13 +408,13 @@ const AdminManagement: React.FC = () => {
       {
         header: "관리자 명",
         accessor: "nickname" as keyof AdminUser,
-        cell: (value: string, row: AdminUser) => (
+        cell: (value: unknown, row: AdminUser) => (
           <span
             className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-xs truncate"
             onClick={() => handleEditAdmin(row)}
-            title={value}
+            title={value as string}
           >
-            {value}
+            {value as string}
           </span>
         ),
       },
@@ -427,30 +425,36 @@ const AdminManagement: React.FC = () => {
       {
         header: "권한",
         accessor: "role" as keyof AdminUser,
-        cell: (value: string) => (
-          <span className={`px-2 py-1 rounded ${getRoleClassName(value)} text-xs font-medium`}>
-            {value}
+        cell: (value: unknown) => (
+          <span
+            className={`px-2 py-1 rounded ${getRoleClassName(value as string)} text-xs font-medium`}
+          >
+            {value as string}
           </span>
         ),
       },
       {
         header: "상태",
         accessor: "status" as keyof AdminUser,
-        cell: (value: string) => (
-          <span className={`px-2 py-1 rounded ${getStatusClassName(value)} text-xs font-medium`}>
-            {value}
+        cell: (value: unknown) => (
+          <span
+            className={`px-2 py-1 rounded ${getStatusClassName(
+              value as string
+            )} text-xs font-medium`}
+          >
+            {value as string}
           </span>
         ),
       },
       {
         header: "등록일자",
         accessor: "createdAt" as keyof AdminUser,
-        cell: (value: string) => formatDate(value),
+        cell: (value: unknown) => formatDate(value as string),
       },
       {
         header: "관리",
         accessor: "id" as keyof AdminUser,
-        cell: (id: number, row: AdminUser) => (
+        cell: (value: unknown, row: AdminUser) => (
           <div className="flex space-x-2">
             <ActionButton
               label="수정"
@@ -461,7 +465,7 @@ const AdminManagement: React.FC = () => {
             <ActionButton
               label="삭제"
               action="delete"
-              onClick={() => handleDeleteAdmin(id)}
+              onClick={() => handleDeleteAdmin(row.id)}
               disabled={loading || saving}
             />
           </div>

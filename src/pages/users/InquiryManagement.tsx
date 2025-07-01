@@ -120,10 +120,8 @@ const InquiryManagement = () => {
   };
 
   // 검색 핸들러
-  const handleSearch = (type: string, value: string) => {
-    if (type === "title" || type === "content" || type === "both") {
-      fetchInquiries(currentPage, pageSize, value);
-    }
+  const handleSearch = (value: string) => {
+    fetchInquiries(currentPage, pageSize, value);
   };
 
   // 1대1 문의 목록 조회 (검색 파라미터 추가)
@@ -555,11 +553,11 @@ const InquiryManagement = () => {
       ),
       accessor: "id" as keyof Inquiry,
       className: "w-12",
-      cell: (value: any, inquiry: Inquiry) => (
+      cell: (value: unknown, row: Inquiry) => (
         <input
           type="checkbox"
-          checked={selectedInquiries.includes(inquiry.id)}
-          onChange={() => handleToggleSelect(inquiry.id)}
+          checked={selectedInquiries.includes(row.id)}
+          onChange={() => handleToggleSelect(row.id)}
           className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
         />
       ),
@@ -621,9 +619,9 @@ const InquiryManagement = () => {
       ),
       accessor: "category" as keyof Inquiry,
       className: "w-24",
-      cell: (value: any, inquiry: Inquiry) => (
+      cell: (value: unknown, row: Inquiry) => (
         <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-          {inquiry.category}
+          {row.category}
         </span>
       ),
     },
@@ -631,13 +629,13 @@ const InquiryManagement = () => {
       header: "문의",
       accessor: "title" as keyof Inquiry,
       className: "w-80",
-      cell: (value: any, inquiry: Inquiry) => (
+      cell: (value: unknown, row: Inquiry) => (
         <div
           className="max-w-md truncate text-blue-600 hover:underline cursor-pointer"
-          title={inquiry.title}
-          onClick={() => handleOpenAnswerModal(inquiry)}
+          title={row.title}
+          onClick={() => handleOpenAnswerModal(row)}
         >
-          {inquiry.title}
+          {row.title}
         </div>
       ),
     },
@@ -645,26 +643,26 @@ const InquiryManagement = () => {
       header: "작성자",
       accessor: "authorId" as keyof Inquiry,
       className: "w-32",
-      cell: (value: any, inquiry: Inquiry) => getNickname(inquiry.authorId),
+      cell: (value: unknown, row: Inquiry) => getNickname(row.authorId),
     },
     {
       header: "등록일자",
       accessor: "createdAt" as keyof Inquiry,
       className: "w-32",
-      cell: (value: any, inquiry: Inquiry) => formatDate(inquiry.createdAt),
+      cell: (value: unknown, row: Inquiry) => formatDate(row.createdAt),
     },
     {
       header: "답변 상태",
       accessor: "status" as keyof Inquiry,
       className: "w-28",
-      cell: (value: any, inquiry: Inquiry) => {
+      cell: (value: unknown, row: Inquiry) => {
         let label = "";
-        if (inquiry.status === InquiryStatus.WAITING) label = "대기";
-        else if (inquiry.status === InquiryStatus.DONE) label = "완료";
+        if (row.status === InquiryStatus.WAITING) label = "대기";
+        else if (row.status === InquiryStatus.DONE) label = "완료";
         return (
           <span
             className={`px-2 py-1 text-xs font-medium rounded-full ${getInquiryStatusClassName(
-              inquiry.status
+              row.status
             )}`}
           >
             {label}
@@ -676,18 +674,18 @@ const InquiryManagement = () => {
       header: "관리",
       accessor: "id" as keyof Inquiry,
       className: "w-24 text-center",
-      cell: (id: number, inquiry: Inquiry) => (
+      cell: (value: unknown, row: Inquiry) => (
         <div className="flex space-x-2">
           <ActionButton
             label="수정"
             action="edit"
-            onClick={() => handleOpenAnswerModal(inquiry)}
+            onClick={() => handleOpenAnswerModal(row)}
             disabled={loading || saving}
           />
           <ActionButton
             label="삭제"
             action="delete"
-            onClick={() => handleDeleteInquiry(inquiry.id)}
+            onClick={() => handleDeleteInquiry(row.id)}
             disabled={loading || saving}
           />
         </div>

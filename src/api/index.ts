@@ -124,7 +124,14 @@ export const getAllSportCategoriesAdmin = async (
   searchValue: any = ""
 ): Promise<{ data: SportCategory[]; pagination: any }> => {
   try {
-    const response = await axios.get(`/sport-categories/admin?page=${page}&limit=${limit}`);
+    const params = new URLSearchParams();
+    params.append("page", page.toString());
+    params.append("limit", limit.toString());
+    if (searchValue && searchValue.trim()) {
+      params.append("search", searchValue.trim());
+    }
+
+    const response = await axios.get(`/sport-categories/admin?${params.toString()}`);
 
     if (response.data && response.data.success) {
       return {
@@ -340,9 +347,21 @@ export const bulkUpdateSportRecommendations = async (data: {
 };
 
 // 스포츠 경기 분석 관련 API 함수
-export const getAllSportGameAnalyses = async (): Promise<ApiResponse<SportGameAnalysis[]>> => {
+export const getAllSportGameAnalyses = async (
+  params: any = {}
+): Promise<ApiResponse<SportGameAnalysis[]>> => {
   try {
-    const response = await axios.get("/sport-analyses");
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const url = queryParams.toString()
+      ? `/sport-analyses?${queryParams.toString()}`
+      : "/sport-analyses";
+    const response = await axios.get(url);
     return response.data;
   } catch (error) {
     console.error("Error fetching sport game analyses:", error);

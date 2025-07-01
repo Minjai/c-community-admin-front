@@ -25,11 +25,18 @@ const CasinoCompanyApiService = {
   // 카지노 업체 목록 조회 (페이지네이션 추가)
   getCasinoCompanies: async (
     page: number = 1,
-    limit: number = 10
+    limit: number = 10,
+    searchValue: string = ""
   ): Promise<ApiResponse<PaginatedData<CasinoCompany>>> => {
     try {
+      const params: any = { page, limit };
+
+      if (searchValue && searchValue.trim()) {
+        params.search = searchValue.trim();
+      }
+
       const response = await axios.get("/companies", {
-        params: { page, limit }, // 페이지네이션 파라미터 추가
+        params,
       });
 
       // API 응답이 ApiResponse<PaginatedData<CasinoCompany>> 형태를 준수한다고 가정하고 그대로 반환
