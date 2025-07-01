@@ -767,12 +767,9 @@ const AdminMessageManagement = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">관리자 쪽지 발송</h1>
-          <p className="mt-2 text-sm text-gray-700"></p>
-        </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">관리자 쪽지 발송</h1>
         <SearchInput
           searchValue={searchValue}
           setSearchValue={setSearchValue}
@@ -810,27 +807,32 @@ const AdminMessageManagement = () => {
           type={alertMessage.type}
           message={alertMessage.message}
           onClose={() => setAlertMessage(null)}
+          className="mb-4"
         />
       )}
 
-      {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
+      {error && (
+        <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
+      )}
 
-      <DataTable
-        data={filteredMessages}
-        columns={columns}
-        loading={loading}
-        pagination={{
-          currentPage,
-          totalItems: filteredMessages.length,
-          pageSize,
-          onPageChange: handlePageChange,
-        }}
-        emptyMessage={
-          selectedCategory
-            ? `${selectedCategory} 구분의 쪽지가 없습니다.`
-            : "발송된 쪽지가 없습니다."
-        }
-      />
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          data={filteredMessages}
+          columns={columns}
+          loading={loading}
+          pagination={{
+            currentPage,
+            totalItems: filteredMessages.length,
+            pageSize,
+            onPageChange: handlePageChange,
+          }}
+          emptyMessage={
+            selectedCategory
+              ? `${selectedCategory} 구분의 쪽지가 없습니다.`
+              : "발송된 쪽지가 없습니다."
+          }
+        />
+      </div>
 
       {/* 쪽지 발송 모달 */}
       <Modal

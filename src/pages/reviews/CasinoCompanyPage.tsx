@@ -574,9 +574,9 @@ const CasinoCompanyPage: React.FC = () => {
   ];
 
   return (
-    <div className="w-full px-8 py-8">
-      <div className="mb-6 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">카지노 업체 관리</h1>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">카지노 업체 관리</h1>
         <SearchInput
           searchValue={searchValue}
           setSearchValue={setSearchValue}

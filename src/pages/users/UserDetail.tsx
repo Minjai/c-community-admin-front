@@ -25,6 +25,7 @@ interface User {
   status: string;
   profileImage?: string;
   profileImageUrl?: string;
+  isDeleted: boolean;
   rank: {
     id: number;
     name: string;
@@ -443,7 +444,11 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
   };
 
   // 상태에 따른 색상 클래스
-  const getStatusClassName = (status: string) => {
+  const getStatusClassName = (status: string, isDeleted: boolean) => {
+    if (isDeleted) {
+      return "bg-red-500 text-white";
+    }
+
     switch (status) {
       case "온라인":
         return "bg-green-100 text-green-800";
@@ -596,9 +601,12 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
                 <div className="w-24 font-medium text-sm text-gray-500">상태</div>
                 <div className="flex-1">
                   <span
-                    className={`px-2 py-1 rounded-full text-xs ${getStatusClassName(user.status)}`}
+                    className={`px-2 py-1 rounded-full text-xs ${getStatusClassName(
+                      user.status,
+                      user.isDeleted
+                    )}`}
                   >
-                    {user.status}
+                    {user.isDeleted ? "삭제" : user.status}
                   </span>
                 </div>
               </div>

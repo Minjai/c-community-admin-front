@@ -989,9 +989,9 @@ const CasinoFilterPage: React.FC = () => {
   ] as any;
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">카지노 필터 관리</h1>
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">카지노 필터 관리</h1>
         <SearchInput
           searchValue={searchValue}
           setSearchValue={setSearchValue}
@@ -1018,31 +1018,34 @@ const CasinoFilterPage: React.FC = () => {
           type={alertMessage.type}
           message={alertMessage.message}
           onClose={() => setAlertMessage(null)}
+          className="mb-4"
         />
       )}
 
       {/* 데이터 테이블 */}
-      <DataTable
-        columns={columns}
-        data={getHierarchicalData()}
-        loading={loading}
-        pagination={{
-          currentPage: currentPage,
-          pageSize: pageSize,
-          totalItems: totalItems,
-          onPageChange: handlePageChange,
-        }}
-        emptyMessage="등록된 대분류가 없습니다."
-        rowClassName={(row: any) => {
-          if (row.isSubCategory) {
-            // 소분류: 기본 스타일
-            return "hover:bg-gray-50 border-b border-gray-100";
-          } else {
-            // 대분류: 연한 초록색 배경
-            return "bg-green-50 hover:bg-green-100 border-b border-gray-100";
-          }
-        }}
-      />
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={getHierarchicalData()}
+          loading={loading}
+          pagination={{
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
+            onPageChange: handlePageChange,
+          }}
+          emptyMessage="등록된 대분류가 없습니다."
+          rowClassName={(row: any) => {
+            if (row.isSubCategory) {
+              // 소분류: 기본 스타일
+              return "hover:bg-gray-50 border-b border-gray-100";
+            } else {
+              // 대분류: 연한 초록색 배경
+              return "bg-green-50 hover:bg-green-100 border-b border-gray-100";
+            }
+          }}
+        />
+      </div>
 
       {/* 대분류 추가/수정 모달 */}
       <Modal
