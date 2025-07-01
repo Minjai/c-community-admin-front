@@ -3,18 +3,25 @@ import { RemittanceBanner } from "../types";
 
 // 암호화폐 송금 배너 API 서비스
 const RemittanceBannerService = {
-  // 송금 배너 목록 조회 (페이지네이션 적용)
+  // 송금 배너 목록 조회 (페이지네이션 적용, 검색 파라미터 추가)
   getRemittanceBanners: async (
     page: number = 1,
-    limit: number = 10
+    limit: number = 10,
+    searchValue: string = ""
     // 반환 타입을 실제 API 응답 구조로 변경
   ): Promise<{ data: RemittanceBanner[]; pagination: any }> => {
     try {
+      const params: any = { page, limit };
+
+      if (searchValue.trim()) {
+        params.search = searchValue;
+      }
+
       console.log(
-        `송금 배너 데이터 요청 시작: /crypto-transfers/admin?page=${page}&limit=${limit}`
+        `송금 배너 데이터 요청 시작: /crypto-transfers/admin?page=${page}&limit=${limit}&search=${searchValue}`
       );
-      // API 호출 시 page, limit 파라미터 전달
-      const response = await axios.get(`/crypto-transfers/admin?page=${page}&limit=${limit}`);
+      // API 호출 시 page, limit, search 파라미터 전달
+      const response = await axios.get(`/crypto-transfers/admin`, { params });
       console.log("송금 배너 응답 데이터:", response.data);
 
       // 응답 구조 ({ success, data, pagination }) 확인 및 반환

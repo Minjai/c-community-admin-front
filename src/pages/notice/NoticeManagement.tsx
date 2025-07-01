@@ -6,6 +6,7 @@ import ActionButton from "@/components/ActionButton";
 import Button from "@/components/Button";
 import Alert from "@/components/Alert";
 import DataTable from "@/components/DataTable";
+import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
 
@@ -25,6 +26,7 @@ const NoticeManagement = () => {
   } | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
   const [displayOrders, setDisplayOrders] = useState<Record<number, number>>({});
+  const [searchValue, setSearchValue] = useState<string>("");
 
   // 공지사항 상세 페이지로 이동
   const handleClick = (id: number) => {
@@ -33,20 +35,29 @@ const NoticeManagement = () => {
 
   // 페이지 변경 처리
   const handlePageChange = (newPage: number) => {
-    getAllNotices(newPage);
+    getAllNotices(newPage, searchValue);
   };
 
-  // 전체 공지사항 목록 가져오기
-  const getAllNotices = async (page = 1) => {
+  // 검색 핸들러
+  const handleSearch = (value: string) => {
+    getAllNotices(1, value);
+  };
+
+  // 전체 공지사항 목록 가져오기 (검색 파라미터 추가)
+  const getAllNotices = async (page = 1, searchValue: string = "") => {
     setLoading(true);
     try {
-      const response = await axios.get("/post", {
-        params: {
-          page,
-          pageSize: pagination.limit,
-          boardId: 1, // 공지사항 (boardId=1)
-        },
-      });
+      const params: any = {
+        page,
+        pageSize: pagination.limit,
+        boardId: 1, // 공지사항 (boardId=1)
+      };
+
+      if (searchValue.trim()) {
+        params.search = searchValue;
+      }
+
+      const response = await axios.get("/post", { params });
 
       console.log("공지사항 API 응답:", response.data);
 
@@ -185,7 +196,9 @@ const NoticeManagement = () => {
       // 변경된 displayOrder만 추출
       const changed = notices.filter((n) => displayOrders[n.id] !== n.displayOrder);
       for (const n of changed) {
-        await axios.patch(`/post/admin/${n.id}/display-order`, { displayOrder: displayOrders[n.id] });
+        await axios.patch(`/post/admin/${n.id}/display-order`, {
+          displayOrder: displayOrders[n.id],
+        });
       }
       setAlertMessage({ type: "success", message: "순서가 저장되었습니다." });
       getAllNotices(pagination.page);
@@ -293,6 +306,11 @@ const NoticeManagement = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold text-gray-900">공지사항 관리</h1>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-2">
           <Button variant="primary" onClick={handleSaveOrder} disabled={loading || deleting}>
             순서저장

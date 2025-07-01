@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import FileUpload from "@/components/forms/FileUpload";
 import Alert from "@/components/Alert";
+import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
 
@@ -44,78 +45,93 @@ const UserRankManagement: React.FC = () => {
   const [pageSize, setPageSize] = useState<number>(10);
   const [totalItems, setTotalItems] = useState<number>(0);
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
   // 파일 상태 관리
   const [imageFile, setImageFile] = useState<File | null>(null);
 
   // 순서 입력 상태 추가
   const [orderInputs, setOrderInputs] = useState<Record<number, number>>({});
 
-  // 등급 목록 조회
-  const fetchRanks = useCallback(async (page: number = 1, limit: number = 10) => {
-    setLoading(true);
-    setError(null);
+  // 등급 목록 조회 (검색 파라미터 추가)
+  const fetchRanks = useCallback(
+    async (page: number = 1, limit: number = 10, searchValue: string = "") => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      // API 호출 시 page, limit 파라미터 전달
-      const response = await axios.get(`/admin/ranks?page=${page}&limit=${limit}`);
-      console.log("회원 등급 응답 구조:", response.data);
+      try {
+        const params: any = {
+          page: page,
+          limit: limit,
+        };
 
-      // 응답 구조 ({ ranks: [], pagination: {} }) 확인 및 처리
-      if (response.data && response.data.ranks && response.data.pagination) {
-        const fetchedRanks = response.data.ranks || [];
-        const pagination = response.data.pagination;
+        if (searchValue.trim()) {
+          params.search = searchValue;
+        }
 
-        // 필드 매핑 및 처리
-        const processedRanks = fetchedRanks.map((rank: any) => ({
-          id: rank.id,
-          rankName: rank.rankName || rank.name || "",
-          image: rank.image || rank.imageUrl || "",
-          score: rank.score || 0,
-          displayOrder: rank.displayOrder || rank.position || 0,
-          createdAt: rank.createdAt || new Date().toISOString(),
-          updatedAt: rank.updatedAt || rank.createdAt || "",
-        }));
+        // API 호출 시 page, limit 파라미터 전달
+        const response = await axios.get(`/admin/ranks`, { params });
+        console.log("회원 등급 응답 구조:", response.data);
 
-        // 정렬은 서버에서 지원하지 않으면 여기서 유지 가능
-        const sortedRanks = [...processedRanks].sort(
-          (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
-        );
+        // 응답 구조 ({ ranks: [], pagination: {} }) 확인 및 처리
+        if (response.data && response.data.ranks && response.data.pagination) {
+          const fetchedRanks = response.data.ranks || [];
+          const pagination = response.data.pagination;
 
-        setRanks(sortedRanks); // 현재 페이지 데이터 설정
-        setTotalItems(pagination.totalItems || 0);
-        setTotalPages(pagination.totalPages || 0);
-        setCurrentPage(pagination.currentPage || page);
-        setPageSize(pagination.pageSize || limit);
-        setSelectedRankIds([]); // 페이지 변경 시 선택 초기화
+          // 필드 매핑 및 처리
+          const processedRanks = fetchedRanks.map((rank: any) => ({
+            id: rank.id,
+            rankName: rank.rankName || rank.name || "",
+            image: rank.image || rank.imageUrl || "",
+            score: rank.score || 0,
+            displayOrder: rank.displayOrder || rank.position || 0,
+            createdAt: rank.createdAt || new Date().toISOString(),
+            updatedAt: rank.updatedAt || rank.createdAt || "",
+          }));
 
-        // 순서 입력 상태 초기화
-        const orderMap: Record<number, number> = {};
-        sortedRanks.forEach((r) => {
-          orderMap[r.id] = r.displayOrder || 0;
-        });
-        setOrderInputs(orderMap);
-      } else {
-        console.error("회원 등급 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
+          // 정렬은 서버에서 지원하지 않으면 여기서 유지 가능
+          const sortedRanks = [...processedRanks].sort(
+            (a, b) => (a.displayOrder || 0) - (b.displayOrder || 0)
+          );
+
+          setRanks(sortedRanks); // 현재 페이지 데이터 설정
+          setTotalItems(pagination.totalItems || 0);
+          setTotalPages(pagination.totalPages || 0);
+          setCurrentPage(pagination.currentPage || page);
+          setPageSize(pagination.pageSize || limit);
+          setSelectedRankIds([]); // 페이지 변경 시 선택 초기화
+
+          // 순서 입력 상태 초기화
+          const orderMap: Record<number, number> = {};
+          sortedRanks.forEach((r) => {
+            orderMap[r.id] = r.displayOrder || 0;
+          });
+          setOrderInputs(orderMap);
+        } else {
+          console.error("회원 등급 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
+          setRanks([]);
+          setTotalItems(0);
+          setTotalPages(0);
+          setCurrentPage(1);
+          setError("회원 등급 데이터 형식이 올바르지 않습니다.");
+        }
+      } catch (err) {
+        console.error("Error fetching user ranks:", err);
         setRanks([]);
         setTotalItems(0);
         setTotalPages(0);
         setCurrentPage(1);
-        setError("회원 등급 데이터 형식이 올바르지 않습니다.");
+        setError("회원 등급을 불러오는데 실패했습니다.");
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Error fetching user ranks:", err);
-      setRanks([]);
-      setTotalItems(0);
-      setTotalPages(0);
-      setCurrentPage(1);
-      setError("회원 등급을 불러오는데 실패했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchRanks(currentPage, pageSize);
+    fetchRanks(currentPage, pageSize, searchValue);
   }, [fetchRanks, currentPage, pageSize]);
 
   // 페이지 변경 핸들러 추가
@@ -195,7 +211,7 @@ const UserRankManagement: React.FC = () => {
 
       setShowModal(false);
       setSelectedRankIds([]);
-      fetchRanks(currentPage, pageSize);
+      fetchRanks(currentPage, pageSize, searchValue);
     } catch (error: any) {
       console.error("Error saving rank:", error);
       setAlertMessage({
@@ -221,7 +237,7 @@ const UserRankManagement: React.FC = () => {
       await axios.delete(`/admin/ranks/${id}`);
       setAlertMessage({ type: "success", message: "등급이 삭제되었습니다." });
       setSelectedRankIds((prev) => prev.filter((rankId) => rankId !== id));
-      fetchRanks(currentPage, pageSize);
+      fetchRanks(currentPage, pageSize, searchValue);
     } catch (error: any) {
       console.error("Error deleting rank:", error);
       setAlertMessage({
@@ -304,7 +320,7 @@ const UserRankManagement: React.FC = () => {
       });
     }
 
-    fetchRanks(currentPage, pageSize);
+    fetchRanks(currentPage, pageSize, searchValue);
   };
 
   // 입력 변경 핸들러
@@ -340,12 +356,17 @@ const UserRankManagement: React.FC = () => {
         await axios.patch(`/ranks/display-order`, { id: r.id, displayOrder: orderInputs[r.id] });
       }
       setAlertMessage({ type: "success", message: "순서가 저장되었습니다." });
-      fetchRanks(currentPage, pageSize);
+      fetchRanks(currentPage, pageSize, searchValue);
     } catch (error) {
       setAlertMessage({ type: "error", message: "순서 저장 중 오류가 발생했습니다." });
     } finally {
       setLoading(false);
     }
+  };
+
+  // 검색 핸들러
+  const handleSearch = (value: string) => {
+    fetchRanks(currentPage, pageSize, value);
   };
 
   // DataTable 컬럼 정의
@@ -437,6 +458,11 @@ const UserRankManagement: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">회원 등급 관리</h1>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-2">
           <Button variant="primary" onClick={handleSaveOrder} disabled={loading}>
             순서저장

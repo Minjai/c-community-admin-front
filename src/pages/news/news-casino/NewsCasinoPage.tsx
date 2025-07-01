@@ -6,6 +6,7 @@ import ActionButton from "@components/ActionButton.tsx";
 import Modal from "@components/Modal.tsx";
 import Input from "@components/forms/Input.tsx";
 import Alert from "@components/Alert.tsx";
+import SearchInput from "@components/SearchInput.tsx";
 import { formatDate } from "@utils/dateUtils.ts";
 import { toast } from "react-toastify";
 import LoadingOverlay from "@components/LoadingOverlay.tsx";
@@ -48,6 +49,9 @@ const NewsCasinoPage = () => {
   const [pageSize, setPageSize] = useState<number>(10); // 기본 페이지 크기
   const [totalItems, setTotalItems] = useState<number>(0);
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
   // 뉴스 데이터 상태 (API 필드 반영)
   const [title, setTitle] = useState<string>("");
   const [link, setLink] = useState<string>("");
@@ -57,8 +61,8 @@ const NewsCasinoPage = () => {
   const [modalIsSelected, setModalIsSelected] = useState<number>(0); // 인기 여부 상태 추가
   // isSelected state is not needed for UI based on previous request - 이 주석은 제거해도 될 듯
 
-  // 뉴스 목록 조회 (페이지네이션 적용)
-  const fetchNews = async (page: number, pageSize: number) => {
+  // 뉴스 목록 조회 (검색 파라미터 추가)
+  const fetchNews = async (page: number, pageSize: number, searchValue: string = "") => {
     setLoading(true);
     setError(null);
     // Fetch 시 선택 상태 초기화 (필요에 따라 유지하도록 수정 가능)
@@ -67,9 +71,13 @@ const NewsCasinoPage = () => {
     try {
       // API 호출 (page, limit 파라미터 다시 추가)
       console.log(`Fetching admin news with page: ${page}, pageSize: ${pageSize}`);
-      const response = await axios.get("admin-news/admin", {
-        params: { page, pageSize }, // page와 pageSize 파라미터 전달
-      });
+      const params: any = { page, pageSize };
+
+      if (searchValue.trim()) {
+        params.search = searchValue;
+      }
+
+      const response = await axios.get("admin-news/admin", { params });
       console.log("뉴스 관리 응답:", response.data);
 
       // 새로운 서버 응답 구조 처리: data[], pagination{}
@@ -84,26 +92,26 @@ const NewsCasinoPage = () => {
         console.log("추출된 페이지 정보:", paginationInfo);
 
         const mappedNewsData: NewsItem[] = articles
-            .filter((item: any) => {
-              const isValidId = typeof item.id === "number" && item.id > 0;
-              if (!isValidId) {
-                console.warn("Invalid or missing ID found in news item, filtering out:", item);
-              }
-              return isValidId;
-            })
-            .map((item: any) => ({
-              ...item,
-              thumbnailUrl: item.thumbnail || item.thumbnailUrl || null,
-              description: item.description || null,
-            }))
-            .sort((a:any, b:any) => {
-              // isSelected=1인 뉴스 먼저
-              if (b.isSelected !== a.isSelected) {
-                return b.isSelected - a.isSelected;
-              }
-              // 그 다음 최신순
-              return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-            });
+          .filter((item: any) => {
+            const isValidId = typeof item.id === "number" && item.id > 0;
+            if (!isValidId) {
+              console.warn("Invalid or missing ID found in news item, filtering out:", item);
+            }
+            return isValidId;
+          })
+          .map((item: any) => ({
+            ...item,
+            thumbnailUrl: item.thumbnail || item.thumbnailUrl || null,
+            description: item.description || null,
+          }))
+          .sort((a: any, b: any) => {
+            // isSelected=1인 뉴스 먼저
+            if (b.isSelected !== a.isSelected) {
+              return b.isSelected - a.isSelected;
+            }
+            // 그 다음 최신순
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
         setNews(mappedNewsData);
 
         // 페이지네이션 상태 업데이트 (API 응답 기준)
@@ -153,13 +161,13 @@ const NewsCasinoPage = () => {
   };
 
   useEffect(() => {
-    fetchNews(currentPage, pageSize);
+    fetchNews(currentPage, pageSize, searchValue);
   }, [currentPage, pageSize]); // currentPage, pageSize 변경 시 다시 로드
 
   // 페이지 변경 핸들러 추가
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= totalPages && newPage !== currentPage) {
-      fetchNews(newPage, pageSize); // 새 페이지 데이터 요청
+      fetchNews(newPage, pageSize, searchValue); // 새 페이지 데이터 요청
     }
   };
 
@@ -199,7 +207,7 @@ const NewsCasinoPage = () => {
       toast.success("뉴스가 삭제되었습니다.");
       // 선택된 목록에서 삭제된 ID 제거
       setSelectedNewsIds((prev) => prev.filter((newsId) => newsId !== id));
-      fetchNews(currentPage, pageSize); // 현재 페이지 유지
+      fetchNews(currentPage, pageSize, searchValue); // 현재 페이지 유지
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || "뉴스 삭제 중 오류가 발생했습니다.";
       toast.error(errorMessage);
@@ -268,7 +276,7 @@ const NewsCasinoPage = () => {
       }
       setShowModal(false);
       setSelectedNewsIds([]); // 저장 후 선택 해제
-      fetchNews(currentPage, pageSize); // 현재 페이지 유지
+      fetchNews(currentPage, pageSize, searchValue); // 현재 페이지 유지
     } catch (err: any) {
       console.error("Save news error:", err);
       const errorMessage = err.response?.data?.message || "뉴스 저장 중 오류가 발생했습니다.";
@@ -294,7 +302,7 @@ const NewsCasinoPage = () => {
       });
       // 성공 시 선택 해제 (선택적)
       // setSelectedNewsIds(prev => prev.filter(newsId => newsId !== id));
-      fetchNews(currentPage, pageSize);
+      fetchNews(currentPage, pageSize, searchValue);
     } catch (err: any) {
       const errorMessage =
         err.response?.data?.message || "뉴스 공개 상태 변경 중 오류가 발생했습니다.";
@@ -435,7 +443,12 @@ const NewsCasinoPage = () => {
     }
 
     // 목록 새로고침
-    fetchNews(currentPage, pageSize);
+    fetchNews(currentPage, pageSize, searchValue);
+  };
+
+  // 검색 핸들러
+  const handleSearch = (value: string) => {
+    fetchNews(currentPage, pageSize, value);
   };
 
   // DataTable 컬럼 정의 (원래 구조 복원 + 체크박스)
@@ -557,6 +570,20 @@ const NewsCasinoPage = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">뉴스 관리</h1>
+        <div className="flex items-center space-x-4">
+          <SearchInput
+            searchValue={searchValue}
+            setSearchValue={setSearchValue}
+            onSearch={handleSearch}
+          />
+          <Button
+            variant="danger"
+            onClick={handleBulkDelete}
+            disabled={selectedNewsIds.length === 0 || loading || saving}
+          >
+            {`선택 삭제 (${selectedNewsIds.length})`}
+          </Button>
+        </div>
       </div>
 
       {/* Alerts */}
@@ -571,22 +598,6 @@ const NewsCasinoPage = () => {
       {error && (
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
-
-      {/* Buttons Container */}
-      <div className="flex justify-end items-center mb-4 space-x-2">
-        {/* 선택 삭제 버튼 추가 */}
-        <Button
-          variant="danger"
-          onClick={handleBulkDelete}
-          disabled={selectedNewsIds.length === 0 || loading || saving}
-        >
-          {`선택 삭제 (${selectedNewsIds.length})`}
-        </Button>
-        {/* 뉴스 추가 버튼 */}
-        <Button variant="primary" onClick={handleAddNews} disabled={loading || saving}>
-          뉴스 추가
-        </Button>
-      </div>
 
       {/* Loading Overlay */}
       <LoadingOverlay isLoading={loading || saving} />

@@ -6,6 +6,7 @@ import ActionButton from "@/components/ActionButton";
 import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
+import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import TextEditor from "@/components/forms/TextEditor";
@@ -45,6 +46,7 @@ const AdminMessageManagement = () => {
     type: "success" | "error" | "info";
     message: string;
   } | null>(null);
+  const [searchValue, setSearchValue] = useState<string>("");
 
   // 선택 관련 상태
   const [selectedMessages, setSelectedMessages] = useState<number[]>([]);
@@ -86,6 +88,11 @@ const AdminMessageManagement = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const [users, setUsers] = useState<{ id: number; nickname: string; email: string }[]>([]);
+
+  // 검색 핸들러
+  const handleSearch = (value: string) => {
+    fetchMessages(1, pageSize, value);
+  };
 
   // 유저 목록 불러오기
   const fetchUsers = useCallback(async () => {
@@ -194,14 +201,19 @@ const AdminMessageManagement = () => {
     setShowCategoryFilter(false);
   };
 
-  // 관리자 쪽지 목록 조회
+  // 관리자 쪽지 목록 조회 (검색 파라미터 추가)
   const fetchMessages = useCallback(
-    async (page: number, limit: number) => {
+    async (page: number, limit: number, searchValue: string = "") => {
       setLoading(true);
       setError(null);
-
       try {
-        const response = await axios.get("/admin/messages/messages");
+        const params: any = { page, limit };
+
+        if (searchValue.trim()) {
+          params.search = searchValue;
+        }
+
+        const response = await axios.get("/admin/messages", { params });
         const fetchedMessages = response.data || [];
 
         // 백엔드 데이터를 프론트엔드 형식에 맞게 변환
@@ -292,8 +304,8 @@ const AdminMessageManagement = () => {
   );
 
   useEffect(() => {
-    fetchMessages(currentPage, pageSize);
-  }, [fetchMessages, currentPage, pageSize]);
+    fetchMessages(currentPage, pageSize, searchValue);
+  }, [fetchMessages, currentPage, pageSize, searchValue]);
 
   // 카테고리 필터 외부 클릭 시 닫기
   useEffect(() => {
@@ -433,7 +445,7 @@ const AdminMessageManagement = () => {
         message: `${selectedUsers.length}명에게 쪽지가 성공적으로 발송되었습니다.`,
       });
       setShowSendModal(false);
-      fetchMessages(currentPage, pageSize);
+      fetchMessages(currentPage, pageSize, searchValue);
     } catch (err) {
       setAlertMessage({
         type: "error",
@@ -477,7 +489,7 @@ const AdminMessageManagement = () => {
         message: "그룹 쪽지가 성공적으로 발송되었습니다.",
       });
       setShowGroupSendModal(false);
-      fetchMessages(currentPage, pageSize);
+      fetchMessages(currentPage, pageSize, searchValue);
     } catch (err) {
       console.error("Error sending group message:", err);
       setAlertMessage({
@@ -545,7 +557,7 @@ const AdminMessageManagement = () => {
         type: "success",
         message: "쪽지가 성공적으로 삭제되었습니다.",
       });
-      fetchMessages(currentPage, pageSize);
+      fetchMessages(currentPage, pageSize, searchValue);
     } catch (err) {
       console.error("Error deleting message:", err);
       setAlertMessage({
@@ -588,7 +600,7 @@ const AdminMessageManagement = () => {
       setAllSelected(false);
 
       // 목록 새로고침
-      fetchMessages(currentPage, pageSize);
+      fetchMessages(currentPage, pageSize, searchValue);
     } catch (err) {
       console.error("Error deleting messages:", err);
       setAlertMessage({
@@ -763,6 +775,11 @@ const AdminMessageManagement = () => {
             회원들에게 쪽지를 발송하고 발송 내역을 관리할 수 있습니다.
           </p>
         </div>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-3">
           <Button onClick={handleOpenGroupSendModal} variant="primary" disabled={sending}>
             그룹 발송

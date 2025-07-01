@@ -184,10 +184,8 @@ export default function SportsManagement() {
   // 드래그 앤 드롭 관련 상태
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
-  const handleSearch = (type: string, value: string) => {
-    // if (type === 'displayName') {
-    //   fetchSportCategories(1, PAGE_SIZE, value);
-    // }
+  const handleSearch = (value: string) => {
+    fetchSportCategories(1, PAGE_SIZE, value);
   };
 
   // fetchSportCategories: 서버 측 페이지네이션 적용

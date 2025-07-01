@@ -9,6 +9,7 @@ import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Select from "@/components/forms/Select";
 import Alert from "@/components/Alert";
+import SearchInput from "@/components/SearchInput";
 import type { Post, Board } from "@/types";
 
 // Define column type based on DataTable.tsx
@@ -35,6 +36,9 @@ const PostManagementPage: React.FC = () => {
     message: string;
   } | null>(null);
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
   // 게시판 목록 조회
   const fetchBoards = async () => {
     try {
@@ -53,18 +57,22 @@ const PostManagementPage: React.FC = () => {
     }
   };
 
-  // 게시물 목록 조회
-  const fetchPosts = async () => {
+  // 게시물 목록 조회 (검색 파라미터 추가)
+  const fetchPosts = async (searchValue: string = "") => {
     try {
       setLoading(true);
       setError(null);
-      const response = await axios.get("/post", {
-        params: {
-          page: currentPage,
-          pageSize: pageSize,
-          boardId: selectedBoard,
-        },
-      });
+      const params: any = {
+        page: currentPage,
+        pageSize: pageSize,
+        boardId: selectedBoard,
+      };
+
+      if (searchValue.trim()) {
+        params.search = searchValue;
+      }
+
+      const response = await axios.get("/post", { params });
 
       if (response.data && response.data.posts && Array.isArray(response.data.posts)) {
         setPosts(response.data.posts);
@@ -89,7 +97,7 @@ const PostManagementPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchPosts();
+    fetchPosts(searchValue);
   }, [currentPage, pageSize, selectedBoard]);
 
   // 게시물 상세 정보 모달 열기
@@ -131,6 +139,11 @@ const PostManagementPage: React.FC = () => {
   const handleBoardChange = (boardId: string) => {
     setSelectedBoard(boardId === "all" ? undefined : parseInt(boardId));
     setCurrentPage(1);
+  };
+
+  // 검색 핸들러
+  const handleSearch = (value: string) => {
+    fetchPosts(value);
   };
 
   // 테이블 컬럼 정의 (Use PostColumnDef and correct accessors)
@@ -208,6 +221,11 @@ const PostManagementPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6 px-4 py-3 bg-white border-b border-gray-200">
         <h1 className="text-xl font-semibold text-gray-800">게시물 관리</h1>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex items-center space-x-2">
           <Select
             value={selectedBoard ? selectedBoard.toString() : "all"}

@@ -5,6 +5,7 @@ import DataTable from "@/components/DataTable";
 import Button from "@/components/Button";
 import ActionButton from "@/components/ActionButton";
 import Alert from "@/components/Alert";
+import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import FooterFormModal from "./FooterFormModal";
 import type { Footer } from "./types";
@@ -52,51 +53,73 @@ function FooterManagementPage() {
   const [pageSize, setPageSize] = useState<number>(10);
   const [totalItems, setTotalItems] = useState<number>(0);
 
+  // 검색 상태 추가
+  const [searchValue, setSearchValue] = useState<string>("");
+
   // fetchFooters (서버 측 페이지네이션으로 복원)
-  const fetchFooters = useCallback(async (page: number = 1, limit: number = 10) => {
-    setLoading(true);
-    setError(null);
-    try {
-      // API 엔드포인트에 페이지네이션 파라미터 추가
-      const response = await axios.get(`/footer/all?page=${page}&limit=${limit}`);
-      console.log("푸터 응답:", response.data);
+  const fetchFooters = useCallback(
+    async (page: number = 1, limit: number = 10, searchValue: string = "") => {
+      setLoading(true);
+      setError(null);
+      try {
+        // API 엔드포인트에 페이지네이션 파라미터 추가
+        const params: any = {
+          page,
+          limit,
+        };
 
-      // API 응답 구조 { data: [], pagination: {} } 처리 복원
-      if (response.data && response.data.data && response.data.pagination) {
-        const fetchedFooters = response.data.data || [];
-        const pagination = response.data.pagination;
+        if (searchValue.trim()) {
+          params.search = searchValue;
+        }
 
-        setFooters(fetchedFooters);
-        setTotalItems(pagination.totalItems || 0);
-        setTotalPages(pagination.totalPages || 0);
-        setCurrentPage(pagination.currentPage || page);
-        setPageSize(pagination.pageSize || limit);
-        setSelectedIds(new Set()); // 페이지 변경 시 선택 초기화
-      } else {
-        console.error("푸터 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
+        const response = await axios.get(`/footer/all`, { params });
+        console.log("푸터 응답:", response.data);
+
+        // API 응답 구조 { data: [], pagination: {} } 처리 복원
+        if (response.data && response.data.data && response.data.pagination) {
+          const fetchedFooters = response.data.data || [];
+          const pagination = response.data.pagination;
+
+          setFooters(fetchedFooters);
+          setTotalItems(pagination.totalItems || 0);
+          setTotalPages(pagination.totalPages || 0);
+          setCurrentPage(pagination.currentPage || page);
+          setPageSize(pagination.pageSize || limit);
+          setSelectedIds(new Set()); // 페이지 변경 시 선택 초기화
+        } else {
+          console.error("푸터 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
+          setFooters([]);
+          setTotalItems(0);
+          setTotalPages(0);
+          setCurrentPage(1);
+          setSelectedIds(new Set());
+        }
+      } catch (err) {
+        console.error("Error fetching footers:", err);
+        setError("푸터 목록을 불러오는데 실패했습니다.");
         setFooters([]);
         setTotalItems(0);
         setTotalPages(0);
         setCurrentPage(1);
         setSelectedIds(new Set());
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Error fetching footers:", err);
-      setError("푸터 목록을 불러오는데 실패했습니다.");
-      setFooters([]);
-      setTotalItems(0);
-      setTotalPages(0);
-      setCurrentPage(1);
-      setSelectedIds(new Set());
-    } finally {
-      setLoading(false);
-    }
-  }, []); // 의존성 배열 비움 (페이지 변경 시 fetch는 handlePageChange에서)
+    },
+    []
+  ); // 의존성 배열 비움 (페이지 변경 시 fetch는 handlePageChange에서)
 
   // useEffect 수정: currentPage, pageSize 변경 시 fetchFooters 호출
   useEffect(() => {
-    fetchFooters(currentPage, pageSize);
+    fetchFooters(currentPage, pageSize, searchValue);
   }, [currentPage, pageSize]); // fetchFooters는 useCallback으로 감싸져 있으므로 넣지 않음
+
+  // 검색 핸들러 추가
+  const handleSearch = (value: string) => {
+    setSearchValue(value);
+    setCurrentPage(1); // 검색 시 첫 페이지로 이동
+    fetchFooters(1, pageSize, value);
+  };
 
   // 페이지 변경 핸들러 수정: fetchFooters 호출
   const handlePageChange = (page: number) => {
@@ -172,7 +195,7 @@ function FooterManagementPage() {
         setCurrentPage(currentPage - 1); // 상태 변경 -> useEffect 트리거
       } else {
         // 현재 페이지 또는 최대 페이지로 새로고침
-        fetchFooters(Math.min(currentPage, newTotalPages || 1), pageSize);
+        fetchFooters(Math.min(currentPage, newTotalPages || 1), pageSize, searchValue);
       }
     } catch (err) {
       console.error("Error deleting footer:", err);
@@ -217,7 +240,7 @@ function FooterManagementPage() {
       });
       setSelectedIds(new Set());
       // 삭제 후 목록 새로고침
-      fetchFooters(currentPage, pageSize);
+      fetchFooters(currentPage, pageSize, searchValue);
     } catch (err) {
       console.error("Error deleting selected footers:", err);
       setAlertMessage({ type: "error", message: "선택된 푸터 항목 삭제 중 오류가 발생했습니다." });
@@ -322,7 +345,12 @@ function FooterManagementPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">하단 푸터 관리</h1>
-        <div className="flex space-x-2">
+        <div className="flex items-center space-x-4">
+          <SearchInput
+            searchValue={searchValue}
+            setSearchValue={setSearchValue}
+            onSearch={handleSearch}
+          />
           <Button
             variant="danger"
             onClick={handleDeleteSelectedClick}
@@ -374,7 +402,7 @@ function FooterManagementPage() {
           footerToEdit={footerToEdit}
           onSuccess={() => {
             setShowFormModal(false);
-            fetchFooters(currentPage, pageSize); // 현재 페이지 새로고침
+            fetchFooters(currentPage, pageSize, searchValue); // 현재 페이지 새로고침
             setAlertMessage({
               type: "success",
               message: footerToEdit ? "푸터가 수정되었습니다." : "푸터가 추가되었습니다.",

@@ -6,6 +6,7 @@ import Select from "@/components/forms/Select";
 import DataTable from "@/components/DataTable";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import ActionButton from "@/components/ActionButton";
+import SearchInput from "@/components/SearchInput";
 import { SportGameAnalysis, SportCategory } from "@/types";
 import {
   getAllSportGameAnalyses,
@@ -41,10 +42,22 @@ const SportsAnalysisManagement = () => {
   const [total, setTotal] = useState(0);
   const [searchValue, setSearchValue] = useState("");
 
-  const fetchAnalyses = useCallback(async () => {
+  const handleSearch = (type: string, value: string) => {
+    if (type === "title" || type === "content" || type === "both") {
+      fetchAnalyses(value);
+    }
+  };
+
+  const fetchAnalyses = useCallback(async (searchValue: string = "") => {
     setLoading(true);
     try {
-      const response = await getAllSportGameAnalyses();
+      const params: any = {};
+
+      if (searchValue.trim()) {
+        params.search = searchValue;
+      }
+
+      const response = await getAllSportGameAnalyses(params);
       if (response.success) {
         setAnalyses(response.data || []);
         setOriginalAnalyses(response.data ? [...response.data] : []);
@@ -333,6 +346,11 @@ const SportsAnalysisManagement = () => {
             className="w-40"
           />
         </div>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-2">
           <Button variant="primary" onClick={handleSaveOrder} disabled={loading}>
             순서저장

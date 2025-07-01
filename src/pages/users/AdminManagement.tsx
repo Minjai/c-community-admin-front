@@ -6,6 +6,7 @@ import ActionButton from "@/components/ActionButton";
 import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
+import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
 
@@ -69,14 +70,30 @@ const AdminManagement: React.FC = () => {
   // 선택된 관리자 ID 상태 추가
   const [selectedAdminIds, setSelectedAdminIds] = useState<number[]>([]);
 
-  // 관리자 목록 조회
-  const fetchAdmins = async (page: number = 1, limit: number = pageSize) => {
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
+  // 관리자 목록 조회 (검색 파라미터 추가)
+  const fetchAdmins = async (
+    page: number = 1,
+    limit: number = pageSize,
+    searchValue: string = ""
+  ) => {
     setLoading(true);
     setError(null);
     const currentSelected = [...selectedAdminIds]; // 선택 상태 유지
 
     try {
-      const response = await axios.get<AdminResponse>(`/admin/admins?page=${page}&limit=${limit}`);
+      const params: any = {
+        page: page,
+        limit: limit,
+      };
+
+      if (searchValue.trim()) {
+        params.search = searchValue;
+      }
+
+      const response = await axios.get<AdminResponse>(`/admin/admins`, { params });
 
       if (response.data) {
         setAdmins(response.data.users);
@@ -107,7 +124,7 @@ const AdminManagement: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchAdmins(currentPage, pageSize);
+    fetchAdmins(currentPage, pageSize, searchValue);
   }, [currentPage, pageSize]);
 
   // 페이지 변경 핸들러
@@ -206,7 +223,7 @@ const AdminManagement: React.FC = () => {
       // 모달 닫고 목록 갱신
       setShowModal(false);
       setSelectedAdminIds([]); // 저장 후 선택 해제
-      fetchAdmins(currentPage, pageSize);
+      fetchAdmins(currentPage, pageSize, searchValue);
     } catch (error: any) {
       console.error("Error saving admin:", error);
       setAlertMessage({
@@ -232,7 +249,7 @@ const AdminManagement: React.FC = () => {
       await axios.delete(`/admin/account/${id}`);
       setAlertMessage({ type: "success", message: "관리자가 삭제되었습니다." });
       setSelectedAdminIds((prev) => prev.filter((adminId) => adminId !== id)); // 선택 해제
-      fetchAdmins(currentPage, pageSize);
+      fetchAdmins(currentPage, pageSize, searchValue);
     } catch (error: any) {
       console.error("Error deleting admin:", error);
       setAlertMessage({
@@ -347,7 +364,14 @@ const AdminManagement: React.FC = () => {
       });
     }
 
-    fetchAdmins(currentPage, pageSize);
+    fetchAdmins(currentPage, pageSize, searchValue);
+  };
+
+  // 검색 핸들러
+  const handleSearch = (type: string, value: string) => {
+    if (type === "nickname" || type === "email") {
+      fetchAdmins(currentPage, pageSize, value);
+    }
   };
 
   // DataTable 컬럼 정의
@@ -460,6 +484,11 @@ const AdminManagement: React.FC = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">관리자 계정 관리</h1>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-2">
           <Button
             variant="danger"

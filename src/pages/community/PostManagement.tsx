@@ -4,6 +4,7 @@ import { Post } from "@/types/index";
 import { useNavigate } from "react-router-dom";
 import ActionButton from "@/components/ActionButton";
 import DataTable from "@/components/DataTable";
+import SearchInput from "@/components/SearchInput";
 
 // Define column type based on DataTable.tsx
 interface PostColumnDef {
@@ -24,6 +25,9 @@ const PostManagement = () => {
     total: 0,
   });
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
   // 게시물 상세 페이지로 이동
   const handleClick = (id: number) => {
     navigate(`/community/posts/${id}`);
@@ -34,17 +38,26 @@ const PostManagement = () => {
     getAllPost(page);
   };
 
-  // 전체 게시물 목록 가져오기
-  const getAllPost = async (page = 1) => {
+  // 검색 핸들러
+  const handleSearch = (value: string) => {
+    getAllPost(1, value);
+  };
+
+  // 전체 게시물 목록 가져오기 (검색 파라미터 추가)
+  const getAllPost = async (page = 1, searchValue: string = "") => {
     setLoading(true);
     try {
-      const response = await axios.get("/post", {
-        params: {
-          page,
-          pageSize: pagination.limit,
-          boardId: 2, // 자유게시판(boardId: 2)에 해당하는 게시물만 불러오기
-        },
-      });
+      const params: any = {
+        page,
+        pageSize: pagination.limit,
+        boardId: 2, // 자유게시판(boardId: 2)에 해당하는 게시물만 불러오기
+      };
+
+      if (searchValue.trim()) {
+        params.search = searchValue;
+      }
+
+      const response = await axios.get("/post", { params });
 
       console.log("게시물 API 응답:", response.data);
 
@@ -233,24 +246,31 @@ const PostManagement = () => {
     <div className="p-6 bg-white rounded-xl shadow-md">
       <h2 className="text-xl font-semibold mb-4">게시물 목록</h2>
 
-      <div className="mb-4 flex justify-end space-x-2">
-        <button
-          onClick={handleDeleteSelected}
-          disabled={selectedPosts.length === 0}
-          className={`px-4 py-2 rounded-md transition-colors ${
-            selectedPosts.length === 0
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-              : "bg-red-600 text-white hover:bg-red-700"
-          }`}
-        >
-          선택 삭제 ({selectedPosts.length})
-        </button>
-        <button
-          onClick={() => navigate("/community/posts/new")}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-        >
-          새 게시물 작성
-        </button>
+      <div className="mb-4 flex justify-between items-center">
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
+        <div className="flex space-x-2">
+          <button
+            onClick={handleDeleteSelected}
+            disabled={selectedPosts.length === 0}
+            className={`px-4 py-2 rounded-md transition-colors ${
+              selectedPosts.length === 0
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-red-600 text-white hover:bg-red-700"
+            }`}
+          >
+            선택 삭제 ({selectedPosts.length})
+          </button>
+          <button
+            onClick={() => navigate("/community/posts/new")}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          >
+            새 게시물 작성
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">

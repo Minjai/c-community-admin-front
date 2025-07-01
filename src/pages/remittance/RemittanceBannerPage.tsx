@@ -8,6 +8,7 @@ import Modal from "../../components/Modal";
 import Input from "../../components/forms/Input";
 import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
+import SearchInput from "../../components/SearchInput";
 import LoadingOverlay from "../../components/LoadingOverlay";
 
 // 날짜 포맷 변환 함수 (컴포넌트 밖으로 이동)
@@ -42,63 +43,76 @@ const RemittanceBannerPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(30);
   const [totalItems, setTotalItems] = useState<number>(0);
+  const [searchValue, setSearchValue] = useState<string>("");
 
-  // 배너 목록 조회 (페이지네이션 적용)
-  const fetchBanners = useCallback(async (page: number = 1, limit: number = 30) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await RemittanceBannerService.getRemittanceBanners(page, limit);
-      if (response && response.data && response.pagination) {
-        const fetchedBanners = response.data || [];
-        const pagination = response.pagination;
-        const processedBanners = fetchedBanners.map((banner: any) => ({
-          id: banner.id,
-          name: banner.name || "",
-          link: banner.link || "",
-          imageUrl: banner.imageUrl || banner.image || "",
-          isPublic: banner.isPublic === undefined ? 1 : banner.isPublic,
-          displayOrder: banner.displayOrder || 0,
-          createdAt: banner.createdAt || "",
-          updatedAt: banner.updatedAt || "",
-        }));
-        // displayOrder 오름차순, 같으면 createdAt 내림차순
-        const sortedBanners = [...processedBanners].sort((a, b) => {
-          if ((a.displayOrder || 0) !== (b.displayOrder || 0)) {
-            return (a.displayOrder || 0) - (b.displayOrder || 0);
-          }
-          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
-        setBanners(sortedBanners);
-        setOriginalBanners(sortedBanners);
-        setTotalItems(pagination.totalItems || 0);
-        setTotalPages(pagination.totalPages || 0);
-        setCurrentPage(pagination.currentPage || page);
-        setPageSize(pagination.pageSize || limit);
-        setSelectedBannerIds([]);
-      } else {
+  // 검색 핸들러
+  const handleSearch = (value: string) => {
+    fetchBanners(1, pageSize, value);
+  };
+
+  // 배너 목록 조회 (페이지네이션 적용, 검색 파라미터 추가)
+  const fetchBanners = useCallback(
+    async (page: number = 1, limit: number = 30, searchValue: string = "") => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await RemittanceBannerService.getRemittanceBanners(
+          page,
+          limit,
+          searchValue
+        );
+        if (response && response.data && response.pagination) {
+          const fetchedBanners = response.data || [];
+          const pagination = response.pagination;
+          const processedBanners = fetchedBanners.map((banner: any) => ({
+            id: banner.id,
+            name: banner.name || "",
+            link: banner.link || "",
+            imageUrl: banner.imageUrl || banner.image || "",
+            isPublic: banner.isPublic === undefined ? 1 : banner.isPublic,
+            displayOrder: banner.displayOrder || 0,
+            createdAt: banner.createdAt || "",
+            updatedAt: banner.updatedAt || "",
+          }));
+          // displayOrder 오름차순, 같으면 createdAt 내림차순
+          const sortedBanners = [...processedBanners].sort((a, b) => {
+            if ((a.displayOrder || 0) !== (b.displayOrder || 0)) {
+              return (a.displayOrder || 0) - (b.displayOrder || 0);
+            }
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
+          setBanners(sortedBanners);
+          setOriginalBanners(sortedBanners);
+          setTotalItems(pagination.totalItems || 0);
+          setTotalPages(pagination.totalPages || 0);
+          setCurrentPage(pagination.currentPage || page);
+          setPageSize(pagination.pageSize || limit);
+          setSelectedBannerIds([]);
+        } else {
+          setBanners([]);
+          setOriginalBanners([]);
+          setTotalItems(0);
+          setTotalPages(0);
+          setCurrentPage(1);
+          setError("송금 배너 데이터 형식이 올바르지 않습니다.");
+        }
+      } catch (err) {
+        setError("송금 배너를 불러오는데 실패했습니다.");
         setBanners([]);
         setOriginalBanners([]);
         setTotalItems(0);
         setTotalPages(0);
         setCurrentPage(1);
-        setError("송금 배너 데이터 형식이 올바르지 않습니다.");
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError("송금 배너를 불러오는데 실패했습니다.");
-      setBanners([]);
-      setOriginalBanners([]);
-      setTotalItems(0);
-      setTotalPages(0);
-      setCurrentPage(1);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchBanners(currentPage, pageSize);
-  }, [fetchBanners, currentPage, pageSize]);
+    fetchBanners(currentPage, pageSize, searchValue);
+  }, [fetchBanners, currentPage, pageSize, searchValue]);
 
   // 배너 추가 모달 열기
   const handleAddBanner = () => {
@@ -188,6 +202,7 @@ const RemittanceBannerPage: React.FC = () => {
       // 모달 닫고 배너 목록 새로고침
       setShowModal(false);
       setSelectedBannerIds([]);
+      fetchBanners(currentPage, pageSize, searchValue);
       fetchBanners(currentPage, pageSize);
     } catch (err) {
       console.error("Error saving remittance banner:", err);
@@ -570,7 +585,29 @@ const RemittanceBannerPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">송금 배너 관리</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">송금 배너 관리</h1>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
+        <div className="flex space-x-2">
+          <Button onClick={handleBulkDisplayOrderSave} variant="primary" disabled={loading}>
+            순서 저장
+          </Button>
+          <Button
+            onClick={handleBulkDelete}
+            variant="danger"
+            disabled={selectedBannerIds.length === 0 || loading}
+          >
+            {`선택 삭제 (${selectedBannerIds.length})`}
+          </Button>
+          <Button onClick={handleAddBanner} disabled={loading}>
+            배너 등록
+          </Button>
+        </div>
+      </div>
 
       {alertMessage && (
         <Alert
@@ -585,22 +622,6 @@ const RemittanceBannerPage: React.FC = () => {
       )}
 
       <LoadingOverlay isLoading={loading || saving || moving} />
-
-      <div className="flex justify-end space-x-2 mb-4">
-        <Button onClick={handleBulkDisplayOrderSave} variant="primary" disabled={loading}>
-          순서 저장
-        </Button>
-        <Button
-          onClick={handleBulkDelete}
-          variant="danger"
-          disabled={selectedBannerIds.length === 0 || loading}
-        >
-          {`선택 삭제 (${selectedBannerIds.length})`}
-        </Button>
-        <Button onClick={handleAddBanner} disabled={loading}>
-          배너 등록
-        </Button>
-      </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <DataTable

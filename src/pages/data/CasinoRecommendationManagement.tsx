@@ -15,7 +15,7 @@ import { extractDataArray } from "../../api/util";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { toast } from "react-toastify";
 import { DragManager } from "./components/drag/DragManager";
-import SearchInput from "@components/SearchInput.tsx";
+import SearchInput from "@/components/SearchInput";
 
 // Add a utility function to determine the display status based on dates
 const getDisplayStatus = (startDateStr: string, endDateStr: string): string => {
@@ -133,113 +133,122 @@ const CasinoRecommendationManagement = () => {
     setIsPublic(publicSettings === "public" ? 1 : 0);
   }, [publicSettings]);
 
+  // 검색 핸들러
   const handleSearch = (type: string, value: string) => {
-    if (type === 'title') {
+    if (type === "title") {
       fetchRecommendations(value);
     }
-  }
+  };
 
   // 게임 추천 목록 조회 (클라이언트 측 페이지네이션 로직 수정)
-  const fetchRecommendations = useCallback(async (searchValue:string) => {
-    // page, limit 제거
-    setLoading(true);
-    setError(null);
-    try {
-      // 페이지네이션 없이 전체 데이터 요청
-      const response = await axios.get("/casino-recommends", {
-        params: {
-          title: searchValue,
-        },
-      });
+  const fetchRecommendations = useCallback(
+    async (searchValue: string = "") => {
+      // page, limit 제거
+      setLoading(true);
+      setError(null);
+      try {
+        // 페이지네이션 없이 전체 데이터 요청
+        const params: any = {};
 
-      // API 응답 구조 확인 및 처리 (data가 배열이라고 가정)
-      if (response.data && response.data.success && Array.isArray(response.data.data)) {
-        const recommendationData = response.data.data;
+        if (searchValue.trim()) {
+          params.title = searchValue;
+        }
 
-        // 서버 응답을 컴포넌트에서 사용하는 형식으로 변환
-        const transformedRecommendations = recommendationData.map((item: any) => {
-          // API 응답의 games 배열을 직접 사용하고, gameIds는 여기서 추출
-          let gamesData: GameLink[] = [];
-          if (item.games && Array.isArray(item.games)) {
-            // API 응답 구조를 GameLink 타입으로 매핑 (필요시 유효성 검사 추가)
-            gamesData = item.games.map((game: any) => ({
-              id: game.id,
-              casinoRecommendId: game.casinoRecommendId,
-              casinoGameId: game.casinoGameId,
-              displayOrder: game.displayOrder || 0,
-              createdAt: game.createdAt || new Date().toISOString(),
-              updatedAt: game.updatedAt || new Date().toISOString(),
-              casinoGame: {
-                id: game.casinoGame?.id || 0,
-                title: game.casinoGame?.title || "제목 없음",
-                // CasinoGame 인터페이스에 맞는 다른 필드 추가
-              },
-            }));
-          }
-          // 다른 게임 목록 구조(gameList, gameIds/gameTitles)는 GameLink[] 타입과 호환되지 않으므로 제거하거나 별도 처리 필요
-          // 우선 games 필드만 사용하도록 단순화
+        const response = await axios.get("/casino-recommends", { params });
 
-          const gameIds = gamesData.map((game) => game.casinoGameId);
+        // API 응답 구조 확인 및 처리 (data가 배열이라고 가정)
+        if (response.data && response.data.success && Array.isArray(response.data.data)) {
+          const recommendationData = response.data.data;
 
-          return {
-            id: item.id,
-            title: item.title,
-            isMainDisplay: item.isMainDisplay === 1 || item.isMainDisplay === true,
-            games: gamesData,
-            gameIds: gameIds,
-            startDate: item.startDate || item.start_date || "",
-            endDate: item.endDate || item.end_date || "",
-            isPublic: item.isPublic === 1 || item.isPublic === true ? 1 : 0,
-            displayOrder: item.displayOrder || item.position || 0,
-            createdAt: item.createdAt || item.created_at || new Date().toISOString(),
-            updatedAt:
-              item.updatedAt || item.updated_at || item.createdAt || new Date().toISOString(),
-          };
-        });
+          // 서버 응답을 컴포넌트에서 사용하는 형식으로 변환
+          const transformedRecommendations = recommendationData.map((item: any) => {
+            // API 응답의 games 배열을 직접 사용하고, gameIds는 여기서 추출
+            let gamesData: GameLink[] = [];
+            if (item.games && Array.isArray(item.games)) {
+              // API 응답 구조를 GameLink 타입으로 매핑 (필요시 유효성 검사 추가)
+              gamesData = item.games.map((game: any) => ({
+                id: game.id,
+                casinoRecommendId: game.casinoRecommendId,
+                casinoGameId: game.casinoGameId,
+                displayOrder: game.displayOrder || 0,
+                createdAt: game.createdAt || new Date().toISOString(),
+                updatedAt: game.updatedAt || new Date().toISOString(),
+                casinoGame: {
+                  id: game.casinoGame?.id || 0,
+                  title: game.casinoGame?.title || "제목 없음",
+                  // CasinoGame 인터페이스에 맞는 다른 필드 추가
+                },
+              }));
+            }
+            // 다른 게임 목록 구조(gameList, gameIds/gameTitles)는 GameLink[] 타입과 호환되지 않으므로 제거하거나 별도 처리 필요
+            // 우선 games 필드만 사용하도록 단순화
 
-        // displayOrder 기준 오름차순 정렬 (작은 값이 위로), displayOrder가 같으면 createdAt 내림차순(최신이 위)
-        const sortedRecommendations = [...transformedRecommendations].sort((a, b) => {
-          if ((a.displayOrder || 0) !== (b.displayOrder || 0)) {
-            return (a.displayOrder || 0) - (b.displayOrder || 0);
-          }
-          // displayOrder가 같으면 createdAt 내림차순(최신이 위)
-          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-        });
+            const gameIds = gamesData.map((game) => game.casinoGameId);
 
-        // 전체 데이터를 상태에 저장
-        setAllRecommendations(sortedRecommendations);
-        originalRecommendationsRef.current = sortedRecommendations; // fetchRecommendations에서만 원본 저장
-        setTotalItems(sortedRecommendations.length);
-        setTotalPages(Math.ceil(sortedRecommendations.length / pageSize)); // pageSize 사용
-        setCurrentPage(1); // 데이터 로드 시 항상 첫 페이지로
-        setSelectedRecommendationIds([]); // 데이터 로드 시 선택 초기화
-      } else {
-        // API 실패 또는 data 형식이 잘못된 경우
-        setAllRecommendations([]); // 전체 데이터 초기화
-        setError(response.data?.message || "게임 추천 목록 형식이 올바르지 않습니다.");
+            return {
+              id: item.id,
+              title: item.title,
+              isMainDisplay: item.isMainDisplay === 1 || item.isMainDisplay === true,
+              games: gamesData,
+              gameIds: gameIds,
+              startDate: item.startDate || item.start_date || "",
+              endDate: item.endDate || item.end_date || "",
+              isPublic: item.isPublic === 1 || item.isPublic === true ? 1 : 0,
+              displayOrder: item.displayOrder || item.position || 0,
+              createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+              updatedAt:
+                item.updatedAt || item.updated_at || item.createdAt || new Date().toISOString(),
+            };
+          });
+
+          // displayOrder 기준 오름차순 정렬 (작은 값이 위로), displayOrder가 같으면 createdAt 내림차순(최신이 위)
+          const sortedRecommendations = transformedRecommendations.sort((a, b) => {
+            if (a.displayOrder !== b.displayOrder) {
+              return a.displayOrder - b.displayOrder;
+            }
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          });
+
+          // 전체 데이터 상태 업데이트
+          setAllRecommendations(sortedRecommendations);
+          originalRecommendationsRef.current = [...sortedRecommendations];
+
+          // 페이지네이션 계산
+          const totalItemsCount = sortedRecommendations.length;
+          const totalPagesCount = Math.ceil(totalItemsCount / pageSize);
+          setTotalItems(totalItemsCount);
+          setTotalPages(totalPagesCount);
+
+          // 현재 페이지 데이터 계산
+          const startIndex = (currentPage - 1) * pageSize;
+          const endIndex = startIndex + pageSize;
+          const currentPageData = sortedRecommendations.slice(startIndex, endIndex);
+          setRecommendations(currentPageData);
+
+          // 선택 상태 초기화
+          setSelectedRecommendationIds([]);
+        } else {
+          // API 응답이 예상과 다른 경우
+          console.error("Invalid API response structure:", response.data);
+          setAllRecommendations([]);
+          setRecommendations([]);
+          setTotalItems(0);
+          setTotalPages(0);
+          setError("게임 추천 목록을 불러오는데 실패했습니다.");
+        }
+      } catch (err) {
+        console.error("Error fetching recommendations:", err);
+        setAllRecommendations([]);
+        setRecommendations([]);
         setTotalItems(0);
         setTotalPages(0);
-        setCurrentPage(1);
-        setSelectedRecommendationIds([]);
+        setError("게임 추천 목록을 불러오는데 실패했습니다.");
+      } finally {
+        setLoading(false);
       }
-    } catch (err: any) {
-      setError("게임 추천 목록을 불러오는데 실패했습니다.");
-      setAllRecommendations([]); // 전체 데이터 초기화
-      setTotalItems(0);
-      setTotalPages(0);
-      setCurrentPage(1);
-      setSelectedRecommendationIds([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [pageSize]); // pageSize가 변경될 때 다시 fetch (옵션) 또는 빈 배열 []
-
-  // 현재 페이지에 표시될 데이터 계산
-  const paginatedRecommendations = useMemo(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    return allRecommendations.slice(startIndex, endIndex);
-  }, [allRecommendations, currentPage, pageSize]);
+    },
+    [currentPage, pageSize]
+  );
 
   // 가능한 게임 목록 가져오기
   const fetchAvailableGames = async () => {
@@ -271,7 +280,7 @@ const CasinoRecommendationManagement = () => {
   };
 
   useEffect(() => {
-    fetchRecommendations(''); // 컴포넌트 마운트 시 데이터 로드
+    fetchRecommendations(""); // 컴포넌트 마운트 시 데이터 로드
     fetchAvailableGames();
   }, [fetchRecommendations]); // fetchRecommendations 의존성 추가 (내부 pageSize 의존성 때문에)
 
@@ -375,7 +384,7 @@ const CasinoRecommendationManagement = () => {
       } catch (err) {
         setError("추천 목록 삭제 중 오류가 발생했습니다.");
         console.error("Delete error:", err);
-        fetchRecommendations(''); // 에러 발생 시에는 다시 불러오기
+        fetchRecommendations(""); // 에러 발생 시에는 다시 불러오기
       } finally {
         setLoading(false);
       }
@@ -428,7 +437,7 @@ const CasinoRecommendationManagement = () => {
     } catch (error: any) {
       console.error("추천 목록 일괄 삭제 중 오류 발생:", error);
       setError("추천 목록 삭제 중 일부 오류가 발생했습니다. 목록을 확인해주세요.");
-      fetchRecommendations(''); // 에러 시 전체 다시 로드
+      fetchRecommendations(""); // 에러 시 전체 다시 로드
     } finally {
       setLoading(false);
     }
@@ -449,7 +458,7 @@ const CasinoRecommendationManagement = () => {
   const handleSelectAllRecommendations = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked) {
       // 현재 페이지에 보이는 항목들의 ID만 선택
-      const currentPageRecommendationIds = paginatedRecommendations.map((rec) => rec.id);
+      const currentPageRecommendationIds = recommendations.map((rec) => rec.id);
       setSelectedRecommendationIds(currentPageRecommendationIds);
     } else {
       setSelectedRecommendationIds([]);
@@ -495,11 +504,11 @@ const CasinoRecommendationManagement = () => {
       await axios.put(`/casino-recommends/${targetItem.id}`, targetItemPayload);
 
       // Fetch updated data from server after successful updates
-      fetchRecommendations('');
+      fetchRecommendations("");
     } catch (err) {
       setError("순서 변경 중 오류가 발생했습니다.");
       // Fetch recommendations even on error to try and get consistent state
-      fetchRecommendations('');
+      fetchRecommendations("");
     } finally {
       setLoading(false);
     }
@@ -544,11 +553,11 @@ const CasinoRecommendationManagement = () => {
       await axios.put(`/casino-recommends/${targetItem.id}`, targetItemPayload);
 
       // Fetch updated data from server after successful updates
-      fetchRecommendations('');
+      fetchRecommendations("");
     } catch (err) {
       setError("순서 변경 중 오류가 발생했습니다.");
       // Fetch recommendations even on error to try and get consistent state
-      fetchRecommendations('');
+      fetchRecommendations("");
     } finally {
       setLoading(false);
     }
@@ -660,7 +669,7 @@ const CasinoRecommendationManagement = () => {
         await axios.post("/casino-recommends", payload);
         setAlertMessage({ type: "success", message: "새 게임 추천이 성공적으로 등록되었습니다." });
       }
-      fetchRecommendations(''); // 저장 후 데이터 다시 로드
+      fetchRecommendations(""); // 저장 후 데이터 다시 로드
       handleCloseModal();
     } catch (err: unknown) {
       console.error("[DEBUG] Error during save:", err);
@@ -689,22 +698,20 @@ const CasinoRecommendationManagement = () => {
             className="form-checkbox h-4 w-4 text-blue-600"
             onChange={handleSelectAllRecommendations}
             checked={
-              paginatedRecommendations.length > 0 && // paginatedRecommendations 사용
-              selectedRecommendationIds.length === paginatedRecommendations.length && // paginatedRecommendations 사용
-              paginatedRecommendations.every((rec) => selectedRecommendationIds.includes(rec.id)) // paginatedRecommendations 사용
+              recommendations.length > 0 && // paginatedRecommendations 사용
+              selectedRecommendationIds.length === recommendations.length && // paginatedRecommendations 사용
+              recommendations.every((rec) => selectedRecommendationIds.includes(rec.id)) // paginatedRecommendations 사용
             }
             ref={(input) => {
               if (input) {
                 const someSelected =
                   selectedRecommendationIds.length > 0 &&
-                  selectedRecommendationIds.length < paginatedRecommendations.length && // paginatedRecommendations 사용
-                  paginatedRecommendations.some((rec) =>
-                    selectedRecommendationIds.includes(rec.id)
-                  ); // paginatedRecommendations 사용
+                  selectedRecommendationIds.length < recommendations.length && // paginatedRecommendations 사용
+                  recommendations.some((rec) => selectedRecommendationIds.includes(rec.id)); // paginatedRecommendations 사용
                 input.indeterminate = someSelected;
               }
             }}
-            disabled={loading || paginatedRecommendations.length === 0} // paginatedRecommendations 사용
+            disabled={loading || recommendations.length === 0} // paginatedRecommendations 사용
           />
         ),
         accessor: "id" as keyof CasinoRecommendation,
@@ -830,7 +837,7 @@ const CasinoRecommendationManagement = () => {
     ],
     [
       loading,
-      paginatedRecommendations,
+      recommendations,
       selectedRecommendationIds,
       currentPage,
       pageSize,
@@ -868,7 +875,7 @@ const CasinoRecommendationManagement = () => {
         )
       );
       toast.success("순서가 저장되었습니다.");
-      fetchRecommendations('');
+      fetchRecommendations("");
     } catch (err) {
       toast.error("순서 저장 중 오류가 발생했습니다.");
     } finally {
@@ -883,39 +890,25 @@ const CasinoRecommendationManagement = () => {
   useEffect(() => {
     if (selectedGames.length > 0) {
       dragManagerRef.current = new DragManager((from, to) => {
-      const tempSelectedGames = [...selectedGames];
-      const tempSelectedGameIds = [...selectedGameIds];
+        const tempSelectedGames = [...selectedGames];
+        const tempSelectedGameIds = [...selectedGameIds];
 
         // 원본을 건드리지 않고 새로운 배열 생성
-      const games = [
-        ...tempSelectedGames.slice(0, from),
-        ...tempSelectedGames.slice(from + 1)
-      ];
-      const ids = [
-        ...tempSelectedGameIds.slice(0, from),
-        ...tempSelectedGameIds.slice(from + 1)
-      ];
+        const games = [...tempSelectedGames.slice(0, from), ...tempSelectedGames.slice(from + 1)];
+        const ids = [...tempSelectedGameIds.slice(0, from), ...tempSelectedGameIds.slice(from + 1)];
 
-      const newGames = [
-        ...games.slice(0, to),
-        selectedGames[from],
-        ...games.slice(to)
-      ];
-      const newIds = [
-        ...ids.slice(0, to),
-        selectedGameIds[from],
-        ...ids.slice(to)
-      ];
+        const newGames = [...games.slice(0, to), selectedGames[from], ...games.slice(to)];
+        const newIds = [...ids.slice(0, to), selectedGameIds[from], ...ids.slice(to)];
 
-      setSelectedGames(newGames);
-      setSelectedGameIds(newIds);
+        setSelectedGames(newGames);
+        setSelectedGameIds(newIds);
       });
     }
   }, [selectedGames, selectedGameIds]);
 
   // 드래그 이벤트 핸들러
   const handleDragStart = (index: number) => {
-    if(!dragManagerRef.current)return;
+    if (!dragManagerRef.current) return;
     dragManagerRef.current.startDrag(index);
   };
 
@@ -924,7 +917,7 @@ const CasinoRecommendationManagement = () => {
   };
 
   const handleDrop = (index: number) => {
-    if(!dragManagerRef.current)return;
+    if (!dragManagerRef.current) return;
     dragManagerRef.current.drop(index);
   };
   // === 드래그 앤 드롭 종료 ===
@@ -933,7 +926,11 @@ const CasinoRecommendationManagement = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">카지노 게임 추천 관리</h1>
-        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch}/>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-2">
           {/* 순서 저장 버튼 */}
           <Button
@@ -973,7 +970,7 @@ const CasinoRecommendationManagement = () => {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <DataTable
           columns={columns}
-          data={paginatedRecommendations} // paginatedRecommendations 사용
+          data={recommendations} // paginatedRecommendations 사용
           loading={loading}
           emptyMessage="등록된 카지노 추천이 없습니다."
           pagination={{
@@ -1130,7 +1127,7 @@ const CasinoRecommendationManagement = () => {
                           onDragStart={() => handleDragStart(index)}
                           onDragOver={handleDragOver}
                           onDrop={() => handleDrop(index)}
-                          style={{ cursor: 'grab' }}
+                          style={{ cursor: "grab" }}
                         >
                           <span
                             className="text-sm truncate flex-1 mr-2 min-w-0 overflow-hidden whitespace-nowrap"

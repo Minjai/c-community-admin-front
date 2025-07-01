@@ -13,6 +13,7 @@ import Button from "@/components/Button";
 import ActionButton from "@/components/ActionButton";
 import Modal from "@/components/Modal";
 import Alert from "@/components/Alert";
+import SearchInput from "@/components/SearchInput";
 import {
   formatDateForDisplay,
   formatISODateToDateTimeLocal,
@@ -191,34 +192,50 @@ export default function SportRecommendationsManagement() {
     [sportMapping, korToEngMapping]
   );
 
-  // 추천 목록 조회
-  const fetchRecommendations = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-    const currentSelected = [...selectedRecommendationIds]; // Keep selection
-
-    try {
-      const result = await getSportRecommendations({ page, limit });
-      const sortedData = result.data.sort((a, b) => b.id - a.id);
-      setRecommendations(sortedData);
-      setTotal(result.meta.total || 0);
-      // totalPages 상태 업데이트 추가
-      setTotalPages(Math.ceil((result.meta.total || 0) / limit) || 1);
-
-      // Restore selection after fetch
-      setSelectedRecommendationIds(
-        currentSelected.filter((id) => sortedData.some((rec) => rec.id === id))
-      );
-    } catch (err) {
-      console.error("Error fetching sport recommendations:", err);
-      setError("스포츠 종목 추천 목록을 불러오는데 실패했습니다.");
-      setRecommendations([]); // Clear data on error
-      setSelectedRecommendationIds([]); // Clear selection on error
-    } finally {
-      setLoading(false);
+  // 검색 핸들러
+  const handleSearch = (type: string, value: string) => {
+    if (type === "title" || type === "content" || type === "both") {
+      fetchRecommendations(value);
     }
-  }, [page, limit]);
+  };
+
+  // 추천 목록 조회 (검색 파라미터 추가)
+  const fetchRecommendations = useCallback(
+    async (searchValue: string = "") => {
+      setLoading(true);
+      setError(null);
+      setSuccess(null);
+      const currentSelected = [...selectedRecommendationIds]; // Keep selection
+
+      try {
+        const params: any = { page, limit };
+
+        if (searchValue.trim()) {
+          params.search = searchValue;
+        }
+
+        const result = await getSportRecommendations(params);
+        const sortedData = result.data.sort((a, b) => b.id - a.id);
+        setRecommendations(sortedData);
+        setTotal(result.meta.total || 0);
+        // totalPages 상태 업데이트 추가
+        setTotalPages(Math.ceil((result.meta.total || 0) / limit) || 1);
+
+        // Restore selection after fetch
+        setSelectedRecommendationIds(
+          currentSelected.filter((id) => sortedData.some((rec) => rec.id === id))
+        );
+      } catch (err) {
+        console.error("Error fetching sport recommendations:", err);
+        setError("스포츠 종목 추천 목록을 불러오는데 실패했습니다.");
+        setRecommendations([]); // Clear data on error
+        setSelectedRecommendationIds([]); // Clear selection on error
+      } finally {
+        setLoading(false);
+      }
+    },
+    [page, limit]
+  );
 
   // 스포츠 게임 목록 조회 (updateSportMappings 호출 제거 및 의존성 제거)
   const fetchSportGames = useCallback(async () => {
@@ -997,8 +1014,11 @@ export default function SportRecommendationsManagement() {
       )}
 
       <div className="flex justify-between items-center mb-4">
-        {/* Placeholder for title alignment */}
-        <div></div>
+        <SearchInput
+          searchValue={searchQuery}
+          setSearchValue={setSearchQuery}
+          onSearch={handleSearch}
+        />
         {/* Buttons on the right */}
         <div className="flex space-x-2">
           {/* 선택 삭제 버튼 추가 */}

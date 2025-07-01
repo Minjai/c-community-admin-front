@@ -8,6 +8,7 @@ import Modal from "../../components/Modal";
 import Input from "../../components/forms/Input";
 import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
+import SearchInput from "../../components/SearchInput";
 import { formatDate } from "../../utils/dateUtils";
 import axios from "@/api/axios";
 import { extractDataArray } from "../../api/util";
@@ -45,6 +46,9 @@ const CasinoCompanyPage: React.FC = () => {
   const [pageSize, setPageSize] = useState<number>(PAGE_SIZE);
   const [totalItems, setTotalItems] = useState<number>(0);
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
   // 초기 상태 설정
   const initialCompanyState: Partial<CasinoCompany> = {
     companyName: "",
@@ -57,14 +61,23 @@ const CasinoCompanyPage: React.FC = () => {
     rating: 0,
   };
 
-  // 카지노 업체 목록 조회 (페이지네이션 적용)
-  const fetchCompanies = async (page: number = currentPage, limit: number = pageSize) => {
+  // 검색 핸들러
+  const handleSearch = (value: string) => {
+    fetchCompanies(currentPage, pageSize, value);
+  };
+
+  // 카지노 업체 목록 조회 (검색 파라미터 추가)
+  const fetchCompanies = async (
+    page: number = currentPage,
+    limit: number = pageSize,
+    searchValue: string = ""
+  ) => {
     setLoading(true);
     setError(null);
     const currentSelected = [...selectedCompanyIds];
     try {
       const response: ApiResponse<PaginatedData<CasinoCompany>> =
-        await CasinoCompanyApiService.getCasinoCompanies(page, limit);
+        await CasinoCompanyApiService.getCasinoCompanies(page, limit, searchValue);
       if (response && response.success && response.data) {
         const {
           items,
@@ -125,14 +138,14 @@ const CasinoCompanyPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchCompanies(currentPage, PAGE_SIZE); // 컴포넌트 마운트 시 첫 페이지 데이터 로드
+    fetchCompanies(currentPage, PAGE_SIZE, searchValue); // 컴포넌트 마운트 시 첫 페이지 데이터 로드
   }, []); // 컴포넌트 마운트 시에만 실행
 
   // 페이지 변경 핸들러 추가
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
       setCurrentPage(page); // 먼저 currentPage 상태를 업데이트
-      fetchCompanies(page, PAGE_SIZE); // 새 페이지 데이터 요청
+      fetchCompanies(page, PAGE_SIZE, searchValue); // 새 페이지 데이터 요청
     }
   };
 
@@ -564,6 +577,11 @@ const CasinoCompanyPage: React.FC = () => {
     <div className="w-full px-8 py-8">
       <div className="mb-6 flex justify-between items-center">
         <h1 className="text-2xl font-bold">카지노 업체 관리</h1>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-2">
           <Button
             onClick={handleBulkDisplayOrderSave}

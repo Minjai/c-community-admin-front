@@ -258,7 +258,7 @@ const SportsAnalysisDetail: React.FC = () => {
               accept="image/*"
               onChange={(file) => setHomeTeamImage(file)}
               disabled={saving}
-              preview={homeTeamImageUrl}
+              preview={true}
               initialPreview={homeTeamImageUrl}
             />
           </div>
@@ -279,7 +279,7 @@ const SportsAnalysisDetail: React.FC = () => {
               accept="image/*"
               onChange={(file) => setAwayTeamImage(file)}
               disabled={saving}
-              preview={awayTeamImageUrl}
+              preview={true}
               initialPreview={awayTeamImageUrl}
             />
           </div>

@@ -59,14 +59,16 @@ const CasinoGameManagement = () => {
   // 검색 value 상태
   const [searchValue, setSearchValue] = useState<string>("");
 
-  const handleSearch = (type: string, value: string) => {
-    if (type === 'title') {
-      fetchGames(currentPage, pageSize, value);
-    }
-  }
+  const handleSearch = (value: string) => {
+    fetchGames(currentPage, pageSize, value);
+  };
 
   // 게임 목록 조회 (페이지네이션 적용)
-  const fetchGames = async (page: number = currentPage, limit: number = pageSize, searchValue: string = '') => {
+  const fetchGames = async (
+    page: number = currentPage,
+    limit: number = pageSize,
+    searchValue: string = ""
+  ) => {
     setLoading(true);
 
     try {
@@ -564,7 +566,11 @@ const CasinoGameManagement = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">카지노 게임 관리</h1>
-        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch} />
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-2">
           <Button
             onClick={handleBulkDelete}

@@ -6,6 +6,7 @@ import ActionButton from "@/components/ActionButton";
 import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
+import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import TextEditor from "@/components/forms/TextEditor";
@@ -77,6 +78,9 @@ const InquiryManagement = () => {
 
   const [users, setUsers] = useState<{ id: number; nickname: string }[]>([]);
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
   // 유저 목록 불러오기
   const fetchUsers = useCallback(async () => {
     try {
@@ -115,37 +119,53 @@ const InquiryManagement = () => {
     setShowCategoryFilter(false);
   };
 
-  // 1대1 문의 목록 조회
-  const fetchInquiries = useCallback(async (page: number, limit: number) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      // 어드민용 전체 조회
-      const response = await axios.get(`/inquiries/admin`);
-      // 페이지네이션이 없으면 전체 데이터로 처리
-      const fetchedInquiries = response.data || [];
-      setInquiries(fetchedInquiries);
-      setTotalItems(fetchedInquiries.length);
-      setTotalPages(1);
-      setCurrentPage(1);
-      setPageSize(fetchedInquiries.length);
-      setSelectedInquiries([]);
-      setAllSelected(false);
-    } catch (err) {
-      console.error("Error fetching inquiries:", err);
-      setError("1대1 문의 목록을 불러오는데 실패했습니다.");
-      setInquiries([]);
-      setTotalItems(0);
-      setTotalPages(0);
-      setCurrentPage(1);
-    } finally {
-      setLoading(false);
+  // 검색 핸들러
+  const handleSearch = (type: string, value: string) => {
+    if (type === "title" || type === "content" || type === "both") {
+      fetchInquiries(currentPage, pageSize, value);
     }
-  }, []);
+  };
+
+  // 1대1 문의 목록 조회 (검색 파라미터 추가)
+  const fetchInquiries = useCallback(
+    async (page: number, limit: number, searchValue: string = "") => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // 어드민용 전체 조회
+        const params: any = {};
+
+        if (searchValue.trim()) {
+          params.search = searchValue;
+        }
+
+        const response = await axios.get(`/inquiries/admin`, { params });
+        // 페이지네이션이 없으면 전체 데이터로 처리
+        const fetchedInquiries = response.data || [];
+        setInquiries(fetchedInquiries);
+        setTotalItems(fetchedInquiries.length);
+        setTotalPages(1);
+        setCurrentPage(1);
+        setPageSize(fetchedInquiries.length);
+        setSelectedInquiries([]);
+        setAllSelected(false);
+      } catch (err) {
+        console.error("Error fetching inquiries:", err);
+        setError("1대1 문의 목록을 불러오는데 실패했습니다.");
+        setInquiries([]);
+        setTotalItems(0);
+        setTotalPages(0);
+        setCurrentPage(1);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchInquiries(currentPage, pageSize);
+    fetchInquiries(currentPage, pageSize, searchValue);
   }, [fetchInquiries, currentPage, pageSize]);
 
   // 카테고리 필터 외부 클릭 시 닫기
@@ -420,7 +440,7 @@ const InquiryManagement = () => {
         message: isNewAnswer ? "답변이 등록되었습니다." : "답변이 수정되었습니다.",
       });
 
-      fetchInquiries(currentPage, pageSize);
+      fetchInquiries(currentPage, pageSize, searchValue);
     } catch (err) {
       console.error("Error saving answer:", err);
       setAlertMessage({
@@ -445,7 +465,7 @@ const InquiryManagement = () => {
         type: "success",
         message: "문의가 삭제되었습니다.",
       });
-      fetchInquiries(currentPage, pageSize);
+      fetchInquiries(currentPage, pageSize, searchValue);
     } catch (err) {
       console.error("Error deleting inquiry:", err);
       setAlertMessage({
@@ -481,7 +501,7 @@ const InquiryManagement = () => {
         type: "success",
         message: `${selectedInquiries.length}개의 문의가 삭제되었습니다.`,
       });
-      fetchInquiries(currentPage, pageSize);
+      fetchInquiries(currentPage, pageSize, searchValue);
     } catch (err) {
       console.error("Error deleting inquiries:", err);
       setAlertMessage({
@@ -676,20 +696,22 @@ const InquiryManagement = () => {
   ];
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-semibold text-gray-900">1:1 문의 관리</h1>
-          <p className="mt-2 text-sm text-gray-700">
-            회원들의 1:1 문의를 관리하고 답변을 작성할 수 있습니다.
-          </p>
-        </div>
-        <div className="flex space-x-3">
-          {selectedInquiries.length > 0 && (
-            <Button onClick={handleDeleteSelected} variant="outline" disabled={saving}>
-              선택 삭제 ({selectedInquiries.length})
-            </Button>
-          )}
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">1대1 문의 관리</h1>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
+        <div className="flex space-x-2">
+          <Button
+            variant="danger"
+            onClick={handleDeleteSelected}
+            disabled={selectedInquiries.length === 0 || loading}
+          >
+            {`선택 삭제 (${selectedInquiries.length})`}
+          </Button>
         </div>
       </div>
 

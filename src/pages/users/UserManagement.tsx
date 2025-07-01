@@ -6,6 +6,7 @@ import ActionButton from "@/components/ActionButton";
 import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
+import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import UserDetail from "./UserDetail";
 import BulkPointModal from "./BulkPointModal";
@@ -54,13 +55,25 @@ const UserManagement = () => {
   const [showUserDetailModal, setShowUserDetailModal] = useState<boolean>(false);
   const [selectedUserId, setSelectedUserId] = useState<number | undefined>(undefined);
 
+  // 검색 value 상태
+  const [searchValue, setSearchValue] = useState<string>("");
+
   // 회원 목록 조회
-  const fetchUsers = useCallback(async (page: number, limit: number) => {
+  const fetchUsers = useCallback(async (page: number, limit: number, searchValue: string = "") => {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await axios.get(`/admin/users?page=${page}&limit=${limit}`);
+      const params: any = {
+        page: page,
+        limit: limit,
+      };
+
+      if (searchValue.trim()) {
+        params.search = searchValue;
+      }
+
+      const response = await axios.get(`/admin/users`, { params });
       console.log("회원 정보 API 응답:", response.data);
 
       if (response.data && response.data.data && response.data.pagination) {
@@ -95,7 +108,7 @@ const UserManagement = () => {
   }, []);
 
   useEffect(() => {
-    fetchUsers(currentPage, pageSize);
+    fetchUsers(currentPage, pageSize, searchValue);
   }, [fetchUsers, currentPage, pageSize]);
 
   // handlePageChange 구현
@@ -187,7 +200,7 @@ const UserManagement = () => {
         message: `${selectedUsers.length}명의 회원에게 ${pointAmount}P가 지급되었습니다.`,
       });
 
-      fetchUsers(currentPage, pageSize);
+      fetchUsers(currentPage, pageSize, searchValue);
     } catch (err) {
       console.error("Error distributing points:", err);
       setAlertMessage({
@@ -213,7 +226,7 @@ const UserManagement = () => {
         message: "회원이 성공적으로 삭제되었습니다.",
       });
 
-      fetchUsers(currentPage, pageSize);
+      fetchUsers(currentPage, pageSize, searchValue);
     } catch (err) {
       console.error("Error deleting user:", err);
       setAlertMessage({
@@ -227,6 +240,11 @@ const UserManagement = () => {
   const handleEditUser = (userId: number) => {
     setSelectedUserId(userId);
     setShowUserDetailModal(true);
+  };
+
+  // 검색 핸들러
+  const handleSearch = (value: string) => {
+    fetchUsers(currentPage, pageSize, value);
   };
 
   // DataTable 컬럼 정의
@@ -250,13 +268,13 @@ const UserManagement = () => {
             />
           ),
           accessor: "id" as keyof User,
-          cell: (id: number) => (
+          cell: (value: unknown, row: User) => (
             <div className="flex items-center justify-center">
               <input
                 type="checkbox"
                 className="form-checkbox h-4 w-4 text-blue-600"
-                checked={selectedUsers.includes(id)}
-                onChange={() => handleToggleSelect(id)}
+                checked={selectedUsers.includes(row.id)}
+                onChange={() => handleToggleSelect(row.id)}
               />
             </div>
           ),
@@ -265,12 +283,12 @@ const UserManagement = () => {
         {
           header: "이메일",
           accessor: "email" as keyof User,
-          cell: (value: string, row: User) => (
+          cell: (value: unknown, row: User) => (
             <span
               className="text-blue-600 hover:underline cursor-pointer"
               onClick={() => handleEditUser(row.id)}
             >
-              {value}
+              {value as string}
             </span>
           ),
         },
@@ -278,41 +296,53 @@ const UserManagement = () => {
         {
           header: "등급",
           accessor: "rank" as keyof User,
-          cell: (rank: UserRank) => (
-            <div className="flex items-center space-x-2">
-              {rank?.image && <img src={rank.image} alt={rank.rankName} className="h-6 w-6" />}
-              <span>{rank?.rankName || "-"}</span>
-            </div>
-          ),
+          cell: (value: unknown, row: User) => {
+            const rank = value as UserRank;
+            return (
+              <div className="flex items-center space-x-2">
+                {rank?.image && <img src={rank.image} alt={rank.rankName} className="h-6 w-6" />}
+                <span>{rank?.rankName || "-"}</span>
+              </div>
+            );
+          },
         },
         {
           header: "상태",
           accessor: "status" as keyof User,
-          cell: (status: string) => (
-            <span
-              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClassName(
-                status
-              )}`}
-            >
-              {status}
-            </span>
-          ),
+          cell: (value: unknown, row: User) => {
+            const status = value as string;
+            return (
+              <span
+                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClassName(
+                  status
+                )}`}
+              >
+                {status}
+              </span>
+            );
+          },
           className: "text-center",
         },
         {
           header: "포인트",
           accessor: "score" as keyof User,
-          cell: (score: number) => score.toLocaleString(),
+          cell: (value: unknown, row: User) => {
+            const score = value as number;
+            return score.toLocaleString();
+          },
         },
         {
           header: "가입일",
           accessor: "createdAt" as keyof User,
-          cell: (value: string) => formatDate(value),
+          cell: (value: unknown, row: User) => {
+            const dateValue = value as string;
+            return formatDate(dateValue);
+          },
         },
         {
           header: "관리",
           accessor: "id" as keyof User,
-          cell: (id: number, row: User) => (
+          cell: (value: unknown, row: User) => (
             <div className="flex space-x-2">
               <ActionButton
                 label="수정"
@@ -323,7 +353,7 @@ const UserManagement = () => {
               <ActionButton
                 label="삭제"
                 action="delete"
-                onClick={() => handleDeleteUser(id)}
+                onClick={() => handleDeleteUser(row.id)}
                 disabled={loading || saving}
               />
             </div>
@@ -343,6 +373,11 @@ const UserManagement = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold mb-6">회원 관리</h1>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-2">
           <Button onClick={handleOpenPointModal} disabled={selectedUsers.length === 0 || loading}>
             포인트 일괄 지급
@@ -391,7 +426,7 @@ const UserManagement = () => {
             type: "success",
             message: `포인트 지급이 완료되었습니다.`,
           });
-          fetchUsers(currentPage, pageSize);
+          fetchUsers(currentPage, pageSize, searchValue);
         }}
       />
 
@@ -404,7 +439,7 @@ const UserManagement = () => {
             setSelectedUserId(undefined);
           }}
           onUserUpdated={() => {
-            fetchUsers(currentPage, pageSize);
+            fetchUsers(currentPage, pageSize, searchValue);
             setAlertMessage({ type: "success", message: "회원 정보가 수정되었습니다." });
           }}
         />

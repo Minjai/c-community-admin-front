@@ -7,6 +7,7 @@ import Input from "../../components/forms/Input";
 import Select from "../../components/forms/Select";
 import DatePicker from "../../components/forms/DatePicker";
 import Alert from "../../components/Alert";
+import SearchInput from "../../components/SearchInput";
 import { formatDate } from "../../utils/dateUtils";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import axios from "../../api/axios";
@@ -60,6 +61,7 @@ const CasinoFilterPage: React.FC = () => {
     message: string;
   } | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [searchValue, setSearchValue] = useState<string>("");
 
   // 선택된 대분류 ID 상태
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>([]);
@@ -93,15 +95,28 @@ const CasinoFilterPage: React.FC = () => {
     displayOrder: 0,
   };
 
-  // 대분류 목록 조회 (소분류 포함)
-  const fetchCategories = async (page: number = currentPage, limit: number = pageSize) => {
+  // 검색 핸들러
+  const handleSearch = (value: string) => {
+    fetchCategories(1, pageSize, value);
+  };
+
+  // 대분류 목록 조회 (소분류 포함, 검색 파라미터 추가)
+  const fetchCategories = async (
+    page: number = currentPage,
+    limit: number = pageSize,
+    searchValue: string = ""
+  ) => {
     setLoading(true);
     setError(null);
     const currentSelected = [...selectedCategoryIds];
     try {
-      const response = await axios.get(`/casino-filters/categories`, {
-        params: { page, limit },
-      });
+      const params: any = { page, limit };
+
+      if (searchValue.trim()) {
+        params.search = searchValue;
+      }
+
+      const response = await axios.get(`/casino-filters/categories`, { params });
 
       if (response.data && response.data.success) {
         const {
@@ -834,7 +849,7 @@ const CasinoFilterPage: React.FC = () => {
             <input
               type="checkbox"
               checked={selectedSubCategoryIds.includes(row.id)}
-              onChange={() => handleSelectSubCategory(row.id)}
+              onChange={() => handleSelectSubCategory(row)}
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
           );
@@ -977,6 +992,11 @@ const CasinoFilterPage: React.FC = () => {
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">카지노 필터 관리</h1>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-3">
           <Button onClick={handleDisplayOrderSave} variant="primary">
             순서 저장
