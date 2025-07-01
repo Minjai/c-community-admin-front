@@ -113,12 +113,54 @@ const HomeManagementPage: React.FC = () => {
         params: {
           page,
           limit,
+          sortBy: "createdAt",
+          sortOrder: "desc",
           ...(search && { title: search }),
         },
       });
 
       if (response.data) {
-        setSections(response.data.sections || []);
+        // API 응답의 selectedItems 구조를 프론트엔드 형식으로 변환
+        const transformedSections = (response.data.sections || []).map((section: any) => {
+          let selectedItems: SelectedItem[] = [];
+
+          if (section.selectedItems) {
+            // items 배열이 있으면 사용, 없으면 객체의 키들을 배열로 변환
+            if (section.selectedItems.items && Array.isArray(section.selectedItems.items)) {
+              selectedItems = section.selectedItems.items.map((item: any) => ({
+                id: item.id,
+                title: item.title,
+                type: item.type,
+              }));
+            } else if (typeof section.selectedItems === "object") {
+              // 객체의 키들을 배열로 변환 (type 필드 제외)
+              selectedItems = Object.keys(section.selectedItems)
+                .filter((key) => key !== "type" && key !== "items")
+                .map((key) => {
+                  const item = section.selectedItems[key];
+                  return {
+                    id: item.id,
+                    title: item.title,
+                    type: item.type,
+                  };
+                });
+            }
+          }
+
+          return {
+            ...section,
+            selectedItems,
+          };
+        });
+
+        // 등록일시 기준으로 내림차순 정렬 (최신순)
+        const sortedSections = transformedSections.sort((a: any, b: any) => {
+          const dateA = new Date(a.createdAt).getTime();
+          const dateB = new Date(b.createdAt).getTime();
+          return dateB - dateA; // 내림차순 (최신이 위로)
+        });
+
+        setSections(sortedSections);
         setTotalItems(response.data.total || 0);
         setTotalPages(response.data.totalPages || 0);
         setCurrentPage(response.data.currentPage || 1);
@@ -220,12 +262,10 @@ const HomeManagementPage: React.FC = () => {
     }
   }, [selectedItems]);
 
-  const handleSearch = (type: string, value: string) => {
-    if (type === "title") {
-      fetchSections(1, pageSize, value).then(() => {
-        setSelectedIds(new Set());
-      });
-    }
+  const handleSearch = (value: string) => {
+    fetchSections(1, pageSize, value).then(() => {
+      setSelectedIds(new Set());
+    });
   };
 
   const handlePageChange = (page: number) => {
@@ -254,7 +294,15 @@ const HomeManagementPage: React.FC = () => {
   const handleEdit = (section: HomeSection) => {
     setModalError(null);
     setCurrentSection(section);
-    setSelectedItems(section.selectedItems || []);
+
+    // 기존 선택된 항목들을 로드
+    if (section.selectedItems && section.selectedItems.length > 0) {
+      setSelectedItems(section.selectedItems);
+    } else {
+      // API에서 데이터가 제대로 변환되지 않은 경우 기본값 설정
+      setSelectedItems([]);
+    }
+
     setShowModal(true);
     setIsEditing(true);
   };
@@ -286,31 +334,37 @@ const HomeManagementPage: React.FC = () => {
       };
 
       if (isEditing && currentSection.id) {
-        // 공개로 변경하는 경우, 다른 섹션들의 상태를 확인
+        // 수정 시: 공개로 변경하는 경우 자동으로 기존 공개 섹션을 비공개로 처리
         if (currentSection.isPublic) {
           const otherPublicSection = sections.find(
             (section) => section.id !== currentSection.id && section.isPublic
           );
           if (otherPublicSection) {
-            if (
-              !window.confirm("다른 공개된 섹션이 있습니다. 해당 섹션을 비공개로 전환하시겠습니까?")
-            ) {
-              setIsSaving(false);
-              return;
+            // 기존 공개 섹션을 비공개로 변경
+            try {
+              await axios.put(`/admin/home/sections/${otherPublicSection.id}`, {
+                ...otherPublicSection,
+                isPublic: false,
+              });
+            } catch (err) {
+              console.error("기존 공개 섹션 비공개 처리 중 오류:", err);
             }
           }
         }
         await axios.put(`/admin/home/sections/${currentSection.id}`, dataToSend);
       } else {
-        // 새로운 섹션을 공개로 생성하는 경우
+        // 추가 시: 새로운 섹션을 공개로 생성하는 경우 자동으로 기존 공개 섹션을 비공개로 처리
         if (currentSection.isPublic) {
-          const hasPublicSection = sections.some((section) => section.isPublic);
-          if (hasPublicSection) {
-            if (
-              !window.confirm("이미 공개된 섹션이 있습니다. 해당 섹션을 비공개로 전환하시겠습니까?")
-            ) {
-              setIsSaving(false);
-              return;
+          const publicSection = sections.find((section) => section.isPublic);
+          if (publicSection) {
+            // 기존 공개 섹션을 비공개로 변경
+            try {
+              await axios.put(`/admin/home/sections/${publicSection.id}`, {
+                ...publicSection,
+                isPublic: false,
+              });
+            } catch (err) {
+              console.error("기존 공개 섹션 비공개 처리 중 오류:", err);
             }
           }
         }

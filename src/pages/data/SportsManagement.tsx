@@ -185,6 +185,7 @@ export default function SportsManagement() {
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
   const handleSearch = (value: string) => {
+    console.log("SportsManagement: 검색 핸들러 호출됨, 검색어:", value);
     fetchSportCategories(1, PAGE_SIZE, value);
   };
 
@@ -775,37 +776,38 @@ export default function SportsManagement() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-2xl font-semibold mb-6">스포츠 종목 관리</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">스포츠 종목 관리</h1>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
+        <div className="flex space-x-2">
+          <Button onClick={handleOpenManualModal} disabled={loading}>
+            수동 등록
+          </Button>
+          <Button onClick={handleBulkDisplayOrderSave} disabled={loading}>
+            순서 저장
+          </Button>
+          <Button
+            onClick={handleBulkDelete}
+            variant="danger"
+            disabled={selectedCategoryIds.length === 0 || loading}
+          >
+            {`선택 삭제 (${selectedCategoryIds.length})`}
+          </Button>
+          <Button onClick={handleAddCategory} disabled={loading}>
+            카테고리 추가
+          </Button>
+        </div>
+      </div>
 
       {/* 알림 메시지 */}
       {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
       {success && <Alert type="success" message={success} onClose={() => setSuccess(null)} />}
 
       <LoadingOverlay isLoading={loading} />
-      {/* 상단 버튼 영역 */}
-      <div className="flex justify-end space-x-2 mb-4">
-        <SearchInput
-          searchValue={searchValue}
-          setSearchValue={setSearchValue}
-          onSearch={handleSearch}
-        />
-        <Button onClick={handleOpenManualModal} disabled={loading}>
-          수동 등록
-        </Button>
-        <Button onClick={handleBulkDisplayOrderSave} disabled={loading}>
-          순서 저장
-        </Button>
-        <Button
-          onClick={handleBulkDelete}
-          variant="danger"
-          disabled={selectedCategoryIds.length === 0 || loading}
-        >
-          {`선택 삭제 (${selectedCategoryIds.length})`}
-        </Button>
-        <Button onClick={handleAddCategory} disabled={loading}>
-          카테고리 추가
-        </Button>
-      </div>
 
       {/* 데이터 테이블: data={categories}, pagination props 전달 */}
       <div className="bg-white rounded-lg shadow overflow-hidden">

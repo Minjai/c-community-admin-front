@@ -194,6 +194,12 @@ export default function SportRecommendationsManagement() {
 
   // 검색 핸들러
   const handleSearch = (type: string, value: string) => {
+    console.log(
+      "SportRecommendationsManagement: 검색 핸들러 호출됨, 타입:",
+      type,
+      "검색어:",
+      value
+    );
     if (type === "title" || type === "content" || type === "both") {
       fetchRecommendations(value);
     }
@@ -1002,26 +1008,15 @@ export default function SportRecommendationsManagement() {
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-semibold mb-4">스포츠 종목 추천 관리</h1>
-
-      {/* Alerts */}
-      {error && (
-        <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
-      )}
-      {success && (
-        <Alert type="success" message={success} onClose={() => setSuccess(null)} className="mb-4" />
-      )}
-
-      <div className="flex justify-between items-center mb-4">
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">스포츠 종목 추천 관리</h1>
         <SearchInput
           searchValue={searchQuery}
           setSearchValue={setSearchQuery}
-          onSearch={handleSearch}
+          onSearch={(value) => handleSearch("title", value)}
         />
-        {/* Buttons on the right */}
         <div className="flex space-x-2">
-          {/* 선택 삭제 버튼 추가 */}
           <Button
             variant="danger"
             onClick={handleBulkDelete}
@@ -1034,6 +1029,14 @@ export default function SportRecommendationsManagement() {
           </Button>
         </div>
       </div>
+
+      {/* Alerts */}
+      {error && (
+        <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
+      )}
+      {success && (
+        <Alert type="success" message={success} onClose={() => setSuccess(null)} className="mb-4" />
+      )}
 
       {/* Loading Overlay */}
       <LoadingOverlay isLoading={loading} />

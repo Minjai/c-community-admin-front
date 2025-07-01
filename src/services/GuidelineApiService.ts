@@ -29,8 +29,7 @@ export class GuidelineApiService {
           boardId,
           page,
           limit,
-          title: searchValue,
-          content: searchValue,
+          search: searchValue,
         },
       });
       console.log("Guideline API Response:", response); // Log the full response

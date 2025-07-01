@@ -589,7 +589,7 @@ const MiniBannerPage: React.FC = () => {
         <SearchInput
           searchValue={searchValue}
           setSearchValue={setSearchValue}
-          onSearch={handleSearch}
+          onSearch={(value) => handleSearch("title", value)}
         />
         <div className="flex space-x-2">
           {/* 순서 저장 버튼 */}

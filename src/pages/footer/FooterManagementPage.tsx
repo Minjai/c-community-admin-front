@@ -116,6 +116,7 @@ function FooterManagementPage() {
 
   // 검색 핸들러 추가
   const handleSearch = (value: string) => {
+    console.log("FooterManagementPage: 검색 핸들러 호출됨, 검색어:", value);
     setSearchValue(value);
     setCurrentPage(1); // 검색 시 첫 페이지로 이동
     fetchFooters(1, pageSize, value);
@@ -345,12 +346,12 @@ function FooterManagementPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">하단 푸터 관리</h1>
-        <div className="flex items-center space-x-4">
-          <SearchInput
-            searchValue={searchValue}
-            setSearchValue={setSearchValue}
-            onSearch={handleSearch}
-          />
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
+        <div className="flex space-x-2">
           <Button
             variant="danger"
             onClick={handleDeleteSelectedClick}

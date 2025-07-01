@@ -16,6 +16,7 @@ export default function SearchInput({ searchValue, setSearchValue, onSearch }: S
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("SearchInput: 검색 버튼 클릭됨, 검색어:", searchValue);
     onSearch(searchValue);
   };
 

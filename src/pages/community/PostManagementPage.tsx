@@ -219,14 +219,14 @@ const PostManagementPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6 px-4 py-3 bg-white border-b border-gray-200">
-        <h1 className="text-xl font-semibold text-gray-800">게시물 관리</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">게시물 목록</h1>
         <SearchInput
           searchValue={searchValue}
           setSearchValue={setSearchValue}
           onSearch={handleSearch}
         />
-        <div className="flex items-center space-x-2">
+        <div className="flex space-x-2">
           <Select
             value={selectedBoard ? selectedBoard.toString() : "all"}
             onChange={(e) => handleBoardChange(e.target.value)}
@@ -262,18 +262,20 @@ const PostManagementPage: React.FC = () => {
         <Alert type="error" message={error} onClose={() => setError(null)} className="mb-4" />
       )}
 
-      <DataTable
-        columns={columns}
-        data={posts}
-        loading={loading}
-        emptyMessage="등록된 게시물이 없습니다."
-        pagination={{
-          currentPage,
-          pageSize,
-          totalItems: totalPosts,
-          onPageChange: handlePageChange,
-        }}
-      />
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <DataTable
+          columns={columns}
+          data={posts}
+          loading={loading}
+          emptyMessage="등록된 게시물이 없습니다."
+          pagination={{
+            currentPage,
+            pageSize,
+            totalItems: totalPosts,
+            onPageChange: handlePageChange,
+          }}
+        />
+      </div>
 
       {/* 게시물 상세 모달 */}
       <Modal

@@ -448,6 +448,7 @@ const NewsCasinoPage = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
+    console.log("NewsCasinoPage: 검색 핸들러 호출됨, 검색어:", value);
     fetchNews(currentPage, pageSize, value);
   };
 
@@ -570,12 +571,12 @@ const NewsCasinoPage = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">뉴스 관리</h1>
-        <div className="flex items-center space-x-4">
-          <SearchInput
-            searchValue={searchValue}
-            setSearchValue={setSearchValue}
-            onSearch={handleSearch}
-          />
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
+        <div className="flex space-x-2">
           <Button
             variant="danger"
             onClick={handleBulkDelete}

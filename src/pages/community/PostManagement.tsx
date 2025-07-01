@@ -40,6 +40,7 @@ const PostManagement = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
+    console.log("PostManagement: 검색 핸들러 호출됨, 검색어:", value);
     getAllPost(1, value);
   };
 
@@ -243,10 +244,9 @@ const PostManagement = () => {
   }
 
   return (
-    <div className="p-6 bg-white rounded-xl shadow-md">
-      <h2 className="text-xl font-semibold mb-4">게시물 목록</h2>
-
-      <div className="mb-4 flex justify-between items-center">
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold">게시물 목록</h1>
         <SearchInput
           searchValue={searchValue}
           setSearchValue={setSearchValue}

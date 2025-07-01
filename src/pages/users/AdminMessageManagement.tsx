@@ -213,7 +213,7 @@ const AdminMessageManagement = () => {
           params.search = searchValue;
         }
 
-        const response = await axios.get("/admin/messages", { params });
+        const response = await axios.get("/admin/messages/messages", { params });
         const fetchedMessages = response.data || [];
 
         // 백엔드 데이터를 프론트엔드 형식에 맞게 변환

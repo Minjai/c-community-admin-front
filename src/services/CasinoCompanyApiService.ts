@@ -31,7 +31,6 @@ const CasinoCompanyApiService = {
       const response = await axios.get("/companies", {
         params: { page, limit }, // 페이지네이션 파라미터 추가
       });
-      console.log("카지노 업체 API 응답:", response.data);
 
       // API 응답이 ApiResponse<PaginatedData<CasinoCompany>> 형태를 준수한다고 가정하고 그대로 반환
       // 데이터 유효성 검사 강화
@@ -204,9 +203,6 @@ const CasinoCompanyApiService = {
   // --- NEW: Update Display Order Only ---
   updateDisplayOrder: async (id: number, displayOrder: number): Promise<void> => {
     try {
-      console.log(
-        `Attempting to PATCH /companies/${id}/display-order with displayOrder: ${displayOrder}`
-      );
       const response = await axios.patch(`/companies/${id}/display-order`, {
         displayOrder: displayOrder, // Send only displayOrder in JSON body
       });
@@ -217,7 +213,7 @@ const CasinoCompanyApiService = {
           response.data.message || "카지노 업체 순서 변경(displayOrder)에 실패했습니다."
         );
       }
-      console.log(`Successfully PATCHed displayOrder for company ${id}`);
+
       // No specific data expected on success for PATCH in this case, return void
     } catch (error) {
       console.error(`카지노 업체 순서 변경 오류 (ID: ${id}, Order: ${displayOrder}):`, error);

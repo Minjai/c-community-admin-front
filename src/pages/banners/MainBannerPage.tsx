@@ -46,6 +46,7 @@ const MainBannerPage: React.FC = () => {
   const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
 
   const handleSearch = (type: string, value: string) => {
+    console.log("MainBannerPage: 검색 핸들러 호출됨, 타입:", type, "검색어:", value);
     if (type === "title") {
       fetchBanners(currentPage, pageSize, value).then((r) => {
         // 검색 후 선택된 배너 ID 초기화
@@ -664,7 +665,7 @@ const MainBannerPage: React.FC = () => {
         <SearchInput
           searchValue={searchValue}
           setSearchValue={setSearchValue}
-          onSearch={handleSearch}
+          onSearch={(value) => handleSearch("title", value)}
         />
         <div className="flex space-x-2">
           {/* 순서 저장 버튼 */}

@@ -76,7 +76,7 @@ const CasinoGameManagement = () => {
         params: {
           page: page,
           limit: limit,
-          title: searchValue,
+          search: searchValue,
         },
       });
 
@@ -414,12 +414,12 @@ const CasinoGameManagement = () => {
         />
       ),
       accessor: "id" as keyof CasinoGame,
-      cell: (id: number) => (
+      cell: (value: unknown, row: CasinoGame, index: number) => (
         <input
           type="checkbox"
           className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedGameIds.includes(id)}
-          onChange={() => handleSelectGame(id)}
+          checked={selectedGameIds.includes(row.id)}
+          onChange={() => handleSelectGame(row.id)}
         />
       ),
       className: "w-px px-4", // 컬럼 너비 및 패딩 조정
@@ -427,50 +427,56 @@ const CasinoGameManagement = () => {
     {
       header: "게임 제목",
       accessor: "title" as keyof CasinoGame,
-      cell: (value: string, row: CasinoGame) => (
+      cell: (value: unknown, row: CasinoGame, index: number) => (
         <span
           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
           onClick={() => handleEditGame(row)}
         >
-          {value}
+          {value as string}
         </span>
       ),
     },
     {
       header: "썸네일",
       accessor: "thumbnailUrl" as keyof CasinoGame,
-      cell: (value: string) => (
-        <div className="w-20 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
-          {value && value.trim() !== "" ? (
-            <img src={value} alt="썸네일" className="max-w-full max-h-full object-contain" />
-          ) : (
-            <span className="text-xs text-gray-500">이미지 없음</span>
-          )}
-        </div>
-      ),
+      cell: (value: unknown) => {
+        const url = value as string;
+        return (
+          <div className="w-20 h-12 bg-gray-100 flex items-center justify-center overflow-hidden">
+            {url && url.trim() !== "" ? (
+              <img src={url} alt="썸네일" className="max-w-full max-h-full object-contain" />
+            ) : (
+              <span className="text-xs text-gray-500">이미지 없음</span>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: "등록일자",
       accessor: "createdAt" as keyof CasinoGame,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: unknown) => formatDateForDisplay(value as string),
     },
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof CasinoGame,
-      cell: (value: number) => (
-        <span
-          className={`px-2 py-1 rounded text-xs ${
-            value === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}
-        >
-          {value === 1 ? "공개" : "비공개"}
-        </span>
-      ),
+      cell: (value: unknown) => {
+        const pub = value as number;
+        return (
+          <span
+            className={`px-2 py-1 rounded text-xs ${
+              pub === 1 ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+            }`}
+          >
+            {pub === 1 ? "공개" : "비공개"}
+          </span>
+        );
+      },
     },
     {
       header: "관리",
       accessor: "id" as keyof CasinoGame,
-      cell: (value: number, row: CasinoGame, index: number) => (
+      cell: (value: unknown, row: CasinoGame, index: number) => (
         <div className="flex items-center space-x-2">
           <ActionButton
             label="수정"
@@ -480,7 +486,7 @@ const CasinoGameManagement = () => {
           />
           <ActionButton
             label="삭제"
-            onClick={() => handleDeleteGame(value)}
+            onClick={() => handleDeleteGame(value as number)}
             color="red"
             action="delete"
           />

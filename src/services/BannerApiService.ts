@@ -12,7 +12,7 @@ const BannerApiService = {
     try {
       // API 요청 시 page와 limit 파라미터 추가
       const response = await axios.get("/banner/main", {
-        params: { page, limit, title: searchValue },
+        params: { page, limit, search: searchValue },
       });
       // 전체 응답 객체 반환 (success, data, pagination 등 포함)
       return response.data;
@@ -36,7 +36,7 @@ const BannerApiService = {
   ): Promise<ApiResponse<Banner[]>> => {
     try {
       const response = await axios.get("/banner/company", {
-        params: { page, limit, title: searchValue },
+        params: { page, limit, search: searchValue },
       });
       return response.data;
     } catch (error: any) {
@@ -58,7 +58,7 @@ const BannerApiService = {
   ): Promise<ApiResponse<Banner[]>> => {
     try {
       const response = await axios.get("/banner/bottom", {
-        params: { page, limit, title: searchValue },
+        params: { page, limit, search: searchValue },
       });
       // API 응답 구조 수정: 루트 레벨의 pagination 객체를 사용하도록 변경
       if (response.data && response.data.success) {
@@ -110,7 +110,7 @@ const BannerApiService = {
   ): Promise<ApiResponse<Banner[]>> => {
     try {
       const response = await axios.get("/banner/mini", {
-        params: { page, limit, title: searchValue },
+        params: { page, limit, search: searchValue },
       });
       return response.data;
     } catch (error: any) {
@@ -137,7 +137,6 @@ const BannerApiService = {
             // ISO 형식으로 변환
             const dateValue = new Date(bannerData[key]).toISOString();
             formData.append(key, dateValue);
-            console.log(`변환된 ${key} (멀티파트):`, dateValue);
           } catch (e) {
             console.error(`${key} 형식 오류 (멀티파트):`, e);
             formData.append(key, bannerData[key]); // 오류 시 원본 값 사용
@@ -195,7 +194,6 @@ const BannerApiService = {
             // ISO 형식으로 변환
             const dateValue = new Date(bannerData[key]).toISOString();
             formData.append(key, dateValue);
-            console.log(`변환된 ${key} (업체):`, dateValue);
           } catch (e) {
             console.error(`${key} 형식 오류 (업체):`, e);
             formData.append(key, bannerData[key]); // 오류 시 원본 값 사용
@@ -249,22 +247,12 @@ const BannerApiService = {
 
       // 이미지가 없는 경우 일반 JSON 요청으로 처리
       if (hasNoImages) {
-        console.log(`Sending JSON PUT request to /banner/main/${id} (without images)`, {
-          requestData: bannerData,
-          requestDataType: typeof bannerData,
-          startDate: bannerData.startDate,
-          startDateType: typeof bannerData.startDate,
-          endDate: bannerData.endDate,
-          endDateType: typeof bannerData.endDate,
-        });
-
         // 날짜 형식 확인 및 변환
         if (bannerData.startDate) {
           try {
             // ISO 형식인지 확인하고 아니면 변환 시도
             const startDate = new Date(bannerData.startDate);
             bannerData.startDate = startDate.toISOString();
-            console.log("변환된 startDate:", bannerData.startDate);
           } catch (e) {
             console.error("startDate 형식 오류:", e);
           }
@@ -275,7 +263,6 @@ const BannerApiService = {
             // ISO 형식인지 확인하고 아니면 변환 시도
             const endDate = new Date(bannerData.endDate);
             bannerData.endDate = endDate.toISOString();
-            console.log("변환된 endDate:", bannerData.endDate);
           } catch (e) {
             console.error("endDate 형식 오류:", e);
           }
@@ -306,7 +293,6 @@ const BannerApiService = {
               // ISO 형식으로 변환
               const dateValue = new Date(bannerData[key]).toISOString();
               formData.append(key, dateValue);
-              console.log(`변환된 ${key} (멀티파트):`, dateValue);
             } catch (e) {
               console.error(`${key} 형식 오류 (멀티파트):`, e);
               formData.append(key, bannerData[key]); // 오류 시 원본 값 사용
