@@ -276,6 +276,36 @@ const CasinoCompanyApiService = {
       throw error;
     }
   },
+
+  // 리뷰 삭제 (관리자용)
+  deleteCompanyReview: async (reviewId: number): Promise<void> => {
+    try {
+      const response = await axios.delete(`/company-reviews/${reviewId}`);
+      if (response.data && !response.data.success) {
+        throw new Error(response.data.message || "리뷰 삭제에 실패했습니다.");
+      }
+    } catch (error) {
+      console.error("리뷰 삭제 오류:", error);
+      throw error;
+    }
+  },
+
+  // 리뷰 수정 (관리자용)
+  updateCompanyReview: async (
+    reviewId: number,
+    reviewData: { content?: string; rating?: number }
+  ): Promise<CompanyReview> => {
+    try {
+      const response = await axios.put(`/company-reviews/${reviewId}`, reviewData);
+      if (response.data && response.data.success) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || "리뷰 수정에 실패했습니다.");
+    } catch (error) {
+      console.error("리뷰 수정 오류:", error);
+      throw error;
+    }
+  },
 };
 
 export default CasinoCompanyApiService;

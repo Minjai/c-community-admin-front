@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import CasinoCompanyApiService from "../../services/CasinoCompanyApiService";
-import { CasinoCompany } from "../../types";
+import { CasinoCompany, CompanyReview } from "../../types";
 import DataTable from "../../components/DataTable";
 import Button from "../../components/Button";
 import ActionButton from "../../components/ActionButton";
@@ -39,6 +39,24 @@ const CasinoCompanyPage: React.FC = () => {
 
   // 선택된 업체 ID 상태 추가
   const [selectedCompanyIds, setSelectedCompanyIds] = useState<number[]>([]);
+
+  // 댓글 관리 모달 상태 추가
+  const [showCommentModal, setShowCommentModal] = useState<boolean>(false);
+  const [selectedCompanyForComment, setSelectedCompanyForComment] = useState<CasinoCompany | null>(
+    null
+  );
+  const [companyReviews, setCompanyReviews] = useState<CompanyReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState<boolean>(false);
+  const [reviewsError, setReviewsError] = useState<string | null>(null);
+
+  // 댓글 수정 모달 상태 추가
+  const [showEditReviewModal, setShowEditReviewModal] = useState<boolean>(false);
+  const [selectedReview, setSelectedReview] = useState<CompanyReview | null>(null);
+  const [editReviewData, setEditReviewData] = useState<{ content: string; rating: number }>({
+    content: "",
+    rating: 0,
+  });
+  const [isEditingReview, setIsEditingReview] = useState<boolean>(false);
 
   // 페이지네이션 상태 추가
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -399,6 +417,95 @@ const CasinoCompanyPage: React.FC = () => {
     }
   };
 
+  // 댓글 관리 모달 열기 핸들러 추가
+  const handleOpenCommentModal = async (company: CasinoCompany) => {
+    setSelectedCompanyForComment(company);
+    setShowCommentModal(true);
+    setReviewsLoading(true);
+    setReviewsError(null);
+
+    try {
+      const reviews = await CasinoCompanyApiService.getCompanyReviews(company.id);
+      setCompanyReviews(reviews);
+    } catch (error) {
+      console.error("댓글 조회 오류:", error);
+      setReviewsError("댓글 목록을 불러오는데 실패했습니다.");
+      setCompanyReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  // 댓글 관리 모달 닫기 핸들러 추가
+  const handleCloseCommentModal = () => {
+    setShowCommentModal(false);
+    setSelectedCompanyForComment(null);
+    setCompanyReviews([]);
+    setReviewsError(null);
+  };
+
+  // 댓글 삭제 핸들러 추가
+  const handleDeleteReview = async (reviewId: number) => {
+    if (!window.confirm("정말로 이 댓글을 삭제하시겠습니까?")) return;
+
+    try {
+      await CasinoCompanyApiService.deleteCompanyReview(reviewId);
+      setCompanyReviews((prev) => prev.filter((review) => review.id !== reviewId));
+      setAlertMessage({ type: "success", message: "댓글이 삭제되었습니다." });
+    } catch (error) {
+      console.error("댓글 삭제 오류:", error);
+      setAlertMessage({ type: "error", message: "댓글 삭제 중 오류가 발생했습니다." });
+    }
+  };
+
+  // 댓글 수정 모달 열기 핸들러
+  const handleEditReview = (review: CompanyReview) => {
+    setSelectedReview(review);
+    setEditReviewData({
+      content: review.content,
+      rating: review.rating,
+    });
+    setShowEditReviewModal(true);
+  };
+
+  // 댓글 수정 모달 닫기 핸들러
+  const handleCloseEditReviewModal = () => {
+    setShowEditReviewModal(false);
+    setSelectedReview(null);
+    setEditReviewData({ content: "", rating: 0 });
+  };
+
+  // 댓글 수정 저장 핸들러
+  const handleSaveReviewEdit = async () => {
+    if (!selectedReview) return;
+
+    if (!editReviewData.content.trim()) {
+      setAlertMessage({ type: "error", message: "댓글 내용을 입력해주세요." });
+      return;
+    }
+
+    setIsEditingReview(true);
+    try {
+      const updatedReview = await CasinoCompanyApiService.updateCompanyReview(
+        selectedReview.id,
+        editReviewData
+      );
+
+      // 댓글 목록 업데이트
+      setCompanyReviews((prev) =>
+        prev.map((review) => (review.id === selectedReview.id ? updatedReview : review))
+      );
+
+      setAlertMessage({ type: "success", message: "댓글이 수정되었습니다." });
+      handleCloseEditReviewModal();
+    } catch (error) {
+      console.error("댓글 수정 오류:", error);
+      setAlertMessage({ type: "error", message: "댓글 수정 중 오류가 발생했습니다." });
+    } finally {
+      setIsEditingReview(false);
+    }
+  };
+
   // displayOrder 입력값 변경 핸들러
   const handleDisplayOrderInputChange = (index: number, newOrder: number) => {
     setCompanies((prev) => {
@@ -479,12 +586,12 @@ const CasinoCompanyPage: React.FC = () => {
         />
       ),
       accessor: "id" as keyof CasinoCompany,
-      cell: (id: number) => (
+      cell: (value: unknown, row: CasinoCompany, index: number) => (
         <input
           type="checkbox"
           className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedCompanyIds.includes(id)}
-          onChange={() => handleSelectCompany(id)}
+          checked={selectedCompanyIds.includes(row.id)}
+          onChange={() => handleSelectCompany(row.id)}
           disabled={loading || isMoving || isSaving}
         />
       ),
@@ -493,21 +600,21 @@ const CasinoCompanyPage: React.FC = () => {
     {
       header: "업체명",
       accessor: "companyName" as keyof CasinoCompany,
-      cell: (value: string, row: CasinoCompany) => (
+      cell: (value: unknown, row: CasinoCompany, index: number) => (
         <span
           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
           onClick={() => handleEditCompany(row)}
         >
-          {value}
+          {value as string}
         </span>
       ),
     },
     {
       header: "로고 이미지",
       accessor: "imageUrl" as keyof CasinoCompany,
-      cell: (value: string) =>
+      cell: (value: unknown) =>
         value ? (
-          <img src={value} alt="로고" className="h-10 w-auto object-contain" />
+          <img src={value as string} alt="로고" className="h-10 w-auto object-contain" />
         ) : (
           <span>이미지 없음</span>
         ),
@@ -516,7 +623,7 @@ const CasinoCompanyPage: React.FC = () => {
     {
       header: "상태",
       accessor: "isPublic" as keyof CasinoCompany,
-      cell: (value: number | boolean) => (
+      cell: (value: unknown) => (
         <span
           className={`px-2 py-1 rounded-full text-xs font-medium ${
             value === 1 || value === true
@@ -532,18 +639,18 @@ const CasinoCompanyPage: React.FC = () => {
     {
       header: "등록일자",
       accessor: "createdAt" as keyof CasinoCompany,
-      cell: (value: string) => formatDate(value),
+      cell: (value: unknown) => formatDate(value as string),
     },
     // 순서 컬럼: 관리 컬럼 왼쪽, 등록일자 다음
     {
       header: "순서",
       accessor: "displayOrder" as keyof CasinoCompany,
-      cell: (displayOrder: number, row: CasinoCompany, index: number) => (
+      cell: (value: unknown, row: CasinoCompany, index: number) => (
         <input
           type="number"
           min={1}
           className="w-16 text-center border rounded"
-          value={displayOrder}
+          value={value as number}
           onChange={(e) => handleDisplayOrderInputChange(index, Number(e.target.value))}
           disabled={loading || isMoving || isSaving}
         />
@@ -553,8 +660,22 @@ const CasinoCompanyPage: React.FC = () => {
     {
       header: "관리",
       accessor: "id" as keyof CasinoCompany,
-      cell: (value: any, row: CasinoCompany) => (
+      cell: (value: unknown, row: CasinoCompany, index: number) => (
         <div className="flex space-x-2">
+          <button
+            onClick={() => handleOpenCommentModal(row)}
+            className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md focus:outline-none transition-colors w-16"
+          >
+            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
+            </svg>
+            댓글
+          </button>
           <ActionButton
             label="수정"
             action="edit"
@@ -569,7 +690,7 @@ const CasinoCompanyPage: React.FC = () => {
           />
         </div>
       ),
-      size: 200,
+      size: 250,
     },
   ];
 
@@ -728,6 +849,204 @@ const CasinoCompanyPage: React.FC = () => {
             />
 
             {renderCasinoInfoField()}
+          </div>
+        </Modal>
+      )}
+
+      {/* 댓글 관리 모달 */}
+      {showCommentModal && selectedCompanyForComment && (
+        <Modal
+          isOpen={showCommentModal}
+          onClose={handleCloseCommentModal}
+          title={`${selectedCompanyForComment.companyName} - 댓글 관리`}
+          size="xl"
+        >
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium text-gray-900 mb-2">업체 정보</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">업체명:</span>{" "}
+                  {selectedCompanyForComment.companyName}
+                </div>
+                <div>
+                  <span className="font-medium">상태:</span>{" "}
+                  <span
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      selectedCompanyForComment.isPublic === 1
+                        ? "bg-green-100 text-green-800"
+                        : "bg-red-100 text-red-800"
+                    }`}
+                  >
+                    {selectedCompanyForComment.isPublic === 1 ? "공개" : "비공개"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t pt-4">
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="font-medium text-gray-900">댓글 목록</h4>
+                <div className="text-sm text-gray-500">총 {companyReviews.length}개의 댓글</div>
+              </div>
+
+              {reviewsError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                  <p className="text-red-600 text-sm">{reviewsError}</p>
+                </div>
+              )}
+
+              {reviewsLoading ? (
+                <div className="bg-gray-50 p-8 rounded-lg text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-2"></div>
+                  <p className="text-gray-500">댓글 목록을 불러오는 중...</p>
+                </div>
+              ) : companyReviews.length === 0 ? (
+                <div className="bg-gray-50 p-8 rounded-lg text-center">
+                  <div className="text-gray-500 mb-2">
+                    <svg
+                      className="mx-auto h-12 w-12 text-gray-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-gray-500">아직 댓글이 없습니다.</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                  <div className="text-sm text-gray-500 mb-2 sticky top-0 bg-white py-1">
+                    댓글 목록 ({companyReviews.length}개)
+                  </div>
+                  {companyReviews.map((review) => (
+                    <div key={review.id} className="bg-white border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium text-sm text-gray-900">
+                            {review.user?.nickname || "익명"}
+                          </span>
+                          <div className="flex items-center space-x-1">
+                            {[...Array(5)].map((_, i) => (
+                              <svg
+                                key={i}
+                                className={`h-4 w-4 ${
+                                  i < review.rating ? "text-yellow-400" : "text-gray-300"
+                                }`}
+                                fill="currentColor"
+                                viewBox="0 0 20 20"
+                              >
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                            ))}
+                          </div>
+                          <span className="text-sm text-gray-500">({review.rating})</span>
+                        </div>
+                        <div className="text-xs text-gray-500">{formatDate(review.createdAt)}</div>
+                      </div>
+                      <div className="flex justify-between items-start">
+                        <p className="text-gray-700 text-sm flex-1">{review.content}</p>
+                        <div className="flex flex-col space-y-1 ml-4">
+                          <ActionButton
+                            label="수정"
+                            action="edit"
+                            size="sm"
+                            onClick={() => handleEditReview(review)}
+                          />
+                          <ActionButton
+                            label="삭제"
+                            action="delete"
+                            size="sm"
+                            onClick={() => handleDeleteReview(review.id)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button onClick={handleCloseCommentModal} variant="secondary">
+                닫기
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* 댓글 수정 모달 */}
+      {showEditReviewModal && selectedReview && (
+        <Modal
+          isOpen={showEditReviewModal}
+          onClose={handleCloseEditReviewModal}
+          title="댓글 수정"
+          size="lg"
+        >
+          <div className="space-y-4">
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium text-gray-900 mb-2">댓글 정보</h4>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">작성자:</span>{" "}
+                  {selectedReview.user?.nickname || "익명"}
+                </div>
+                <div>
+                  <span className="font-medium">작성일:</span>{" "}
+                  {formatDate(selectedReview.createdAt)}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">평점</label>
+              <div className="flex items-center space-x-1">
+                {[1, 2, 3, 4, 5].map((rating) => (
+                  <button
+                    key={rating}
+                    type="button"
+                    onClick={() => setEditReviewData((prev) => ({ ...prev, rating }))}
+                    className={`p-1 rounded ${
+                      editReviewData.rating >= rating ? "text-yellow-400" : "text-gray-300"
+                    } hover:text-yellow-400`}
+                  >
+                    <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  </button>
+                ))}
+                <span className="ml-2 text-sm text-gray-500">({editReviewData.rating}/5)</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">댓글 내용</label>
+              <textarea
+                value={editReviewData.content}
+                onChange={(e) =>
+                  setEditReviewData((prev) => ({ ...prev, content: e.target.value }))
+                }
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                rows={4}
+                placeholder="댓글 내용을 입력하세요"
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t">
+              <Button onClick={handleCloseEditReviewModal} variant="secondary">
+                취소
+              </Button>
+              <Button onClick={handleSaveReviewEdit} variant="primary" disabled={isEditingReview}>
+                {isEditingReview ? "저장 중..." : "저장"}
+              </Button>
+            </div>
           </div>
         </Modal>
       )}
