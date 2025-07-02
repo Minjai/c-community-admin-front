@@ -214,12 +214,25 @@ const UserRankManagement: React.FC = () => {
       fetchRanks(currentPage, pageSize, searchValue);
     } catch (error: any) {
       console.error("Error saving rank:", error);
-      setAlertMessage({
-        type: "error",
-        message: `등급 저장 중 오류가 발생했습니다: ${
-          error.response?.data?.message || error.message
-        }`,
-      });
+
+      // 특정 오류 메시지 처리 (400 에러인 경우)
+      if (
+        error.response?.status === 400 &&
+        error.response?.data?.error ===
+          "스코어가 0인 랭크는 원활한 서비스 운영을 위해 최소 1개는 유지되어야 합니다."
+      ) {
+        setAlertMessage({
+          type: "error",
+          message: error.response.data.error,
+        });
+      } else {
+        setAlertMessage({
+          type: "error",
+          message: `등급 저장 중 오류가 발생했습니다: ${
+            error.response?.data?.message || error.message
+          }`,
+        });
+      }
     } finally {
       setSaving(false);
     }
@@ -240,12 +253,25 @@ const UserRankManagement: React.FC = () => {
       fetchRanks(currentPage, pageSize, searchValue);
     } catch (error: any) {
       console.error("Error deleting rank:", error);
-      setAlertMessage({
-        type: "error",
-        message: `등급 삭제 중 오류가 발생했습니다: ${
-          error.response?.data?.message || error.message
-        }`,
-      });
+
+      // 특정 오류 메시지 처리 (400 에러인 경우)
+      if (
+        error.response?.status === 400 &&
+        error.response?.data?.error ===
+          "스코어가 0인 랭크는 원활한 서비스 운영을 위해 최소 1개는 유지되어야 합니다."
+      ) {
+        setAlertMessage({
+          type: "error",
+          message: error.response.data.error,
+        });
+      } else {
+        setAlertMessage({
+          type: "error",
+          message: `등급 삭제 중 오류가 발생했습니다: ${
+            error.response?.data?.message || error.message
+          }`,
+        });
+      }
     } finally {
       setLoading(false);
     }
