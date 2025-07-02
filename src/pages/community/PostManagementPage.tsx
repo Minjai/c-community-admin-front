@@ -76,7 +76,7 @@ const PostManagementPage: React.FC = () => {
         params.search = searchValue;
       }
 
-      const response = await axios.get("/post", { params });
+      const response = await axios.get("/admin/post", { params });
 
       if (response.data && response.data.posts && Array.isArray(response.data.posts)) {
         setPosts(response.data.posts);
@@ -169,17 +169,14 @@ const PostManagementPage: React.FC = () => {
     },
     { header: "조회수", accessor: "viewCount" },
     {
-      header: "인기글",
+      header: "인기 여부",
       accessor: "isPopular",
       cell: (value: number) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs ${
-            value ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"
-          }`}
-        >
-          {value ? "인기" : "일반"}
+        <span className={`font-medium ${value === 1 ? "text-red-600" : "text-gray-900"}`}>
+          {value === 1 ? "Y" : "N"}
         </span>
       ),
+      className: "text-center",
     },
     {
       header: "작성일",
@@ -190,7 +187,7 @@ const PostManagementPage: React.FC = () => {
       header: "관리",
       accessor: "id",
       cell: (value: any, row: Post, index?: number) => (
-        <div className="flex space-x-1">
+        <div className="flex space-x-1 justify-start">
           <ActionButton
             label="위로"
             action="up"
@@ -218,6 +215,7 @@ const PostManagementPage: React.FC = () => {
           />
         </div>
       ),
+      className: "text-left",
     },
   ];
 

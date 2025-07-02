@@ -57,7 +57,7 @@ const NoticeManagement = () => {
         params.search = searchValue;
       }
 
-      const response = await axios.get("/post", { params });
+      const response = await axios.get("/admin/post", { params });
 
       console.log("공지사항 API 응답:", response.data);
 
@@ -274,6 +274,7 @@ const NoticeManagement = () => {
       ),
       className: "w-24 px-2 text-center",
     },
+
     {
       header: "관리",
       accessor: "id" as keyof Post,

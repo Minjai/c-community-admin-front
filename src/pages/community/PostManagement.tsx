@@ -62,7 +62,7 @@ const PostManagement = () => {
         params.search = searchValue;
       }
 
-      const response = await axios.get("/post", { params });
+      const response = await axios.get("/admin/post", { params });
 
       console.log("게시물 API 응답:", response.data);
 
@@ -210,10 +210,20 @@ const PostManagement = () => {
       className: "text-center",
     },
     {
+      header: "인기 여부",
+      accessor: "isPopular" as keyof Post,
+      cell: (value: unknown) => (
+        <span className={`font-medium ${value === 1 ? "text-red-600" : "text-gray-900"}`}>
+          {value === 1 ? "Y" : "N"}
+        </span>
+      ),
+      className: "text-center",
+    },
+    {
       header: "관리",
       accessor: "id" as keyof Post,
       cell: (value: unknown, row: Post) => (
-        <div className="flex space-x-1 justify-end">
+        <div className="flex space-x-1 justify-start">
           <ActionButton
             label="수정"
             action="edit"
@@ -228,7 +238,7 @@ const PostManagement = () => {
           />
         </div>
       ),
-      className: "text-right",
+      className: "text-left",
     },
   ];
 
