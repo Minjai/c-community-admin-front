@@ -23,6 +23,7 @@ interface Inquiry {
   title: string;
   content: string;
   createdAt: string;
+  updatedAt: string;
   status: string;
   authorId: number;
   answer?: string;
@@ -660,13 +661,18 @@ const InquiryManagement = () => {
         if (row.status === InquiryStatus.WAITING) label = "대기";
         else if (row.status === InquiryStatus.DONE) label = "완료";
         return (
-          <span
-            className={`px-2 py-1 text-xs font-medium rounded-full ${getInquiryStatusClassName(
-              row.status
-            )}`}
-          >
-            {label}
-          </span>
+          <div>
+            <span
+              className={`px-2 py-1 text-xs font-medium rounded-full ${getInquiryStatusClassName(
+                row.status
+              )}`}
+            >
+              {label}
+            </span>
+            {row.status === InquiryStatus.DONE && row.answeredAt && (
+              <div className="text-xs text-gray-500 mt-1">{formatDate(row.answeredAt)}</div>
+            )}
+          </div>
         );
       },
     },
