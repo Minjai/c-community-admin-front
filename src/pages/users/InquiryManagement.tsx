@@ -85,29 +85,33 @@ const InquiryManagement = () => {
   // 유저 목록 불러오기
   const fetchUsers = useCallback(async () => {
     try {
-      const response = await axios.get("/admin/users?page=1&limit=1000");
+      const response = await axios.get("/admin/users");
       if (response.data && response.data.data) {
         setUsers(response.data.data.map((u: any) => ({ id: u.id, nickname: u.nickname })));
       }
     } catch (e) {
       setUsers([]);
     }
-  }, []);
+  }, [selectedCategory]);
 
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
 
-  // userId로 닉네임 찾기
-  const getNickname = (userId: number) => {
-    const user = users.find((u) => u.id === userId);
+  // userId로 닉네임 찾기 (API 응답에 author 정보가 있으면 사용, 없으면 users 배열에서 찾기)
+  const getNickname = (inquiry: Inquiry) => {
+    // API 응답에 author 정보가 있으면 사용
+    if ((inquiry as any).author && (inquiry as any).author.nickname) {
+      return (inquiry as any).author.nickname;
+    }
+
+    // 없으면 기존 방식으로 users 배열에서 찾기
+    const user = users.find((u) => u.id === inquiry.authorId);
     return user ? user.nickname : "-";
   };
 
-  // 필터링된 문의 목록
-  const filteredInquiries = selectedCategory
-    ? inquiries.filter((inquiry) => inquiry.category === selectedCategory)
-    : inquiries;
+  // 카테고리 필터링은 서버에서 처리하도록 변경
+  // selectedCategory가 있으면 서버에 카테고리 파라미터 전달
 
   // 카테고리 필터 토글
   const handleCategoryFilterToggle = () => {
@@ -118,37 +122,64 @@ const InquiryManagement = () => {
   const handleCategorySelect = (category: string | null) => {
     setSelectedCategory(category);
     setShowCategoryFilter(false);
+    setCurrentPage(1); // 카테고리 변경 시 첫 페이지로 이동
+    fetchInquiries(1, pageSize, searchValue);
   };
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
-    fetchInquiries(currentPage, pageSize, value);
+    setCurrentPage(1); // 검색 시 첫 페이지로 이동
+    fetchInquiries(1, pageSize, value);
   };
 
-  // 1대1 문의 목록 조회 (검색 파라미터 추가)
+  // 1대1 문의 목록 조회 (페이지네이션 적용)
   const fetchInquiries = useCallback(
     async (page: number, limit: number, searchValue: string = "") => {
       setLoading(true);
       setError(null);
 
       try {
-        // 어드민용 전체 조회
-        const params: any = {};
+        // 페이지네이션 파라미터 추가
+        const params: any = {
+          page: page,
+          limit: limit,
+        };
 
         if (searchValue.trim()) {
           params.search = searchValue;
         }
 
+        if (selectedCategory) {
+          params.category = selectedCategory;
+        }
+
         const response = await axios.get(`/inquiries/admin`, { params });
-        // 페이지네이션이 없으면 전체 데이터로 처리
-        const fetchedInquiries = response.data || [];
-        setInquiries(fetchedInquiries);
-        setTotalItems(fetchedInquiries.length);
-        setTotalPages(1);
-        setCurrentPage(1);
-        setPageSize(fetchedInquiries.length);
-        setSelectedInquiries([]);
-        setAllSelected(false);
+
+        // API 응답 구조에 따라 데이터 및 페이지네이션 정보 추출
+        if (response.data && response.data.inquiries && response.data.pagination) {
+          const fetchedInquiries = Array.isArray(response.data.inquiries)
+            ? response.data.inquiries
+            : [];
+          const pagination = response.data.pagination;
+
+          setInquiries(fetchedInquiries);
+          setTotalItems(pagination.totalCount || 0);
+          setTotalPages(pagination.totalPages || 0);
+          setCurrentPage(pagination.currentPage || page);
+          setPageSize(pagination.limit || limit);
+          setSelectedInquiries([]);
+          setAllSelected(false);
+        } else {
+          // 페이지네이션 정보가 없는 경우 (기존 방식으로 처리)
+          const fetchedInquiries = Array.isArray(response.data) ? response.data : [];
+          setInquiries(fetchedInquiries);
+          setTotalItems(fetchedInquiries.length);
+          setTotalPages(1);
+          setCurrentPage(1);
+          setPageSize(fetchedInquiries.length);
+          setSelectedInquiries([]);
+          setAllSelected(false);
+        }
       } catch (err) {
         console.error("Error fetching inquiries:", err);
         setError("1대1 문의 목록을 불러오는데 실패했습니다.");
@@ -163,9 +194,17 @@ const InquiryManagement = () => {
     []
   );
 
+  // 초기 데이터 로딩
   useEffect(() => {
-    fetchInquiries(currentPage, pageSize, searchValue);
-  }, [fetchInquiries, currentPage, pageSize]);
+    fetchInquiries(1, 10, "");
+  }, []);
+
+  // 페이지, 검색, 카테고리 변경 시 데이터 로딩
+  useEffect(() => {
+    if (currentPage > 0) {
+      fetchInquiries(currentPage, pageSize, searchValue);
+    }
+  }, [currentPage, pageSize, selectedCategory, searchValue]);
 
   // 카테고리 필터 외부 클릭 시 닫기
   useEffect(() => {
@@ -305,8 +344,12 @@ const InquiryManagement = () => {
     if (!userDetail) return;
 
     try {
-      await axios.post(`/admin/account/${userDetail.id}/memo`, {
-        memo: adminMemo,
+      // 메모 내용이 비어있으면 null, 아니면 해당 내용으로 설정
+      const memoToSend = adminMemo.trim() === "" ? null : adminMemo;
+
+      // API 요청 메소드를 PUT으로 변경하고 엔드포인트 수정
+      await axios.put(`/admin/account/${userDetail.id}/memo`, {
+        memo: memoToSend,
       });
 
       setAlertMessage({
@@ -644,7 +687,7 @@ const InquiryManagement = () => {
       header: "작성자",
       accessor: "authorId" as keyof Inquiry,
       className: "w-32",
-      cell: (value: unknown, row: Inquiry) => getNickname(row.authorId),
+      cell: (value: unknown, row: Inquiry) => getNickname(row),
     },
     {
       header: "등록일자",
@@ -730,12 +773,12 @@ const InquiryManagement = () => {
       {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
 
       <DataTable
-        data={filteredInquiries}
+        data={inquiries}
         columns={columns}
         loading={loading}
         pagination={{
           currentPage,
-          totalItems: filteredInquiries.length,
+          totalItems,
           pageSize,
           onPageChange: handlePageChange,
         }}
@@ -771,8 +814,8 @@ const InquiryManagement = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">작성자</label>
                   <div className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm">
-                    <span className="block truncate" title={getNickname(selectedInquiry.authorId)}>
-                      {getNickname(selectedInquiry.authorId)}
+                    <span className="block truncate" title={getNickname(selectedInquiry)}>
+                      {getNickname(selectedInquiry)}
                     </span>
                   </div>
                 </div>
@@ -780,30 +823,15 @@ const InquiryManagement = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">문의 제목</label>
-                <div className="relative">
-                  <div
-                    className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm overflow-x-auto"
-                    style={{
-                      scrollbarWidth: "none",
-                      msOverflowStyle: "none",
-                    }}
-                  >
-                    <div className="whitespace-nowrap" title={selectedInquiry.title}>
-                      {selectedInquiry.title}
-                    </div>
-                  </div>
-                  <style>{`
-                    .overflow-x-auto::-webkit-scrollbar {
-                      display: none;
-                    }
-                  `}</style>
+                <div className="p-3 bg-gray-50 border border-gray-200 rounded-md text-sm break-words">
+                  {selectedInquiry.title}
                 </div>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">문의 내용</label>
                 <div
-                  className="p-4 bg-gray-50 border border-gray-200 rounded-md text-sm min-h-[200px] max-h-[400px] overflow-y-auto prose prose-sm max-w-none"
+                  className="p-4 bg-gray-50 border border-gray-200 rounded-md text-sm min-h-[200px] max-h-[400px] overflow-y-auto prose prose-sm max-w-none break-words"
                   dangerouslySetInnerHTML={{ __html: selectedInquiry.content }}
                 />
               </div>
@@ -831,60 +859,74 @@ const InquiryManagement = () => {
                 ) : userDetail ? (
                   <div className="flex flex-col space-y-6">
                     <div className="flex flex-col space-y-6">
-                      <div className="flex items-center justify-between">
-                        <div className="w-24 font-medium text-sm text-gray-500">사용자명</div>
-                        <div className="flex-1 flex items-center">
-                          <span className="font-medium text-gray-900">{userDetail.nickname}</span>
+                      <div className="flex items-start justify-between">
+                        <div className="w-24 font-medium text-sm text-gray-500 flex-shrink-0">
+                          사용자명
+                        </div>
+                        <div className="flex-1 flex items-center min-w-0">
+                          <span className="font-medium text-gray-900 break-words">
+                            {userDetail.nickname}
+                          </span>
                           <ActionButton
                             label="초기화"
                             action="refresh"
                             size="sm"
-                            className="ml-2"
+                            className="ml-2 flex-shrink-0"
                             onClick={handleResetNickname}
                           />
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="w-24 font-medium text-sm text-gray-500">이메일</div>
-                        <div className="flex-1 flex items-center">
-                          <span className="font-medium text-gray-900">{userDetail.email}</span>
+                      <div className="flex items-start justify-between">
+                        <div className="w-24 font-medium text-sm text-gray-500 flex-shrink-0">
+                          이메일
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium text-gray-900 break-all">
+                            {userDetail.email}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="w-24 font-medium text-sm text-gray-500">패스워드</div>
-                        <div className="flex-1 flex items-center">
+                      <div className="flex items-start justify-between">
+                        <div className="w-24 font-medium text-sm text-gray-500 flex-shrink-0">
+                          패스워드
+                        </div>
+                        <div className="flex-1 flex items-center min-w-0">
                           <span className="font-medium text-gray-900">********</span>
                           <ActionButton
                             label="초기화"
                             action="refresh"
                             size="sm"
-                            className="ml-2"
+                            className="ml-2 flex-shrink-0"
                             onClick={handleResetPassword}
                           />
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="w-24 font-medium text-sm text-gray-500">등급</div>
-                        <div className="flex-1 flex items-center">
+                      <div className="flex items-start justify-between">
+                        <div className="w-24 font-medium text-sm text-gray-500 flex-shrink-0">
+                          등급
+                        </div>
+                        <div className="flex-1 flex items-center min-w-0">
                           <span className="px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
                             {userDetail.rank?.name || "등급 없음"}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="w-24 font-medium text-sm text-gray-500">포인트</div>
-                        <div className="flex-1 flex items-center">
+                      <div className="flex items-start justify-between">
+                        <div className="w-24 font-medium text-sm text-gray-500 flex-shrink-0">
+                          포인트
+                        </div>
+                        <div className="flex-1 flex items-center min-w-0">
                           <span className="font-medium text-gray-900">
                             {(userDetail.score || 0).toLocaleString()} P
                           </span>
                           <Button
                             variant="primary"
                             size="sm"
-                            className="ml-2"
+                            className="ml-2 flex-shrink-0"
                             onClick={() => handlePointModalOpen("add")}
                           >
                             지급
@@ -892,7 +934,7 @@ const InquiryManagement = () => {
                           <Button
                             variant="danger"
                             size="sm"
-                            className="ml-2"
+                            className="ml-2 flex-shrink-0"
                             onClick={() => handlePointModalOpen("subtract")}
                           >
                             차감
@@ -900,18 +942,22 @@ const InquiryManagement = () => {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="w-24 font-medium text-sm text-gray-500">가입일자</div>
-                        <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <div className="w-24 font-medium text-sm text-gray-500 flex-shrink-0">
+                          가입일자
+                        </div>
+                        <div className="flex-1 min-w-0">
                           <span className="font-medium text-gray-900">
                             {formatDate(userDetail.createdAt)}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="w-24 font-medium text-sm text-gray-500">상태</div>
-                        <div className="flex-1">
+                      <div className="flex items-start justify-between">
+                        <div className="w-24 font-medium text-sm text-gray-500 flex-shrink-0">
+                          상태
+                        </div>
+                        <div className="flex-1 min-w-0">
                           <span
                             className={`px-2 py-1 rounded-full text-xs ${getUserStatusClassName(
                               userDetail.status
@@ -925,9 +971,11 @@ const InquiryManagement = () => {
 
                     {/* 회원 프로필 영역 */}
                     <div className="flex justify-between items-start mt-6">
-                      <div className="w-24 font-medium text-sm text-gray-500">프로필 사진</div>
-                      <div className="flex-1 flex items-start">
-                        <div className="bg-gray-200 rounded-md w-48 h-48 flex items-center justify-center overflow-hidden mr-2">
+                      <div className="w-24 font-medium text-sm text-gray-500 flex-shrink-0">
+                        프로필 사진
+                      </div>
+                      <div className="flex-1 flex items-start min-w-0">
+                        <div className="bg-gray-200 rounded-md w-48 h-48 flex items-center justify-center overflow-hidden mr-2 flex-shrink-0">
                           {userDetail.profileImageUrl ? (
                             <img
                               src={userDetail.profileImageUrl}
@@ -945,6 +993,7 @@ const InquiryManagement = () => {
                           label="초기화"
                           action="delete"
                           size="sm"
+                          className="flex-shrink-0"
                           onClick={handleDeleteProfileImage}
                         />
                       </div>
@@ -952,17 +1001,21 @@ const InquiryManagement = () => {
 
                     {/* 활동내역 영역 */}
                     <div className="flex justify-between items-start mt-6">
-                      <div className="w-24 font-medium text-sm text-gray-500">활동내역</div>
-                      <div className="flex-1">
+                      <div className="w-24 font-medium text-sm text-gray-500 flex-shrink-0">
+                        활동내역
+                      </div>
+                      <div className="flex-1 min-w-0">
                         <div className="border rounded-md overflow-y-auto h-48 bg-gray-50">
                           {userDetail.activities && userDetail.activities.length > 0 ? (
                             <div className="p-2">
                               {userDetail.activities.map((activity: any, index: number) => (
                                 <div key={index} className="border-b py-2 last:border-0">
-                                  <div className="text-sm text-gray-600">
+                                  <div className="text-sm text-gray-600 mb-1">
                                     {formatDate(activity.timestamp)}
                                   </div>
-                                  <div className="text-sm">{activity.message}</div>
+                                  <div className="text-sm break-words leading-relaxed">
+                                    {activity.message}
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -977,10 +1030,12 @@ const InquiryManagement = () => {
 
                     {/* 관리자 메모 영역 */}
                     <div className="flex justify-between items-start mt-6">
-                      <div className="w-24 font-medium text-sm text-gray-500">관리자 메모</div>
-                      <div className="flex-1">
+                      <div className="w-24 font-medium text-sm text-gray-500 flex-shrink-0">
+                        관리자 메모
+                      </div>
+                      <div className="flex-1 min-w-0">
                         <textarea
-                          className="w-full h-48 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full h-48 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
                           value={adminMemo}
                           onChange={(e) => setAdminMemo(e.target.value)}
                           placeholder="회원에 대한 관리자 메모를 입력하세요."

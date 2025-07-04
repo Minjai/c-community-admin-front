@@ -125,7 +125,10 @@ const DataTable = <T extends Record<string, any>>({
                 <input
                   type="checkbox"
                   className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  checked={data.length > 0 && selectedIds.length === data.length}
+                  checked={
+                    (Array.isArray(data) ? data.length : 0) > 0 &&
+                    selectedIds.length === (Array.isArray(data) ? data.length : 0)
+                  }
                   onChange={handleSelectAll}
                 />
               </th>
@@ -156,7 +159,7 @@ const DataTable = <T extends Record<string, any>>({
                 </div>
               </td>
             </tr>
-          ) : data.length === 0 ? (
+          ) : (Array.isArray(data) ? data.length : 0) === 0 ? (
             <tr>
               <td
                 colSpan={columns.length + (onSelectIds ? 1 : 0)}
@@ -166,7 +169,7 @@ const DataTable = <T extends Record<string, any>>({
               </td>
             </tr>
           ) : (
-            data.map((row, rowIndex) => (
+            (Array.isArray(data) ? data : []).map((row, rowIndex) => (
               <tr
                 key={rowIndex}
                 className={`${rowClassName ? rowClassName(row, rowIndex) : "hover:bg-gray-50"}`}

@@ -91,13 +91,14 @@ const AdminMessageManagement = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
+    setCurrentPage(1); // 검색 시 첫 페이지로 이동
     fetchMessages(1, pageSize, value);
   };
 
   // 유저 목록 불러오기
   const fetchUsers = useCallback(async () => {
     try {
-      const response = await axios.get("/admin/users?page=1&limit=1000");
+      const response = await axios.get("/admin/users/all");
       if (response.data && response.data.data) {
         setUsers(
           response.data.data.map((u: any) => ({
@@ -199,96 +200,158 @@ const AdminMessageManagement = () => {
   const handleCategorySelect = (category: string | null) => {
     setSelectedCategory(category);
     setShowCategoryFilter(false);
+    setCurrentPage(1); // 카테고리 변경 시 첫 페이지로 이동
+    fetchMessages(1, pageSize, searchValue);
   };
 
-  // 관리자 쪽지 목록 조회 (검색 파라미터 추가)
+  // 관리자 쪽지 목록 조회 (페이지네이션 적용)
   const fetchMessages = useCallback(
     async (page: number, limit: number, searchValue: string = "") => {
       setLoading(true);
       setError(null);
       try {
-        const params: any = { page, limit };
+        // 페이지네이션 파라미터 추가
+        const params: any = {
+          page: page,
+          limit: limit,
+        };
 
         if (searchValue.trim()) {
           params.search = searchValue;
         }
 
+        if (selectedCategory) {
+          params.category = selectedCategory;
+        }
+
         const response = await axios.get("/admin/messages/messages", { params });
-        const fetchedMessages = response.data || [];
 
-        // 백엔드 데이터를 프론트엔드 형식에 맞게 변환
-        const mappedMessages: AdminMessage[] = fetchedMessages.map((msg: any) => {
-          // 메시지 타입에 따른 대상자 표시
-          let recipientDisplay = "-";
-          if (msg.messageType === "GROUP") {
-            if (msg.targetRanks && msg.targetRanks.length > 0) {
-              // 등급별 사용자들의 닉네임 수집
-              const allNicknames: string[] = [];
-              msg.targetRanks.forEach((rank: any) => {
-                if (rank.users) {
-                  rank.users.forEach((user: any) => {
-                    if (user.nickname) {
-                      allNicknames.push(user.nickname);
-                    }
-                  });
-                }
-              });
+        // API 응답 구조에 따라 데이터 및 페이지네이션 정보 추출
+        if (response.data && response.data.messages && response.data.pagination) {
+          const fetchedMessages = Array.isArray(response.data.messages)
+            ? response.data.messages
+            : [];
+          const pagination = response.data.pagination;
 
-              if (allNicknames.length > 0) {
-                if (allNicknames.length <= 2) {
-                  recipientDisplay = allNicknames.join(", ");
+          // 백엔드 데이터를 프론트엔드 형식에 맞게 변환
+          const mappedMessages: AdminMessage[] = fetchedMessages.map((msg: any) => {
+            // 메시지 타입에 따른 대상자 표시
+            let recipientDisplay = "-";
+            if (msg.messageType === "GROUP") {
+              if (msg.targetRanks && msg.targetRanks.length > 0) {
+                // 등급명들을 수집
+                const rankNames = msg.targetRanks.map((rank: any) => rank.rankName).filter(Boolean);
+                if (rankNames.length > 0) {
+                  recipientDisplay = rankNames.join(", ");
                 } else {
-                  recipientDisplay = `${allNicknames.slice(0, 2).join(", ")} (외 ${
-                    allNicknames.length - 2
+                  recipientDisplay = "그룹 발송";
+                }
+              } else if (msg.targetRankIds && msg.targetRankIds.length > 0) {
+                recipientDisplay = `등급 ${msg.targetRankIds.length}개`;
+              } else {
+                recipientDisplay = "그룹 발송";
+              }
+            } else if (msg.messageType === "INDIVIDUAL") {
+              if (msg.recipients && msg.recipients.length > 0) {
+                const nicknames = msg.recipients
+                  .map((r: any) => r.user?.nickname || "알 수 없음")
+                  .filter(Boolean);
+
+                if (nicknames.length <= 2) {
+                  recipientDisplay = nicknames.join(", ");
+                } else {
+                  recipientDisplay = `${nicknames.slice(0, 2).join(", ")} (외 ${
+                    nicknames.length - 2
                   }명)`;
                 }
               } else {
-                recipientDisplay = msg.targetRanks.map((rank: any) => rank.rankName).join(", ");
+                recipientDisplay = "개별 발송";
               }
-            } else if (msg.targetRankIds && msg.targetRankIds.length > 0) {
-              recipientDisplay = `등급 ${msg.targetRankIds.length}개`;
-            } else {
-              recipientDisplay = "그룹 발송";
             }
-          } else if (msg.messageType === "INDIVIDUAL") {
-            if (msg.recipients && msg.recipients.length > 0) {
-              const nicknames = msg.recipients
-                .map((r: any) => r.user?.nickname || "알 수 없음")
-                .filter(Boolean);
 
-              if (nicknames.length <= 2) {
-                recipientDisplay = nicknames.join(", ");
+            return {
+              id: msg.id,
+              category: msg.messageType || "GENERAL",
+              title: msg.title,
+              content: msg.content,
+              recipientId: 0, // 그룹 발송에서는 의미없음
+              recipientNickname: recipientDisplay,
+              sentAt: msg.createdAt,
+              status: MessageStatus.SENT,
+              sentBy: msg.sender?.nickname || "관리자",
+              targetRankIds: msg.targetRankIds || [], // 그룹 발송 시 선택된 등급 ID들
+            };
+          });
+
+          setMessages(mappedMessages);
+          setTotalItems(pagination.totalCount || 0);
+          setTotalPages(pagination.totalPages || 0);
+          setCurrentPage(pagination.currentPage || page);
+          setPageSize(pagination.limit || limit);
+          setSelectedMessages([]);
+          setAllSelected(false);
+        } else {
+          // 페이지네이션 정보가 없는 경우 (기존 방식으로 처리)
+          const fetchedMessages = Array.isArray(response.data?.data) ? response.data.data : [];
+
+          // 백엔드 데이터를 프론트엔드 형식에 맞게 변환
+          const mappedMessages: AdminMessage[] = fetchedMessages.map((msg: any) => {
+            // 메시지 타입에 따른 대상자 표시
+            let recipientDisplay = "-";
+            if (msg.messageType === "GROUP") {
+              if (msg.targetRanks && msg.targetRanks.length > 0) {
+                // 등급명들을 수집
+                const rankNames = msg.targetRanks.map((rank: any) => rank.rankName).filter(Boolean);
+                if (rankNames.length > 0) {
+                  recipientDisplay = rankNames.join(", ");
+                } else {
+                  recipientDisplay = "그룹 발송";
+                }
+              } else if (msg.targetRankIds && msg.targetRankIds.length > 0) {
+                recipientDisplay = `등급 ${msg.targetRankIds.length}개`;
               } else {
-                recipientDisplay = `${nicknames.slice(0, 2).join(", ")} (외 ${
-                  nicknames.length - 2
-                }명)`;
+                recipientDisplay = "그룹 발송";
               }
-            } else {
-              recipientDisplay = "개별 발송";
+            } else if (msg.messageType === "INDIVIDUAL") {
+              if (msg.recipients && msg.recipients.length > 0) {
+                const nicknames = msg.recipients
+                  .map((r: any) => r.user?.nickname || "알 수 없음")
+                  .filter(Boolean);
+
+                if (nicknames.length <= 2) {
+                  recipientDisplay = nicknames.join(", ");
+                } else {
+                  recipientDisplay = `${nicknames.slice(0, 2).join(", ")} (외 ${
+                    nicknames.length - 2
+                  }명)`;
+                }
+              } else {
+                recipientDisplay = "개별 발송";
+              }
             }
-          }
 
-          return {
-            id: msg.id,
-            category: msg.messageType || "GENERAL",
-            title: msg.title,
-            content: msg.content,
-            recipientId: 0, // 그룹 발송에서는 의미없음
-            recipientNickname: recipientDisplay,
-            sentAt: msg.createdAt,
-            status: MessageStatus.SENT,
-            sentBy: msg.sender?.nickname || "관리자",
-            targetRankIds: msg.targetRankIds || [], // 그룹 발송 시 선택된 등급 ID들
-          };
-        });
+            return {
+              id: msg.id,
+              category: msg.messageType || "GENERAL",
+              title: msg.title,
+              content: msg.content,
+              recipientId: 0, // 그룹 발송에서는 의미없음
+              recipientNickname: recipientDisplay,
+              sentAt: msg.createdAt,
+              status: MessageStatus.SENT,
+              sentBy: msg.sender?.nickname || "관리자",
+              targetRankIds: msg.targetRankIds || [], // 그룹 발송 시 선택된 등급 ID들
+            };
+          });
 
-        setMessages(mappedMessages);
-        setTotalItems(mappedMessages.length);
-        setTotalPages(1);
-        setCurrentPage(1);
-        setPageSize(mappedMessages.length);
-        setSelectedMessages([]);
-        setAllSelected(false);
+          setMessages(mappedMessages);
+          setTotalItems(mappedMessages.length);
+          setTotalPages(1);
+          setCurrentPage(1);
+          setPageSize(mappedMessages.length);
+          setSelectedMessages([]);
+          setAllSelected(false);
+        }
       } catch (err) {
         console.error("Error fetching admin messages:", err);
         // 데이터가 없거나 오류가 있어도 사용자에게는 알리지 않음
@@ -300,12 +363,12 @@ const AdminMessageManagement = () => {
         setLoading(false);
       }
     },
-    [users]
+    [selectedCategory]
   );
 
   useEffect(() => {
     fetchMessages(currentPage, pageSize, searchValue);
-  }, [fetchMessages, currentPage, pageSize]);
+  }, [fetchMessages, currentPage, pageSize, searchValue]);
 
   // 카테고리 필터 외부 클릭 시 닫기
   useEffect(() => {
@@ -726,10 +789,10 @@ const AdminMessageManagement = () => {
     {
       header: "제목",
       accessor: "title" as keyof AdminMessage,
-      className: "w-80",
+      className: "w-60",
       cell: (value: unknown, row: AdminMessage) => (
         <div
-          className="max-w-md truncate text-blue-600 hover:underline cursor-pointer"
+          className="max-w-xs truncate text-blue-600 hover:underline cursor-pointer"
           title={row.title}
           onClick={() => handleOpenDetailModal(row)}
         >
@@ -822,7 +885,7 @@ const AdminMessageManagement = () => {
           loading={loading}
           pagination={{
             currentPage,
-            totalItems: filteredMessages.length,
+            totalItems: totalItems,
             pageSize,
             onPageChange: handlePageChange,
           }}
@@ -842,6 +905,15 @@ const AdminMessageManagement = () => {
         size="xl"
       >
         <div className="space-y-6">
+          {/* 버튼 - 상단 왼쪽 */}
+          <div className="flex justify-start space-x-3">
+            <Button onClick={handleSendMessage} variant="primary" disabled={sending}>
+              {sending ? "발송 중..." : "발송"}
+            </Button>
+            <Button onClick={() => setShowSendModal(false)} variant="outline" disabled={sending}>
+              취소
+            </Button>
+          </div>
           {/* 선택된 회원 표시 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -949,16 +1021,6 @@ const AdminMessageManagement = () => {
             <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
             <TextEditor content={messageContent} setContent={setMessageContent} height="300px" />
           </div>
-
-          {/* 버튼 */}
-          <div className="flex justify-end space-x-3">
-            <Button onClick={() => setShowSendModal(false)} variant="outline" disabled={sending}>
-              취소
-            </Button>
-            <Button onClick={handleSendMessage} variant="primary" disabled={sending}>
-              {sending ? "발송 중..." : "발송"}
-            </Button>
-          </div>
         </div>
       </Modal>
 
@@ -970,6 +1032,19 @@ const AdminMessageManagement = () => {
         size="xl"
       >
         <div className="space-y-6">
+          {/* 버튼 - 상단 왼쪽 */}
+          <div className="flex justify-start space-x-3">
+            <Button onClick={handleGroupSendMessage} variant="primary" disabled={sending}>
+              {sending ? "발송 중..." : "쪽지 그룹 발송"}
+            </Button>
+            <Button
+              onClick={() => setShowGroupSendModal(false)}
+              variant="outline"
+              disabled={sending}
+            >
+              취소
+            </Button>
+          </div>
           {/* 대상 그룹 선택 */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-4">대상 등급</label>
@@ -1075,20 +1150,6 @@ const AdminMessageManagement = () => {
               setContent={setGroupMessageContent}
               height="300px"
             />
-          </div>
-
-          {/* 버튼 */}
-          <div className="flex justify-end space-x-3">
-            <Button
-              onClick={() => setShowGroupSendModal(false)}
-              variant="outline"
-              disabled={sending}
-            >
-              취소
-            </Button>
-            <Button onClick={handleGroupSendMessage} variant="primary" disabled={sending}>
-              {sending ? "발송 중..." : "쪽지 그룹 발송"}
-            </Button>
           </div>
         </div>
       </Modal>
