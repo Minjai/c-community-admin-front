@@ -20,7 +20,11 @@ interface FileUploadProps {
   showText?: boolean;
 }
 
-const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
+export interface FileUploadRef {
+  reset: () => void;
+}
+
+const FileUpload = forwardRef<FileUploadRef, FileUploadProps>(
   (
     {
       label,
@@ -47,7 +51,17 @@ const FileUpload = forwardRef<HTMLInputElement, FileUploadProps>(
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    useImperativeHandle(ref, () => fileInputRef.current as HTMLInputElement);
+    useImperativeHandle(ref, () => ({
+      reset: () => {
+        setFile(null);
+        setPreviewUrl(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+        onChange?.(null);
+        onFileSelect?.(null);
+      },
+    }));
 
     useEffect(() => {
       setPreviewUrl(value || null);

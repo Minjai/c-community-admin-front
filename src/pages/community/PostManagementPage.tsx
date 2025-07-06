@@ -102,7 +102,7 @@ const PostManagementPage: React.FC = () => {
 
   useEffect(() => {
     fetchPosts(searchValue);
-  }, [currentPage, pageSize, selectedBoard]);
+  }, [currentPage, pageSize, selectedBoard, searchValue]);
 
   // 게시물 상세 정보 모달 열기
   const handleViewPost = (post: Post) => {
@@ -269,7 +269,7 @@ const PostManagementPage: React.FC = () => {
           columns={columns}
           data={posts}
           loading={loading}
-          emptyMessage="등록된 게시물이 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 게시물이 없습니다."}
           pagination={{
             currentPage,
             pageSize,

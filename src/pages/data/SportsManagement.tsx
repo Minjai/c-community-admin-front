@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   getAllSportCategoriesAdmin,
   createSportCategory,
@@ -18,7 +18,7 @@ import Input from "@/components/forms/Input";
 import Select from "@/components/forms/Select";
 import SearchInput from "@components/SearchInput.tsx";
 import DatePicker from "@/components/forms/DatePicker";
-import FileUpload from "@/components/forms/FileUpload";
+import FileUpload, { FileUploadRef } from "@/components/forms/FileUpload";
 import { DragManager } from "./components/drag/DragManager";
 import axios from "axios";
 
@@ -184,6 +184,9 @@ export default function SportsManagement() {
   // 드래그 앤 드롭 관련 상태
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
+  // FileUpload ref 추가
+  const fileUploadRef = useRef<FileUploadRef>(null);
+
   const handleSearch = (value: string) => {
     console.log("SportsManagement: 검색 핸들러 호출됨, 검색어:", value);
     fetchSportCategories(1, PAGE_SIZE, value);
@@ -208,8 +211,33 @@ export default function SportsManagement() {
           ...category,
           displayName: category.displayName || getKoreanSportName(category.sportName),
         }));
+
+        // 수동 등록 카테고리(category가 'sport')인 경우 상세 정보 가져오기
+        const categoriesWithDetails = await Promise.all(
+          processedData.map(async (category: SportCategory) => {
+            if (category.category === "sport") {
+              try {
+                const detailData = await getManualRegistrationDetail(category.id);
+                return {
+                  ...category,
+                  games: detailData?.games || [],
+                  gameCount: detailData?.games?.length || 0,
+                };
+              } catch (error) {
+                console.error(`Error fetching detail for category ${category.id}:`, error);
+                return {
+                  ...category,
+                  games: [],
+                  gameCount: 0,
+                };
+              }
+            }
+            return category;
+          })
+        );
+
         // displayOrder 오름차순, 같으면 createdAt 내림차순
-        const sortedData = processedData.sort((a: SportCategory, b: SportCategory) => {
+        const sortedData = categoriesWithDetails.sort((a: SportCategory, b: SportCategory) => {
           if ((a.displayOrder || 0) !== (b.displayOrder || 0)) {
             return (a.displayOrder || 0) - (b.displayOrder || 0);
           }
@@ -247,7 +275,7 @@ export default function SportsManagement() {
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
       // setCurrentPage(page); // 상태 변경 -> useEffect가 fetch 호출 (이전 방식)
-      fetchSportCategories(page, pageSize); // 직접 fetch 호출 (CompanyBannerPage 방식)
+      fetchSportCategories(page, pageSize, searchValue); // 직접 fetch 호출 (CompanyBannerPage 방식), 검색어 포함
     }
   };
 
@@ -551,7 +579,18 @@ export default function SportsManagement() {
       {
         header: "종목 명",
         accessor: "sportName" as keyof SportCategory,
-        cell: (value: unknown) => getKoreanSportName(value as string),
+        cell: (value: unknown, row: SportCategory) => {
+          // 수동 등록 카테고리면 "숫자개 (수동)" 표시
+          const isManual = row.category === "sport";
+          const gameCount = (row as any).games ? (row as any).games.length : (row as any).gameCount;
+          return (
+            <span>
+              {isManual && typeof gameCount === "number"
+                ? `${gameCount}개 (수동)`
+                : getKoreanSportName(value as string)}
+            </span>
+          );
+        },
       },
       {
         header: "공개 여부",
@@ -683,6 +722,10 @@ export default function SportsManagement() {
       time: "",
       icon: "",
     });
+
+    // FileUpload 초기화
+    fileUploadRef.current?.reset();
+
     setGameDetailError(null);
   };
 
@@ -815,7 +858,9 @@ export default function SportsManagement() {
           columns={columns}
           data={categories} // categories 전달
           loading={loading}
-          emptyMessage="등록된 스포츠 카테고리가 없습니다."
+          emptyMessage={
+            searchValue ? "검색된 결과가 없습니다." : "등록된 스포츠 카테고리가 없습니다."
+          }
           // pagination prop에 서버 데이터 및 핸들러 전달
           pagination={{
             currentPage: currentPage,
@@ -1116,6 +1161,7 @@ export default function SportsManagement() {
                     accept="image/*"
                     disabled={loading}
                     initialPreview={currentGameDetail.icon}
+                    ref={fileUploadRef}
                   />
                 </div>
               </div>

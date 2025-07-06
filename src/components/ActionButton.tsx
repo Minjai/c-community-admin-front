@@ -33,6 +33,14 @@ const ActionButton: React.FC<ActionButtonProps> = ({
     down: "bg-gray-600 text-white hover:bg-gray-700",
   };
 
+  const getActionClasses = () => {
+    const baseActionClass = actionClasses[action];
+    if (props.disabled) {
+      return "bg-gray-400 text-gray-200 cursor-not-allowed";
+    }
+    return baseActionClass;
+  };
+
   const sizeClasses = {
     sm: "px-2 py-1 text-sm",
     md: "px-3 py-1.5 text-base",
@@ -62,7 +70,7 @@ const ActionButton: React.FC<ActionButtonProps> = ({
     <button
       className={`
         ${baseClasses}
-        ${actionClasses[action]}
+        ${getActionClasses()}
         ${sizeClasses[size]}
         ${className}
       `}

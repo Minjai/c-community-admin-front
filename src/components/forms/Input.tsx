@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -6,13 +6,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   helperText?: string;
 }
 
-const Input: React.FC<InputProps> = ({
-  label,
-  error,
-  helperText,
-  className = '',
-  ...props
-}) => {
+const Input: React.FC<InputProps> = ({ label, error, helperText, className = "", ...props }) => {
   return (
     <div>
       {label && (
@@ -21,7 +15,15 @@ const Input: React.FC<InputProps> = ({
         </label>
       )}
       <input
-        className={`input ${error ? 'border-red-500 focus:ring-red-500 focus:border-red-500' : ''} ${className}`}
+        className={`input ${
+          error ? "border-red-500 focus:ring-red-500 focus:border-red-500" : ""
+        } ${className}`}
+        style={{
+          wordWrap: "break-word",
+          whiteSpace: "pre-wrap",
+          minHeight: "2.5rem",
+          resize: "vertical",
+        }}
         {...props}
       />
       {error && <p className="mt-1 text-sm text-red-600">{error}</p>}

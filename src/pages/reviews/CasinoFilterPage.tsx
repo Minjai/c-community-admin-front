@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import DataTable from "../../components/DataTable";
 import Button from "../../components/Button";
 import ActionButton from "../../components/ActionButton";
@@ -12,6 +12,7 @@ import { formatDate } from "../../utils/dateUtils";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import axios from "../../api/axios";
 import { CasinoCompany } from "../../types";
+import { DragManager } from "../data/components/drag/DragManager";
 
 interface CasinoFilterCategory {
   id: number;
@@ -85,6 +86,26 @@ const CasinoFilterPage: React.FC = () => {
   const [companySearchQuery, setCompanySearchQuery] = useState<string>("");
   const [filteredCompanies, setFilteredCompanies] = useState<CasinoCompany[]>([]);
   const [isEditingSubCategory, setIsEditingSubCategory] = useState<boolean>(false);
+
+  // 드래그 매니저 초기화
+  const dragManagerRef = useRef<DragManager | null>(null);
+
+  useEffect(() => {
+    dragManagerRef.current = new DragManager((from: number, to: number) => {
+      if (
+        from === to ||
+        from < 0 ||
+        to < 0 ||
+        from >= selectedCompanyIds.length ||
+        to >= selectedCompanyIds.length
+      )
+        return;
+      const newSelectedCompanyIds = [...selectedCompanyIds];
+      const [movedItem] = newSelectedCompanyIds.splice(from, 1);
+      newSelectedCompanyIds.splice(to, 0, movedItem);
+      setSelectedCompanyIds(newSelectedCompanyIds);
+    });
+  }, [selectedCompanyIds]);
 
   // 초기 상태 설정
   const initialCategoryState: Partial<CasinoFilterCategory> = {
@@ -232,7 +253,7 @@ const CasinoFilterPage: React.FC = () => {
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
       setCurrentPage(page);
-      fetchCategories(page, PAGE_SIZE);
+      fetchCategories(page, PAGE_SIZE, searchValue);
     }
   };
 
@@ -400,38 +421,14 @@ const CasinoFilterPage: React.FC = () => {
 
   // 소분류 선택
   const handleSelectSubCategory = (id: number) => {
-    const subCategory = getHierarchicalData().find(
-      (item: any) => item.isSubCategory && item.id === id
-    ) as (CasinoFilterSubCategory & { isSubCategory: true }) | undefined;
-    const parentCategoryId = subCategory?.categoryId;
-    const parentCategory = categories.find((cat) => cat.id === parentCategoryId);
-    const siblingSubCategoryIds = parentCategory?.subCategories?.map((sub) => sub.id) || [];
-
     setSelectedSubCategoryIds((prev) => {
-      let newSelectedSubCategoryIds: number[];
       if (prev.includes(id)) {
         // 소분류 선택 해제
-        newSelectedSubCategoryIds = prev.filter((subCategoryId) => subCategoryId !== id);
-        // 부모 대분류도 선택 해제
-        if (parentCategoryId) {
-          setSelectedCategoryIds((prevCat) =>
-            prevCat.filter((catId) => catId !== parentCategoryId)
-          );
-        }
+        return prev.filter((subCategoryId) => subCategoryId !== id);
       } else {
         // 소분류 선택
-        newSelectedSubCategoryIds = [...prev, id];
-        // 같은 부모의 모든 소분류가 선택되었으면 부모 대분류도 선택
-        if (
-          parentCategoryId &&
-          siblingSubCategoryIds.every((siblingId) => newSelectedSubCategoryIds.includes(siblingId))
-        ) {
-          setSelectedCategoryIds((prevCat) =>
-            prevCat.includes(parentCategoryId) ? prevCat : [...prevCat, parentCategoryId]
-          );
-        }
+        return [...prev, id];
       }
-      return newSelectedSubCategoryIds;
     });
   };
 
@@ -599,6 +596,11 @@ const CasinoFilterPage: React.FC = () => {
         return;
       }
 
+      if (selectedCompanyIds.length === 0) {
+        setError("카지노 업체 확인해주세요.");
+        return;
+      }
+
       const subCategoryData = {
         categoryId: parentCategory.id,
         title: currentSubCategory.title,
@@ -642,28 +644,32 @@ const CasinoFilterPage: React.FC = () => {
           }
         }
 
-        // 추가할 매핑과 삭제할 매핑 계산
-        const toAdd = selectedCompanyIds.filter((id) => !existingCompanyIds.includes(id));
-        const toRemove = existingCompanyIds.filter((id) => !selectedCompanyIds.includes(id));
+        // 기존 매핑 모두 삭제 후 새로운 순서로 재생성
+        try {
+          // 기존 매핑 삭제
+          for (const companyId of existingCompanyIds) {
+            try {
+              await axios.delete(`/casino-filters/mappings/${companyId}/${subCategoryId}`);
+            } catch (err) {
+              console.error(`매핑 삭제 오류 (companyId: ${companyId}):`, err);
+            }
+          }
+        } catch (err) {
+          console.error("기존 매핑 삭제 오류:", err);
+        }
 
-        // 매핑 추가
-        for (const companyId of toAdd) {
+        // 새로운 순서로 매핑 추가
+        for (let i = 0; i < selectedCompanyIds.length; i++) {
+          const companyId = selectedCompanyIds[i];
+          const displayOrder = i + 1;
           try {
             await axios.post("/casino-filters/mappings", {
               companyId,
               subCategoryId,
+              displayOrder: displayOrder, // 순서 정보 추가
             });
           } catch (err) {
             console.error(`매핑 추가 오류 (companyId: ${companyId}):`, err);
-          }
-        }
-
-        // 매핑 삭제
-        for (const companyId of toRemove) {
-          try {
-            await axios.delete(`/casino-filters/mappings/${companyId}/${subCategoryId}`);
-          } catch (err) {
-            console.error(`매핑 삭제 오류 (companyId: ${companyId}):`, err);
           }
         }
 
@@ -782,12 +788,14 @@ const CasinoFilterPage: React.FC = () => {
             : new Date().toISOString().split("T")[0],
         });
 
-        // 연결된 카지노 업체 ID들 추출
+        // 연결된 카지노 업체 ID들 추출 (순서 정보 포함)
         const connectedCompanyIds = subCategoryData.companies
-          ? subCategoryData.companies.map((mapping: any) => mapping.company.id)
+          ? subCategoryData.companies
+              .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
+              .map((mapping: any) => mapping.company.id)
           : [];
 
-        console.log("연결된 카지노 업체 IDs:", connectedCompanyIds); // 디버깅용
+        console.log("연결된 카지노 업체 IDs (순서 포함):", connectedCompanyIds); // 디버깅용
 
         setSelectedCompanyIds(connectedCompanyIds);
         setCompanySearchQuery("");
@@ -849,7 +857,7 @@ const CasinoFilterPage: React.FC = () => {
             <input
               type="checkbox"
               checked={selectedSubCategoryIds.includes(row.id)}
-              onChange={() => handleSelectSubCategory(row)}
+              onChange={() => handleSelectSubCategory(row.id)}
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
           );
@@ -869,18 +877,33 @@ const CasinoFilterPage: React.FC = () => {
     {
       header: "대분류/소분류",
       accessor: "title" as keyof (CasinoFilterCategory | CasinoFilterSubCategory),
+      className: "w-60",
       cell: (value: string, row: any) => {
         if (row.isSubCategory) {
-          // 소분류: 들여쓰기와 └ 기호
+          // 소분류: 들여쓰기와 └ 기호, 클릭 가능한 파란 글씨
           return (
             <div className="flex items-center pl-6">
               <span className="text-gray-400 mr-2">└</span>
-              <span className="text-black">{value}</span>
+              <div
+                className="max-w-xs truncate text-blue-600 hover:text-blue-800 cursor-pointer"
+                title={value}
+                onClick={() => handleEditSubCategory(row)}
+              >
+                {value}
+              </div>
             </div>
           );
         } else {
-          // 대분류: 굵은 글씨
-          return <div className="font-medium text-black">{value}</div>;
+          // 대분류: 굵은 글씨, 클릭 가능한 파란 글씨
+          return (
+            <div
+              className="font-medium text-blue-600 hover:text-blue-800 cursor-pointer max-w-xs truncate"
+              title={value}
+              onClick={() => handleEditCategory(row)}
+            >
+              {value}
+            </div>
+          );
         }
       },
     },
@@ -1034,7 +1057,7 @@ const CasinoFilterPage: React.FC = () => {
             totalItems: totalItems,
             onPageChange: handlePageChange,
           }}
-          emptyMessage="등록된 대분류가 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 대분류가 없습니다."}
           rowClassName={(row: any) => {
             if (row.isSubCategory) {
               // 소분류: 기본 스타일
@@ -1050,7 +1073,10 @@ const CasinoFilterPage: React.FC = () => {
       {/* 대분류 추가/수정 모달 */}
       <Modal
         isOpen={showModal}
-        onClose={() => setShowModal(false)}
+        onClose={() => {
+          setShowModal(false);
+          setError(null);
+        }}
         title={isEditing ? "대분류 수정" : "대분류 추가"}
         size="lg"
       >
@@ -1063,7 +1089,13 @@ const CasinoFilterPage: React.FC = () => {
               <Button onClick={handleSaveCategory} variant="primary" disabled={isSaving}>
                 {isSaving ? "저장 중..." : isEditing ? "수정" : "추가"}
               </Button>
-              <Button onClick={() => setShowModal(false)} variant="secondary">
+              <Button
+                onClick={() => {
+                  setShowModal(false);
+                  setError(null);
+                }}
+                variant="secondary"
+              >
                 취소
               </Button>
             </div>
@@ -1091,17 +1123,22 @@ const CasinoFilterPage: React.FC = () => {
           <hr className="border-gray-200" />
 
           {/* 대분류 제목 */}
-          <Input
-            label="대분류 제목"
-            value={currentCategory?.title || ""}
-            onChange={(e) =>
-              setCurrentCategory((prev) => ({
-                ...prev,
-                title: e.target.value,
-              }))
-            }
-            required
-          />
+          <div>
+            <label className="label">대분류 제목</label>
+            <textarea
+              value={currentCategory?.title || ""}
+              onChange={(e) =>
+                setCurrentCategory((prev) => ({
+                  ...prev,
+                  title: e.target.value,
+                }))
+              }
+              placeholder="대분류 제목을 입력하세요"
+              required
+              className="input w-full min-h-[2.5rem] resize-y"
+              rows={3}
+            />
+          </div>
 
           {/* 시작일시와 종료일시 */}
           <div className="grid grid-cols-2 gap-6">
@@ -1132,7 +1169,10 @@ const CasinoFilterPage: React.FC = () => {
       {/* 소분류 추가 모달 */}
       <Modal
         isOpen={showSubCategoryModal}
-        onClose={() => setShowSubCategoryModal(false)}
+        onClose={() => {
+          setShowSubCategoryModal(false);
+          setError(null);
+        }}
         title={isEditingSubCategory ? "소분류 수정" : "소분류 추가"}
         size="xl"
       >
@@ -1145,7 +1185,13 @@ const CasinoFilterPage: React.FC = () => {
               <Button onClick={handleSaveSubCategory} variant="primary" disabled={isSaving}>
                 {isSaving ? "저장 중..." : isEditingSubCategory ? "수정" : "추가"}
               </Button>
-              <Button onClick={() => setShowSubCategoryModal(false)} variant="secondary">
+              <Button
+                onClick={() => {
+                  setShowSubCategoryModal(false);
+                  setError(null);
+                }}
+                variant="secondary"
+              >
                 취소
               </Button>
             </div>
@@ -1175,23 +1221,28 @@ const CasinoFilterPage: React.FC = () => {
           {/* 대분류 제목 표시 */}
           <div>
             <label className="text-sm font-medium text-gray-700">대분류 제목</label>
-            <div className="mt-1 p-2 bg-gray-50 border border-gray-300 rounded-md text-gray-600">
+            <div className="mt-1 p-2 bg-gray-50 border border-gray-300 rounded-md text-gray-600 break-words">
               {parentCategory?.title}
             </div>
           </div>
 
           {/* 소분류 제목 */}
-          <Input
-            label="소분류 제목"
-            value={currentSubCategory?.title || ""}
-            onChange={(e) =>
-              setCurrentSubCategory((prev) => ({
-                ...prev,
-                title: e.target.value,
-              }))
-            }
-            required
-          />
+          <div>
+            <label className="label">소분류 제목</label>
+            <input
+              type="text"
+              value={currentSubCategory?.title || ""}
+              onChange={(e) =>
+                setCurrentSubCategory((prev) => ({
+                  ...prev,
+                  title: e.target.value,
+                }))
+              }
+              placeholder="소분류 제목을 입력하세요"
+              required
+              className="input w-full"
+            />
+          </div>
 
           {/* 선택된 카지노 업체 */}
           <div>
@@ -1204,22 +1255,38 @@ const CasinoFilterPage: React.FC = () => {
             >
               {selectedCompanyIds.length > 0 ? (
                 <div className="space-y-2">
-                  {selectedCompanyIds.map((companyId) => {
+                  {selectedCompanyIds.map((companyId, index) => {
                     const company = casinoCompanies.find((c) => c.id === companyId);
                     if (!company) return null;
                     return (
                       <div
-                        key={company.id}
-                        className="flex justify-between items-center border-b pb-2 last:border-b-0"
+                        key={`${company.id}-${index}`}
+                        className="flex justify-between items-center border-b pb-2 last:border-b-0 cursor-move hover:bg-gray-100 transition-colors"
+                        draggable
+                        onDragStart={() => {
+                          if (!dragManagerRef.current) return;
+                          dragManagerRef.current.startDrag(index);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                        }}
+                        onDrop={() => {
+                          if (!dragManagerRef.current) return;
+                          dragManagerRef.current.drop(index);
+                        }}
                       >
-                        <div>
-                          <div className="font-medium text-sm">{company.companyName}</div>
-                          <div className="text-xs text-gray-500">평점: {company.rating || 0}/5</div>
+                        <div className="flex items-center flex-1">
+                          <div>
+                            <div className="font-medium text-sm">{company.companyName}</div>
+                            <div className="text-xs text-gray-500">
+                              평점: {company.rating || 0}/5
+                            </div>
+                          </div>
                         </div>
                         <button
                           type="button"
                           onClick={() => handleRemoveSelectedCompany(company.id)}
-                          className="text-red-500 hover:text-red-700 text-xs p-1"
+                          className="text-red-500 hover:text-red-700 text-xs p-1 ml-2"
                           disabled={isSaving}
                         >
                           삭제
@@ -1251,7 +1318,7 @@ const CasinoFilterPage: React.FC = () => {
             </div>
             <div
               className="border border-gray-300 rounded-md p-3"
-              style={{ maxHeight: "300px", overflowY: "auto" }}
+              style={{ maxHeight: "150px", overflowY: "auto" }}
             >
               {filteredCompanies.length > 0 ? (
                 <div className="space-y-2">

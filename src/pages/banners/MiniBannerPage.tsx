@@ -110,7 +110,7 @@ const MiniBannerPage: React.FC = () => {
   // 페이지 변경 핸들러
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      fetchBanners(page, pageSize);
+      fetchBanners(page, pageSize, searchValue);
     }
   };
 
@@ -622,7 +622,7 @@ const MiniBannerPage: React.FC = () => {
           columns={columns}
           data={banners}
           loading={loading}
-          emptyMessage="등록된 배너가 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 배너가 없습니다."}
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,

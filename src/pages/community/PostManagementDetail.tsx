@@ -17,7 +17,7 @@ const replaceAsync = async (
   asyncFn: (match: string, ...args: any[]) => Promise<string>
 ): Promise<string> => {
   // 입력 문자열 검증
-  if (!str || typeof str !== "string") {
+  if (!str) {
     console.warn("Invalid string provided to replaceAsync:", str);
     return str || "";
   }
@@ -172,12 +172,19 @@ const PostDetail = () => {
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
 
   // 댓글 작성 관련 상태 추가
-  const [commentTempUser, setCommentTempUser] = useState({
+  const [commentCreateTempUser, setCommentCreateTempUser] = useState({
     nickname: "",
     rank: "",
     profileImageFile: null as File | null,
   });
   const [commentContent, setCommentContent] = useState("");
+
+  // 댓글 수정 관련 상태 추가
+  const [commentEditTempUser, setCommentEditTempUser] = useState({
+    nickname: "",
+    rank: "",
+    profileImageFile: null as File | null,
+  });
 
   // 스크롤을 맨 위로 이동
   useScrollToTop();
@@ -207,9 +214,17 @@ const PostDetail = () => {
     }));
   };
 
-  // 댓글 tempUser 정보 업데이트
-  const handleCommentTempUserChange = (field: string, value: string) => {
-    setCommentTempUser((prev) => ({
+  // 댓글 tempUser 정보 업데이트 (작성용)
+  const handleCommentCreateTempUserChange = (field: string, value: string) => {
+    setCommentCreateTempUser((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  // 댓글 수정용 tempUser 정보 업데이트
+  const handleCommentEditTempUserChange = (field: string, value: string) => {
+    setCommentEditTempUser((prev) => ({
       ...prev,
       [field]: value,
     }));
@@ -220,9 +235,17 @@ const PostDetail = () => {
     setProfileImageFile(file);
   };
 
-  // 댓글 프로필 이미지 파일 변경 처리
-  const handleCommentProfileImageChange = (file: File | null) => {
-    setCommentTempUser((prev) => ({
+  // 댓글 작성용 프로필 이미지 파일 변경 처리
+  const handleCommentCreateProfileImageChange = (file: File | null) => {
+    setCommentCreateTempUser((prev) => ({
+      ...prev,
+      profileImageFile: file,
+    }));
+  };
+
+  // 댓글 수정용 프로필 이미지 파일 변경 처리
+  const handleCommentEditProfileImageChange = (file: File | null) => {
+    setCommentEditTempUser((prev) => ({
       ...prev,
       profileImageFile: file,
     }));
@@ -240,6 +263,12 @@ const PostDetail = () => {
         return;
       }
 
+      // 닉네임 유효성 검사 (새 게시물이거나 템프유저 정보가 있는 경우)
+      if ((!isEditMode || (isEditMode && tempUser.nickname.trim())) && !tempUser.nickname.trim()) {
+        setError("닉네임을 입력해주세요.");
+        return;
+      }
+
       // 에디터 내용 분석
       const contentAnalysis = analyzeContent(content);
 
@@ -251,10 +280,35 @@ const PostDetail = () => {
       formData.append("isPopular", isPopular.toString());
       formData.append("isPublic", isPublic.toString());
 
-      // tempUser 정보가 있는 경우 (새로 입력한 경우)
-      if (tempUser.nickname.trim()) {
+      // tempUser 정보 처리
+      if (isEditMode && post?.tempUser && post.tempUser.nickname) {
+        // 수정 모드이고 기존에 tempUser로 작성된 게시물인 경우
+        // 기존 tempUser 정보를 그대로 유지 (새로 입력한 정보는 무시)
+        formData.append("tempUserNickname", post.tempUser.nickname);
+        formData.append("tempUserRank", post.tempUser.rank || "");
+        formData.append("tempUserTitle", "");
+        formData.append("tempUserContent", "");
+
+        // 프로필 이미지 처리: 새 파일이 있으면 파일을, 없으면 기존 URL을 전송
+        if (profileImageFile) {
+          formData.append("images", profileImageFile);
+        } else if (post.tempUser.profileImageUrl) {
+          formData.append("tempUserProfileImageUrl", post.tempUser.profileImageUrl);
+        }
+      } else if (!isEditMode && tempUser.nickname.trim()) {
+        // 새 게시물이고 새로 입력한 tempUser 정보가 있는 경우
         formData.append("tempUserNickname", tempUser.nickname.trim());
-        formData.append("tempUserRank", tempUser.rank);
+
+        // 등급이 선택되지 않았으면 가장 낮은 등급(스코어 0)을 자동 설정
+        let selectedRank = tempUser.rank;
+        if (!selectedRank && userRanks.length > 0) {
+          const lowestRank = userRanks.reduce((lowest, current) =>
+            current.score < lowest.score ? current : lowest
+          );
+          selectedRank = lowestRank.rankName;
+        }
+        formData.append("tempUserRank", selectedRank || "");
+
         formData.append("tempUserTitle", tempUser.title);
         formData.append("tempUserContent", tempUser.content);
 
@@ -262,23 +316,11 @@ const PostDetail = () => {
         if (profileImageFile) {
           formData.append("images", profileImageFile);
         }
-      } else if (isEditMode && post?.tempUser && post.tempUser.nickname) {
-        // 수정 모드이고 기존에 tempUser로 작성된 게시물인 경우
-        // 기존 tempUser 정보를 그대로 유지
-        formData.append("tempUserNickname", post.tempUser.nickname);
-        formData.append("tempUserRank", post.tempUser.rank || "");
-        // tempUser 타입에 title, content가 없으므로 안전하게 처리
-        formData.append("tempUserTitle", "");
-        formData.append("tempUserContent", "");
-      } else if (isEditMode) {
+      } else if (isEditMode && post?.authorId) {
         // 수정 모드이고 기존에 실제 사용자가 작성한 게시물인 경우
         // 기존 작성자 정보를 유지하기 위해 authorId를 전송
-        if (post?.authorId) {
-          formData.append("authorId", post.authorId.toString());
-        }
+        formData.append("authorId", post.authorId.toString());
       }
-      // tempUser가 없고 기존 작성자가 실제 사용자인 경우는 별도 처리하지 않음
-      // (서버에서 기존 작성자 정보를 유지)
 
       // 에디터에서 감지된 이미지들 추가
       if (contentAnalysis.imgSources.length > 0) {
@@ -387,6 +429,18 @@ const PostDetail = () => {
             nickname: postData.tempUser.nickname || "",
             profileImageUrl: postData.tempUser.profileImageUrl || "",
             rank: postData.tempUser.rank || "",
+            title: "", // tempUser 타입에 title이 없으므로 빈 문자열
+            content: "", // tempUser 타입에 content가 없으므로 빈 문자열
+          });
+        } else if (postData.author && postData.author.nickname) {
+          // 실제 사용자가 작성한 게시물인 경우 - 작성자 정보를 표시용으로 설정
+          setTempUser({
+            nickname: postData.author.nickname || "",
+            profileImageUrl: postData.author.profileImageUrl || postData.author.profileImage || "",
+            rank:
+              typeof postData.author.rank === "string"
+                ? postData.author.rank
+                : postData.author.rank?.rankName || "",
             title: "", // tempUser 타입에 title이 없으므로 빈 문자열
             content: "", // tempUser 타입에 content가 없으므로 빈 문자열
           });
@@ -507,14 +561,14 @@ const PostDetail = () => {
       formData.append("postId", id!);
 
       // tempUser 정보가 있는 경우
-      if (commentTempUser.nickname.trim()) {
-        formData.append("tempUser[nickname]", commentTempUser.nickname.trim());
-        formData.append("tempUser[rank]", commentTempUser.rank);
+      if (commentCreateTempUser.nickname.trim()) {
+        formData.append("tempUser[nickname]", commentCreateTempUser.nickname.trim());
+        formData.append("tempUser[rank]", commentCreateTempUser.rank);
         formData.append("tempUser[title]", "");
         formData.append("tempUser[content]", "");
 
-        if (commentTempUser.profileImageFile) {
-          formData.append("tempUserProfileImage", commentTempUser.profileImageFile);
+        if (commentCreateTempUser.profileImageFile) {
+          formData.append("tempUserProfileImage", commentCreateTempUser.profileImageFile);
         }
       }
 
@@ -527,7 +581,7 @@ const PostDetail = () => {
       if (response.status === 201 || response.status === 200) {
         alert("댓글이 등록되었습니다.");
         setCommentContent("");
-        setCommentTempUser({
+        setCommentCreateTempUser({
           nickname: "",
           rank: "",
           profileImageFile: null,
@@ -549,6 +603,25 @@ const PostDetail = () => {
   const startEditComment = (comment: Comment) => {
     setEditingCommentId(comment.id);
     setEditCommentContent(comment.content);
+
+    // 템프유저 댓글인 경우 기존 정보를 수정 폼에 설정
+    if (comment.tempUser) {
+      setCommentEditTempUser({
+        nickname: comment.tempUser.nickname || "",
+        rank:
+          typeof comment.tempUser.rank === "string"
+            ? comment.tempUser.rank
+            : (comment.tempUser.rank as any)?.rankName || "",
+        profileImageFile: null,
+      });
+    } else {
+      // 실제 사용자 댓글인 경우 빈 값으로 설정
+      setCommentEditTempUser({
+        nickname: "",
+        rank: "",
+        profileImageFile: null,
+      });
+    }
   };
 
   // 댓글 수정 취소
@@ -565,14 +638,37 @@ const PostDetail = () => {
     }
 
     try {
-      const response = await axios.put(`/comment/${commentId}`, {
-        content: editCommentContent,
+      const formData = new FormData();
+      formData.append("content", editCommentContent.trim());
+
+      // 템프유저 댓글인 경우 템프유저 정보도 함께 전송
+      if (commentEditTempUser.nickname.trim()) {
+        formData.append("tempUser[nickname]", commentEditTempUser.nickname.trim());
+        formData.append("tempUser[rank]", commentEditTempUser.rank);
+        formData.append("tempUser[title]", "");
+        formData.append("tempUser[content]", "");
+
+        if (commentEditTempUser.profileImageFile) {
+          formData.append("tempUserProfileImage", commentEditTempUser.profileImageFile);
+        }
+      }
+      // 실제 사용자 댓글인 경우 내용만 전송 (작성자 정보는 변경하지 않음)
+
+      const response = await axios.put(`/comment/${commentId}`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
       });
 
       if (response.status === 200) {
         alert("댓글이 수정되었습니다.");
         setEditingCommentId(null);
         setEditCommentContent("");
+        setCommentEditTempUser({
+          nickname: "",
+          rank: "",
+          profileImageFile: null,
+        });
         getPostDetail(); // 댓글 목록 새로고침
       } else {
         alert("댓글 수정에 실패했습니다.");
@@ -752,7 +848,7 @@ const PostDetail = () => {
               onChange={(e) => handleTempUserChange("nickname", e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               placeholder="닉네임을 입력하세요"
-              disabled={saving}
+              disabled={saving || (isEditMode && post?.author && !post?.tempUser)}
             />
           </div>
         </div>
@@ -761,15 +857,29 @@ const PostDetail = () => {
         <div className="mt-4 flex gap-4">
           {/* 프로필 이미지 */}
           <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              프로필 이미지 (선택사항)
-            </label>
-            <FileUpload onChange={handleProfileImageChange} accept="image/*" />
+            <label className="block text-sm font-medium text-gray-700 mb-1">프로필 이미지</label>
+
+            <FileUpload
+              onChange={handleProfileImageChange}
+              accept="image/*"
+              value={tempUser.profileImageUrl}
+              disabled={isEditMode && post?.author && !post?.tempUser}
+            />
           </div>
 
           {/* 회원등급 */}
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">회원등급</label>
+
+            {/* 현재 선택된 등급 표시 */}
+            {tempUser.rank && (
+              <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                <span className="text-sm text-blue-700">
+                  현재 등급: {typeof tempUser.rank === "string" ? tempUser.rank : ""}
+                </span>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
               {userRanks.map((rank) => (
                 <label
@@ -783,7 +893,7 @@ const PostDetail = () => {
                     checked={tempUser.rank === rank.rankName}
                     onChange={(e) => handleTempUserChange("rank", e.target.value)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                    disabled={saving}
+                    disabled={saving || (isEditMode && post?.author && !post?.tempUser)}
                   />
                   <span className="ml-2 text-sm">{rank.rankName}</span>
                 </label>
@@ -791,6 +901,13 @@ const PostDetail = () => {
             </div>
           </div>
         </div>
+
+        {/* 실제 사용자 게시물인 경우 안내 메시지 */}
+        {isEditMode && post?.author && !post?.tempUser && (
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+            <p className="text-sm text-yellow-700">실제 사용자가 작성한 게시물입니다.</p>
+          </div>
+        )}
       </div>
 
       {/* Title Input */}
@@ -825,8 +942,8 @@ const PostDetail = () => {
               <input
                 type="text"
                 placeholder="닉네임"
-                value={commentTempUser.nickname}
-                onChange={(e) => handleCommentTempUserChange("nickname", e.target.value)}
+                value={commentCreateTempUser.nickname}
+                onChange={(e) => handleCommentCreateTempUserChange("nickname", e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
               />
             </div>
@@ -834,7 +951,7 @@ const PostDetail = () => {
             {/* 프로필 이미지 */}
             <div className="w-20">
               <FileUpload
-                onChange={handleCommentProfileImageChange}
+                onChange={handleCommentCreateProfileImageChange}
                 accept="image/*"
                 className="w-full h-10"
                 showText={false}
@@ -847,15 +964,20 @@ const PostDetail = () => {
                 {userRanks.map((rank) => (
                   <label
                     key={rank.id}
-                    className="flex items-center p-1 border border-gray-200 rounded hover:bg-gray-100 text-xs"
+                    className="flex items-center p-1 border border-gray-200 rounded hover:bg-gray-100 text-xs cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
                   >
                     <input
                       type="radio"
                       name="commentUserRank"
                       value={rank.rankName}
-                      checked={commentTempUser.rank === rank.rankName}
-                      onChange={(e) => handleCommentTempUserChange("rank", e.target.value)}
+                      checked={commentCreateTempUser.rank === rank.rankName}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        handleCommentCreateTempUserChange("rank", e.target.value);
+                      }}
                       className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300"
+                      onClick={(e) => e.stopPropagation()}
                     />
                     <span className="ml-1">{rank.rankName}</span>
                   </label>
@@ -892,50 +1014,246 @@ const PostDetail = () => {
             {comments.map((comment) => (
               <div key={comment.id} className="bg-gray-50 p-3 rounded-md shadow-sm">
                 {editingCommentId === comment.id ? (
-                  <div>
-                    <textarea
-                      value={editCommentContent}
-                      onChange={(e) => setEditCommentContent(e.target.value)}
-                      rows={3}
-                      className="w-full p-2 border border-gray-300 rounded-md mb-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      required
-                    />
-                    <div className="flex justify-end space-x-2">
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => handleUpdateComment(comment.id)}
-                      >
-                        수정 완료
-                      </Button>
-                      <Button variant="secondary" size="sm" onClick={cancelEditComment}>
-                        취소
-                      </Button>
+                  <div className="space-y-4" onClick={(e) => e.stopPropagation()}>
+                    {/* 댓글 수정 폼 - 댓글 작성 영역과 동일한 디자인 */}
+                    <div className="bg-white p-4 border border-gray-200 rounded-md">
+                      <h4 className="text-sm font-medium text-gray-700 mb-3">댓글 수정</h4>
+
+                      {/* 템프유저 정보 수정 (템프유저 댓글인 경우만) */}
+                      {comment.tempUser && (
+                        <div className="mb-4">
+                          <div className="flex gap-3 mb-3">
+                            {/* 닉네임 입력란 */}
+                            <div className="w-1/3">
+                              <input
+                                type="text"
+                                placeholder="닉네임"
+                                value={commentEditTempUser.nickname}
+                                onChange={(e) =>
+                                  handleCommentEditTempUserChange("nickname", e.target.value)
+                                }
+                                className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+
+                            {/* 프로필 이미지 */}
+                            <div className="w-20">
+                              <FileUpload
+                                onChange={handleCommentEditProfileImageChange}
+                                accept="image/*"
+                                className="w-full h-10"
+                                showText={false}
+                                value={comment.tempUser.profileImageUrl}
+                              />
+                            </div>
+
+                            {/* 등급 선택 */}
+                            <div className="flex-1">
+                              <div className="grid grid-cols-3 gap-1 max-h-16 overflow-y-auto">
+                                {userRanks.map((rank) => (
+                                  <label
+                                    key={rank.id}
+                                    className="flex items-center p-1 border border-gray-200 rounded hover:bg-gray-100 text-xs cursor-pointer"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="editCommentUserRank"
+                                      value={rank.rankName}
+                                      checked={commentEditTempUser.rank === rank.rankName}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        handleCommentEditTempUserChange("rank", e.target.value);
+                                      }}
+                                      className="h-3 w-3 text-blue-600 focus:ring-blue-500 border-gray-300"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    <span className="ml-1">{rank.rankName}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 실제 사용자 정보 표시 (읽기 전용) */}
+                      {!comment.tempUser && (
+                        <div className="mb-4">
+                          <div className="flex gap-3 mb-3">
+                            {/* 닉네임 표시 */}
+                            <div className="w-1/3">
+                              <div className="w-full p-2 border border-gray-300 rounded-md bg-gray-50 text-gray-700">
+                                {comment.author?.nickname || "익명"}
+                              </div>
+                            </div>
+
+                            {/* 프로필 이미지 표시 */}
+                            <div className="w-20">
+                              {(comment.author as any)?.profileImageUrl ||
+                              (comment.author as any)?.profileImage ? (
+                                <img
+                                  src={
+                                    (comment.author as any)?.profileImageUrl ||
+                                    (comment.author as any)?.profileImage
+                                  }
+                                  alt="프로필 이미지"
+                                  className="w-8 h-8 rounded-full object-cover border border-gray-300"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 bg-gray-200 rounded-full border border-gray-300 flex items-center justify-center">
+                                  <span className="text-xs text-gray-500">?</span>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* 등급 표시 (체크박스 형태) */}
+                            <div className="flex-1">
+                              <div className="grid grid-cols-3 gap-1 max-h-16 overflow-y-auto">
+                                {userRanks.map((rank) => (
+                                  <label
+                                    key={rank.id}
+                                    className="flex items-center p-1 border border-gray-200 rounded text-xs cursor-not-allowed bg-gray-50"
+                                  >
+                                    <input
+                                      type="radio"
+                                      name="editCommentUserRankReadonly"
+                                      value={rank.rankName}
+                                      checked={
+                                        typeof (comment.author as any)?.rank === "string"
+                                          ? (comment.author as any).rank === rank.rankName
+                                          : (comment.author as any)?.rank?.rankName ===
+                                            rank.rankName
+                                      }
+                                      disabled
+                                      className="h-3 w-3 text-gray-400 focus:ring-gray-500 border-gray-300"
+                                    />
+                                    <span className="ml-1 text-gray-600">{rank.rankName}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 댓글 내용 수정 */}
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <textarea
+                            placeholder="댓글을 입력하세요..."
+                            value={editCommentContent}
+                            onChange={(e) => setEditCommentContent(e.target.value)}
+                            rows={2}
+                            className="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            required
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </div>
+                        <div className="flex items-end space-x-2">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUpdateComment(comment.id);
+                            }}
+                          >
+                            수정 완료
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              cancelEditComment();
+                            }}
+                          >
+                            취소
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ) : (
                   <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm font-semibold text-gray-800">
-                        {comment.tempUser?.nickname || comment.author?.nickname || "익명"}
-                      </p>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        {/* 프로필 이미지 */}
+                        {(comment.tempUser?.profileImageUrl ||
+                          (comment.author as any)?.profileImageUrl ||
+                          (comment.author as any)?.profileImage) && (
+                          <img
+                            src={
+                              comment.tempUser?.profileImageUrl ||
+                              (comment.author as any)?.profileImageUrl ||
+                              (comment.author as any)?.profileImage
+                            }
+                            alt="프로필 이미지"
+                            className="w-8 h-8 rounded-full object-cover border border-gray-300"
+                          />
+                        )}
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800">
+                            {comment.tempUser?.nickname || comment.author?.nickname || "익명"}
+                          </p>
+                          {/* 등급 표시 */}
+                          <p className="text-xs text-gray-500">
+                            {typeof comment.tempUser?.rank === "string"
+                              ? comment.tempUser.rank
+                              : (comment.tempUser?.rank &&
+                                  (comment.tempUser.rank as any)?.rankName) ||
+                                (typeof (comment.author as any)?.rank === "string"
+                                  ? (comment.author as any).rank
+                                  : (comment.author as any)?.rank?.rankName || "")}
+                          </p>
+                        </div>
+                      </div>
                       <span className="text-xs text-gray-500">{formatDate(comment.createdAt)}</span>
                     </div>
                     <p className="text-gray-700 whitespace-pre-wrap break-words">
                       {comment.content}
                     </p>
-                    {/* 수정 및 삭제 버튼 (임시로 숨김 또는 권한 로직 추가 필요) */}
+                    {/* 수정 및 삭제 버튼 - 실제 사용자 댓글도 수정 가능하되 작성자 정보는 잠금 */}
                     <div className="flex justify-end space-x-2 mt-2">
-                      <Button variant="outline" size="sm" onClick={() => startEditComment(comment)}>
-                        수정
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleDeleteComment(comment.id)}
-                      >
-                        삭제
-                      </Button>
+                      {comment.tempUser ? (
+                        // 템프유저 댓글은 모든 정보 수정 가능
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEditComment(comment)}
+                          >
+                            수정
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleDeleteComment(comment.id)}
+                          >
+                            삭제
+                          </Button>
+                        </>
+                      ) : (
+                        // 실제 사용자 댓글은 수정과 삭제 모두 가능
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEditComment(comment)}
+                          >
+                            수정
+                          </Button>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => handleDeleteComment(comment.id)}
+                          >
+                            삭제
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}

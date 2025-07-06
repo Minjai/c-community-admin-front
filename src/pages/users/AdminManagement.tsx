@@ -125,7 +125,7 @@ const AdminManagement: React.FC = () => {
 
   useEffect(() => {
     fetchAdmins(currentPage, pageSize, searchValue);
-  }, [currentPage, pageSize]);
+  }, [currentPage, pageSize, searchValue]);
 
   // 페이지 변경 핸들러
   const handlePageChange = (page: number) => {
@@ -527,11 +527,11 @@ const AdminManagement: React.FC = () => {
           columns={columns}
           data={admins}
           loading={loading}
-          emptyMessage="등록된 관리자가 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 관리자가 없습니다."}
           pagination={{
-            currentPage,
-            pageSize,
-            totalItems,
+            currentPage: currentPage,
+            pageSize: pageSize,
+            totalItems: totalItems,
             onPageChange: handlePageChange,
           }}
         />

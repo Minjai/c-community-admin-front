@@ -83,15 +83,15 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
 
   const { path, title } = getPageInfo();
 
-  
-  const handleSearch = (type: string, value: string) => {
-    // title
-    if (type === "title") {
-      fetchGuidelines(currentPage, pageSize, value);
-    }
-  }
+  const handleSearch = (value: string) => {
+    fetchGuidelines(currentPage, pageSize, value);
+  };
 
-  const fetchGuidelines = async (page: number = 1, limit: number = 10, searchValue: string = '') => {
+  const fetchGuidelines = async (
+    page: number = 1,
+    limit: number = 10,
+    searchValue: string = ""
+  ) => {
     setLoading(true);
     setError(null);
 
@@ -151,12 +151,12 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
   };
 
   useEffect(() => {
-    fetchGuidelines(currentPage, pageSize);
-  }, [boardId, currentPage, pageSize]); // useEffect 의존성 배열 복원
+    fetchGuidelines(currentPage, pageSize, searchValue);
+  }, [boardId, currentPage, pageSize, searchValue]); // useEffect 의존성 배열 복원
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      fetchGuidelines(page, pageSize);
+      fetchGuidelines(page, pageSize, searchValue);
     }
   };
 
@@ -519,7 +519,11 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">{title}</h1>
-        <SearchInput searchValue={searchValue} setSearchValue={setSearchValue} onSearch={handleSearch}/>
+        <SearchInput
+          searchValue={searchValue}
+          setSearchValue={setSearchValue}
+          onSearch={handleSearch}
+        />
         <div className="flex space-x-2">
           <Button onClick={handleBulkPositionSave} variant="primary" disabled={loading || isSaving}>
             순서 저장
@@ -548,7 +552,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
           columns={columns}
           data={guidelines}
           loading={loading}
-          emptyMessage="등록된 가이드라인이 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 가이드라인이 없습니다."}
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,

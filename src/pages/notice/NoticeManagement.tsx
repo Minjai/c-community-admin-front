@@ -345,7 +345,7 @@ const NoticeManagement = () => {
           columns={columns}
           data={notices}
           loading={loading || deleting}
-          emptyMessage="등록된 공지사항이 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 공지사항이 없습니다."}
           pagination={{
             currentPage: pagination.page,
             pageSize: pagination.limit,

@@ -123,7 +123,7 @@ const MainBannerPage: React.FC = () => {
   // 페이지 변경 핸들러 (CasinoGameManagement.tsx 참고)
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      fetchBanners(page, pageSize); // 새 페이지 데이터 요청
+      fetchBanners(page, pageSize, searchValue); // 새 페이지 데이터 요청 (검색어 포함)
     }
   };
 
@@ -699,7 +699,7 @@ const MainBannerPage: React.FC = () => {
           columns={columns}
           data={banners}
           loading={loading}
-          emptyMessage="등록된 배너가 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 배너가 없습니다."}
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,

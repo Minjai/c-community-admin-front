@@ -112,7 +112,7 @@ const RemittanceBannerPage: React.FC = () => {
 
   useEffect(() => {
     fetchBanners(currentPage, pageSize, searchValue);
-  }, [fetchBanners, currentPage, pageSize]);
+  }, [fetchBanners, currentPage, pageSize, searchValue]);
 
   // 배너 추가 모달 열기
   const handleAddBanner = () => {
@@ -628,7 +628,7 @@ const RemittanceBannerPage: React.FC = () => {
           columns={columns}
           data={banners}
           loading={loading}
-          emptyMessage="등록된 송금 배너가 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 배너가 없습니다."}
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,

@@ -112,7 +112,7 @@ function FooterManagementPage() {
   // useEffect 수정: currentPage, pageSize 변경 시 fetchFooters 호출
   useEffect(() => {
     fetchFooters(currentPage, pageSize, searchValue);
-  }, [currentPage, pageSize]); // fetchFooters는 useCallback으로 감싸져 있으므로 넣지 않음
+  }, [currentPage, pageSize, searchValue]); // fetchFooters는 useCallback으로 감싸져 있으므로 넣지 않음
 
   // 검색 핸들러 추가
   const handleSearch = (value: string) => {
@@ -385,7 +385,7 @@ function FooterManagementPage() {
           columns={columns}
           data={footers}
           loading={loading}
-          emptyMessage="등록된 푸터 항목이 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 푸터 항목이 없습니다."}
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,

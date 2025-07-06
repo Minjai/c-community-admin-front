@@ -377,7 +377,7 @@ const SportsAnalysisManagement = () => {
           columns={columns}
           data={filteredData}
           loading={loading}
-          emptyMessage="등록된 분석글이 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 분석글이 없습니다."}
           pagination={{
             currentPage: page,
             pageSize: limit,

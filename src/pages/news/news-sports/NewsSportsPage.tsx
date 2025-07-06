@@ -589,7 +589,7 @@ const NewsSportsPage = () => {
           columns={columns}
           data={news}
           loading={loading}
-          emptyMessage="등록된 뉴스가 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 뉴스가 없습니다."}
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,

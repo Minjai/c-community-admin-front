@@ -39,7 +39,7 @@ const PostManagement = () => {
 
   // 페이지 변경 처리
   const handlePageChange = (page: number) => {
-    getAllPost(page);
+    getAllPost(page, searchValue);
   };
 
   // 검색 핸들러
@@ -292,7 +292,7 @@ const PostManagement = () => {
           columns={columns}
           data={posts}
           loading={loading}
-          emptyMessage="게시물이 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "게시물이 없습니다."}
           pagination={{
             currentPage: pagination.page,
             pageSize: pagination.limit,

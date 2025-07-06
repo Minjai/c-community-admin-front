@@ -970,7 +970,7 @@ const CasinoRecommendationManagement = () => {
           columns={columns}
           data={recommendations} // paginatedRecommendations 사용
           loading={loading}
-          emptyMessage="등록된 카지노 추천이 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 카지노 추천이 없습니다."}
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,
@@ -1085,17 +1085,21 @@ const CasinoRecommendationManagement = () => {
                   <div className="h-64 overflow-y-auto border border-gray-200 rounded-md p-2">
                     {filteredGames.length > 0 ? (
                       filteredGames.map((game) => (
-                        <div key={game.id} className="flex items-center py-1">
+                        <div
+                          key={game.id}
+                          className="flex items-center py-1 w-full max-w-[280px] overflow-hidden"
+                        >
                           <input
                             type="checkbox"
                             id={`game-${game.id}`}
                             checked={selectedGameIds.includes(game.id)}
                             onChange={() => handleGameToggle(game.id, game.title)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded flex-shrink-0"
                           />
                           <label
                             htmlFor={`game-${game.id}`}
-                            className="ml-2 block text-sm text-gray-900 truncate"
+                            className="ml-2 block text-sm text-gray-900 truncate w-full min-w-0"
+                            title={game.title}
                           >
                             {game.title}
                           </label>
@@ -1120,7 +1124,7 @@ const CasinoRecommendationManagement = () => {
                       selectedGames.map((gameTitle, index) => (
                         <div
                           key={index}
-                          className="flex justify-between items-center py-1 px-2 bg-gray-50 mb-1 rounded overflow-hidden"
+                          className="flex justify-between items-center py-1 px-2 bg-gray-50 mb-1 rounded overflow-hidden w-full max-w-[280px]"
                           draggable
                           onDragStart={() => handleDragStart(index)}
                           onDragOver={handleDragOver}
@@ -1128,7 +1132,7 @@ const CasinoRecommendationManagement = () => {
                           style={{ cursor: "grab" }}
                         >
                           <span
-                            className="text-sm truncate flex-1 mr-2 min-w-0 overflow-hidden whitespace-nowrap"
+                            className="text-sm truncate w-full min-w-0 mr-2 overflow-hidden whitespace-nowrap"
                             title={gameTitle}
                           >
                             {gameTitle}

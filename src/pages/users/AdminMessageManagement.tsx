@@ -880,20 +880,16 @@ const AdminMessageManagement = () => {
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <DataTable
-          data={filteredMessages}
           columns={columns}
+          data={messages}
           loading={loading}
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 메시지가 없습니다."}
           pagination={{
             currentPage,
-            totalItems: totalItems,
             pageSize,
+            totalItems,
             onPageChange: handlePageChange,
           }}
-          emptyMessage={
-            selectedCategory
-              ? `${selectedCategory} 구분의 쪽지가 없습니다.`
-              : "발송된 쪽지가 없습니다."
-          }
         />
       </div>
 

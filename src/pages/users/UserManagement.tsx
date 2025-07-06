@@ -110,7 +110,7 @@ const UserManagement = () => {
 
   useEffect(() => {
     fetchUsers(currentPage, pageSize, searchValue);
-  }, [fetchUsers, currentPage, pageSize]);
+  }, [fetchUsers, currentPage, pageSize, searchValue]);
 
   // handlePageChange 구현
   const handlePageChange = (page: number) => {
@@ -221,6 +221,15 @@ const UserManagement = () => {
   const handleDeleteUser = async (userId: number) => {
     const user = users.find((u) => u.id === userId);
     const nickname = user?.nickname || "알 수 없음";
+
+    // 삭제된 회원인지 확인
+    if (user?.isDeleted) {
+      setAlertMessage({
+        type: "error",
+        message: "이미 삭제 처리된 회원입니다.",
+      });
+      return;
+    }
 
     if (
       !window.confirm(`[${nickname}] 회원 삭제하시겠습니까?\n\n삭제된 회원은 복구 불가능합니다.`)
@@ -366,7 +375,7 @@ const UserManagement = () => {
                 label="삭제"
                 action="delete"
                 onClick={() => handleDeleteUser(row.id)}
-                disabled={loading || saving}
+                disabled={loading || saving || row.isDeleted}
               />
             </div>
           ),
@@ -415,7 +424,7 @@ const UserManagement = () => {
           columns={columns}
           data={users}
           loading={loading}
-          emptyMessage="등록된 회원이 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 회원이 없습니다."}
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,

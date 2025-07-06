@@ -49,6 +49,9 @@ const CasinoCompanyPage: React.FC = () => {
   const [reviewsLoading, setReviewsLoading] = useState<boolean>(false);
   const [reviewsError, setReviewsError] = useState<string | null>(null);
 
+  // 댓글 개수 상태 추가
+  const [reviewCounts, setReviewCounts] = useState<Record<number, number>>({});
+
   // 댓글 수정 모달 상태 추가
   const [showEditReviewModal, setShowEditReviewModal] = useState<boolean>(false);
   const [selectedReview, setSelectedReview] = useState<CompanyReview | null>(null);
@@ -121,6 +124,13 @@ const CasinoCompanyPage: React.FC = () => {
           setSelectedCompanyIds(
             currentSelected.filter((id) => sortedCompanies.some((comp) => comp.id === id))
           );
+
+          // 서버에서 제공하는 댓글 개수 사용
+          const countsMap: Record<number, number> = {};
+          sortedCompanies.forEach((company) => {
+            countsMap[company.id] = (company as any).reviewCount || 0;
+          });
+          setReviewCounts(countsMap);
         } else {
           setCompanies([]);
           setOriginalCompanies([]);
@@ -431,6 +441,12 @@ const CasinoCompanyPage: React.FC = () => {
       console.error("댓글 조회 오류:", error);
       setReviewsError("댓글 목록을 불러오는데 실패했습니다.");
       setCompanyReviews([]);
+
+      // 오류 시 댓글 개수 0으로 설정
+      setReviewCounts((prev) => ({
+        ...prev,
+        [company.id]: 0,
+      }));
     } finally {
       setReviewsLoading(false);
     }
@@ -451,6 +467,7 @@ const CasinoCompanyPage: React.FC = () => {
     try {
       await CasinoCompanyApiService.deleteCompanyReview(reviewId);
       setCompanyReviews((prev) => prev.filter((review) => review.id !== reviewId));
+
       setAlertMessage({ type: "success", message: "댓글이 삭제되었습니다." });
     } catch (error) {
       console.error("댓글 삭제 오류:", error);
@@ -664,7 +681,7 @@ const CasinoCompanyPage: React.FC = () => {
         <div className="flex space-x-2">
           <button
             onClick={() => handleOpenCommentModal(row)}
-            className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md focus:outline-none transition-colors w-16"
+            className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md focus:outline-none transition-colors w-20"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -674,7 +691,7 @@ const CasinoCompanyPage: React.FC = () => {
                 d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
               />
             </svg>
-            댓글
+            댓글 ({reviewCounts[row.id] || 0})
           </button>
           <ActionButton
             label="수정"
@@ -752,7 +769,9 @@ const CasinoCompanyPage: React.FC = () => {
             columns={columns}
             data={companies}
             loading={loading} // Pass loading state to DataTable as well if needed internally
-            emptyMessage="등록된 카지노 업체가 없습니다."
+            emptyMessage={
+              searchValue ? "검색된 결과가 없습니다." : "등록된 카지노 업체가 없습니다."
+            }
             pagination={{
               currentPage,
               pageSize: PAGE_SIZE,
@@ -951,8 +970,10 @@ const CasinoCompanyPage: React.FC = () => {
                         <div className="text-xs text-gray-500">{formatDate(review.createdAt)}</div>
                       </div>
                       <div className="flex justify-between items-start">
-                        <p className="text-gray-700 text-sm flex-1">{review.content}</p>
-                        <div className="flex flex-col space-y-1 ml-4">
+                        <p className="text-gray-700 text-sm flex-1 break-words overflow-hidden">
+                          {review.content}
+                        </p>
+                        <div className="flex flex-col space-y-1 ml-4 flex-shrink-0">
                           <ActionButton
                             label="수정"
                             action="edit"
@@ -1033,9 +1054,10 @@ const CasinoCompanyPage: React.FC = () => {
                 onChange={(e) =>
                   setEditReviewData((prev) => ({ ...prev, content: e.target.value }))
                 }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 resize-none"
                 rows={4}
                 placeholder="댓글 내용을 입력하세요"
+                style={{ wordWrap: "break-word", overflowWrap: "break-word" }}
               />
             </div>
 

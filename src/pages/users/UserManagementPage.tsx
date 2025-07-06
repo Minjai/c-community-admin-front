@@ -22,6 +22,7 @@ const UserManagementPage: React.FC = () => {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const [searchValue, setSearchValue] = useState<string>("");
 
   // 회원 상세 정보 모달 열기
   const handleViewUser = (user: any) => {
@@ -137,7 +138,7 @@ const UserManagementPage: React.FC = () => {
         columns={columns}
         data={users}
         loading={loading}
-        emptyMessage="등록된 회원이 없습니다."
+        emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 회원이 없습니다."}
         pagination={{
           currentPage,
           pageSize,

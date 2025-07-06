@@ -258,7 +258,7 @@ export default function SportRecommendationsManagement() {
   useEffect(() => {
     fetchRecommendations();
     fetchSportGames();
-  }, [fetchRecommendations, fetchSportGames]);
+  }, [fetchRecommendations, fetchSportGames, page]);
 
   // Debounce search query 업데이트 로직 추가
   useEffect(() => {
@@ -1047,7 +1047,7 @@ export default function SportRecommendationsManagement() {
           columns={columns}
           data={recommendations}
           loading={loading}
-          emptyMessage="등록된 추천이 없습니다."
+          emptyMessage={searchQuery ? "검색된 결과가 없습니다." : "등록된 추천이 없습니다."}
           pagination={{
             currentPage: page,
             pageSize: limit,

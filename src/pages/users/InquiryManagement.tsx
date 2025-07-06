@@ -783,7 +783,9 @@ const InquiryManagement = () => {
           onPageChange: handlePageChange,
         }}
         emptyMessage={
-          selectedCategory
+          searchValue
+            ? "검색된 결과가 없습니다."
+            : selectedCategory
             ? `${selectedCategory} 구분의 문의가 없습니다.`
             : "등록된 1:1 문의가 없습니다."
         }

@@ -270,7 +270,7 @@ const HomeManagementPage: React.FC = () => {
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      fetchSections(page, pageSize);
+      fetchSections(page, pageSize, searchValue);
     }
   };
 
@@ -320,6 +320,11 @@ const HomeManagementPage: React.FC = () => {
     try {
       if (!currentSection.title) {
         setModalError("제목은 필수 항목입니다.");
+        return;
+      }
+
+      if (selectedItems.length === 0) {
+        setModalError("홈 화면 항목을 확인해주세요.");
         return;
       }
 
@@ -794,7 +799,7 @@ const HomeManagementPage: React.FC = () => {
           columns={columns}
           data={sections}
           loading={loading}
-          emptyMessage="등록된 섹션이 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 섹션이 없습니다."}
           pagination={{
             currentPage,
             pageSize,

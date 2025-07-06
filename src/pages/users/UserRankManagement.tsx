@@ -132,7 +132,7 @@ const UserRankManagement: React.FC = () => {
 
   useEffect(() => {
     fetchRanks(currentPage, pageSize, searchValue);
-  }, [fetchRanks, currentPage, pageSize]);
+  }, [fetchRanks, currentPage, pageSize, searchValue]);
 
   // 페이지 변경 핸들러 추가
   const handlePageChange = (page: number) => {
@@ -526,7 +526,7 @@ const UserRankManagement: React.FC = () => {
           columns={columns}
           data={ranks}
           loading={loading}
-          emptyMessage="등록된 회원 등급이 없습니다."
+          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 등급이 없습니다."}
           pagination={{
             currentPage: currentPage,
             pageSize: pageSize,
