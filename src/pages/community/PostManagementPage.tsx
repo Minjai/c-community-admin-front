@@ -276,6 +276,7 @@ const PostManagementPage: React.FC = () => {
             totalItems: totalPosts,
             onPageChange: handlePageChange,
           }}
+          rowClassName={(row) => (row.isPopular === 1 ? "bg-blue-50 hover:bg-blue-100" : "")}
         />
       </div>
 

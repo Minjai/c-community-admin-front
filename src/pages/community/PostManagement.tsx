@@ -212,9 +212,11 @@ const PostManagement = () => {
     {
       header: "인기 여부",
       accessor: "isPopular" as keyof Post,
-      cell: (value: unknown) => (
-        <span className={`font-medium ${value === 1 ? "text-red-600" : "text-gray-900"}`}>
-          {value === 1 ? "Y" : "N"}
+      cell: (value: unknown, row: Post) => (
+        <span
+          className={`font-medium ${(value as number) === 1 ? "text-red-600" : "text-gray-900"}`}
+        >
+          {(value as number) === 1 ? "Y" : "N"}
         </span>
       ),
       className: "text-center",
@@ -301,6 +303,7 @@ const PostManagement = () => {
           }}
           selectedIds={selectedPosts}
           onSelectIds={setSelectedPosts}
+          rowClassName={(row) => (row.isPopular === 1 ? "bg-blue-50 hover:bg-blue-100" : "")}
         />
       </div>
     </div>

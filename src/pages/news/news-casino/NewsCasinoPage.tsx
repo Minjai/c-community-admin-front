@@ -528,9 +528,11 @@ const NewsCasinoPage = () => {
     {
       header: "인기 여부", // 누락된 컬럼 복원
       accessor: "isSelected" as keyof NewsItem,
-      cell: (value: number) => (
-        <span className={`font-medium ${value === 1 ? "text-red-600" : "text-gray-900"}`}>
-          {value === 1 ? "Y" : "N"}
+      cell: (value: unknown, row: NewsItem) => (
+        <span
+          className={`font-medium ${(value as number) === 1 ? "text-red-600" : "text-gray-900"}`}
+        >
+          {(value as number) === 1 ? "Y" : "N"}
         </span>
       ),
       size: 80,
@@ -620,6 +622,7 @@ const NewsCasinoPage = () => {
             totalItems: totalItems,
             onPageChange: handlePageChange,
           }}
+          rowClassName={(row) => (row.isSelected === 1 ? "bg-blue-50 hover:bg-blue-100" : "")}
         />
       </div>
 
