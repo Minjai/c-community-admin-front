@@ -6,6 +6,11 @@ import {
   deleteSportRecommendation,
   getSportGames,
   getSportRecommendationById,
+  createSportManualGame,
+  updateSportManualGame,
+  getSportManualGameById,
+  createSportManualRecommendation,
+  updateSportManualRecommendation,
 } from "@/api";
 import { SportGame, SportRecommendation } from "@/types";
 import DataTable from "@/components/DataTable";
@@ -22,6 +27,30 @@ import {
 } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import { DragManager } from "./components/drag/DragManager";
+import DatePicker from "@/components/forms/DatePicker";
+import Input from "@/components/forms/Input";
+import FileUpload, { FileUploadRef } from "@/components/forms/FileUpload";
+import { RefObject } from "react";
+
+// 스포츠 게임 상세 정보 타입
+interface SportGameDetail {
+  id?: number;
+  home: string;
+  away: string;
+  league: string;
+  time: string;
+  icon?: string;
+}
+
+// 수동 등록 폼 데이터 타입
+interface ManualRegistrationForm {
+  title: string;
+  startTime: string;
+  endTime: string;
+  games: SportGameDetail[];
+  isPublic: number;
+  displayOrder?: number;
+}
 
 // 스포츠 종목 추천 관리 컴포넌트
 export default function SportRecommendationsManagement() {
@@ -47,6 +76,9 @@ export default function SportRecommendationsManagement() {
   const [currentRecommendation, setCurrentRecommendation] = useState<SportRecommendation | null>(
     null
   );
+
+  // FileUpload ref 추가
+  const fileUploadRef = useRef<FileUploadRef>(null);
 
   // 동적으로 생성될 스포츠 매핑
   const [sportMapping, setSportMapping] = useState<Record<string, string[]>>({
@@ -318,6 +350,24 @@ export default function SportRecommendationsManagement() {
 
   // 추천 수정 모달 열기
   const handleEditRecommendation = async (recommendation: SportRecommendation) => {
+    // 수동 등록된 추천인지 확인 (여러 조건으로 체크)
+    const isManualRecommendation =
+      ((recommendation as any).manualGames && (recommendation as any).manualGames.length > 0) ||
+      (recommendation as any).category === "manual" ||
+      (recommendation as any).source === "manual" ||
+      (recommendation.games &&
+        Array.isArray(recommendation.games) &&
+        recommendation.games.length > 0 &&
+        recommendation.games.some(
+          (game: any) => game.source === "manual" || game.home || game.away
+        ));
+
+    if (isManualRecommendation) {
+      // 수동 등록된 추천은 별도 모달로 처리
+      handleOpenManualEditModal(recommendation);
+      return;
+    }
+
     // 가드 조건 추가
     if (!sportGames || sportGames.length === 0) {
       console.log("사용 가능한 게임이 로드되지 않았습니다");
@@ -642,17 +692,17 @@ export default function SportRecommendationsManagement() {
     }
   }, [selectedGames]);
 
-  // 드래그 이벤트 핸들러
-  const handleDragStart = (index: number) => {
+  // 드래그 이벤트 핸들러 (자동 추천용)
+  const handleAutoDragStart = (index: number) => {
     if (!dragManagerRef.current) return;
     dragManagerRef.current.startDrag(index);
   };
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleAutoDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
   };
 
-  const handleDrop = (index: number) => {
+  const handleAutoDrop = (index: number) => {
     if (!dragManagerRef.current) return;
     dragManagerRef.current.drop(index);
   };
@@ -738,9 +788,9 @@ export default function SportRecommendationsManagement() {
                     key={game.id}
                     className="flex justify-between items-center border-b pb-2 last:border-b-0"
                     draggable
-                    onDragStart={() => handleDragStart(index)}
-                    onDragOver={handleDragOver}
-                    onDrop={() => handleDrop(index)}
+                    onDragStart={() => handleAutoDragStart(index)}
+                    onDragOver={handleAutoDragOver}
+                    onDrop={() => handleAutoDrop(index)}
                     style={{ cursor: "grab" }}
                   >
                     <div>
@@ -864,6 +914,180 @@ export default function SportRecommendationsManagement() {
     );
   };
 
+  // === 수동 추천 수정 상태/함수/모달 ===
+  const [showManualEditModal, setShowManualEditModal] = useState(false);
+  const [editManualForm, setEditManualForm] = useState<ManualRegistrationForm & { id?: number }>({
+    title: "",
+    startTime: "",
+    endTime: "",
+    games: [],
+    isPublic: 1,
+  });
+  const [editCurrentGameDetail, setEditCurrentGameDetail] = useState<SportGameDetail>({
+    home: "",
+    away: "",
+    league: "",
+    time: "",
+    icon: "",
+  });
+  const [editDraggedIndex, setEditDraggedIndex] = useState<number | null>(null);
+  const editFileUploadRef: RefObject<FileUploadRef> = useRef<FileUploadRef>(null);
+  const [editGameDetailError, setEditGameDetailError] = useState<string | null>(null);
+
+  const handleOpenManualEditModal = (recommendation: SportRecommendation) => {
+    // 시작시간/종료시간이 없으면 현재 시간으로 설정
+    const now = new Date();
+    const nextWeek = new Date(now);
+    nextWeek.setDate(now.getDate() + 7);
+
+    const formatDateForInput = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}T00:00`;
+    };
+
+    // 수동 등록된 추천인지 확인
+    const isManualRecommendation =
+      (recommendation as any).manualGames && (recommendation as any).manualGames.length > 0;
+
+    let games: SportGameDetail[] = [];
+    let startTime = recommendation.startTime || formatDateForInput(now);
+    let endTime = recommendation.endTime || formatDateForInput(nextWeek);
+
+    if (isManualRecommendation) {
+      // 수동 등록된 추천: manualGames에서 데이터 가져오기 (displayOrder 순서대로 정렬)
+      games = (recommendation as any).manualGames
+        .sort((a: any, b: any) => (a.displayOrder || 0) - (b.displayOrder || 0))
+        .map((game: any, i: number) => ({
+          id: game.id,
+          home: game.home,
+          away: game.away,
+          league: game.league,
+          time: game.time,
+          icon: game.iconUrl || "",
+        }));
+
+      // 첫 번째 게임의 시작/종료 시간 사용
+      if (games.length > 0) {
+        startTime = (recommendation as any).manualGames[0].startTime || startTime;
+        endTime = (recommendation as any).manualGames[0].endTime || endTime;
+      }
+    } else {
+      // 자동 등록된 추천: games 배열에서 수동 게임만 필터링
+      games = ((recommendation.games as any[]) || [])
+        .filter((game: any) => game.source === "manual")
+        .map((game: any, i: number) => ({
+          id: game.id,
+          home: game.homeTeam,
+          away: game.awayTeam,
+          league: game.league,
+          time: game.dateTime,
+          icon: game.iconUrl || "",
+        }));
+    }
+
+    setEditManualForm({
+      id: recommendation.id,
+      title: recommendation.title || "",
+      startTime: formatISODateToDateTimeLocal(startTime),
+      endTime: formatISODateToDateTimeLocal(endTime),
+      games: games,
+      isPublic: recommendation.isPublic,
+      displayOrder: (recommendation as any).displayOrder || 0,
+    });
+    setEditCurrentGameDetail({ home: "", away: "", league: "", time: "", icon: "" });
+    setEditGameDetailError(null);
+    setShowManualEditModal(true);
+  };
+  const handleCloseManualEditModal = () => {
+    setShowManualEditModal(false);
+    setEditGameDetailError(null);
+  };
+  const handleEditGameDetailChange = (field: keyof SportGameDetail, value: string) => {
+    setEditCurrentGameDetail((prev) => ({ ...prev, [field]: value }));
+  };
+  const handleEditAddGameDetail = () => {
+    if (
+      !editCurrentGameDetail.home ||
+      !editCurrentGameDetail.away ||
+      !editCurrentGameDetail.league ||
+      !editCurrentGameDetail.time
+    ) {
+      setEditGameDetailError("모든 필드를 입력해주세요.");
+      return;
+    }
+    setEditManualForm((prev) => ({
+      ...prev,
+      games: [...prev.games, { ...editCurrentGameDetail, id: Date.now() }],
+    }));
+    setEditCurrentGameDetail({ home: "", away: "", league: "", time: "", icon: "" });
+    if (editFileUploadRef.current) editFileUploadRef.current.reset();
+    setEditGameDetailError(null);
+  };
+  const handleEditRemoveGameDetail = (id: number) => {
+    setEditManualForm((prev) => ({
+      ...prev,
+      games: prev.games.filter((game: SportGameDetail) => game.id !== id),
+    }));
+  };
+  const handleEditDragStart = (index: number, e: React.DragEvent<HTMLDivElement>) => {
+    setEditDraggedIndex(index);
+  };
+  const handleEditDrop = (index: number, e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (editDraggedIndex === null || editDraggedIndex === index) return;
+    const items = Array.from(editManualForm.games);
+    const [reorderedItem] = items.splice(editDraggedIndex, 1);
+    items.splice(index, 0, reorderedItem);
+    setEditManualForm((prev) => ({ ...prev, games: items }));
+    setEditDraggedIndex(null);
+  };
+  const handleSaveManualEdit = async (id: number) => {
+    if (!editManualForm.title) {
+      setEditGameDetailError("추천명을 입력해주세요.");
+      return;
+    }
+    if (!editManualForm.startTime) {
+      setEditGameDetailError("시작 시간을 입력해주세요.");
+      return;
+    }
+    if (!editManualForm.endTime) {
+      setEditGameDetailError("종료 시간을 입력해주세요.");
+      return;
+    }
+    if (editManualForm.games.length === 0) {
+      setEditGameDetailError("최소 한 개의 스포츠 경기를 등록해주세요.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const recommendationData = {
+        title: editManualForm.title,
+        startTime: editManualForm.startTime,
+        endTime: editManualForm.endTime,
+        isPublic: editManualForm.isPublic,
+        games: editManualForm.games.map((game: SportGameDetail, index: number) => ({
+          home: game.home,
+          away: game.away,
+          league: game.league,
+          time: game.time,
+          icon: game.icon || "",
+          displayOrder: index,
+        })),
+      };
+      await updateSportManualRecommendation(id, recommendationData);
+      handleCloseManualEditModal();
+      fetchRecommendations();
+      setSuccess("수동 추천이 수정되었습니다.");
+    } catch (error: any) {
+      setError(error.response?.data?.message || "수정 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // 데이터 테이블 컬럼 정의
   const columns = [
     // 체크박스 컬럼 추가
@@ -888,12 +1112,12 @@ export default function SportRecommendationsManagement() {
         />
       ),
       accessor: "id" as keyof SportRecommendation,
-      cell: (id: number) => (
+      cell: (value: unknown, row: SportRecommendation, index: number) => (
         <input
           type="checkbox"
           className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedRecommendationIds.includes(id)}
-          onChange={() => handleSelectRecommendation(id)}
+          checked={selectedRecommendationIds.includes(row.id)}
+          onChange={() => handleSelectRecommendation(row.id)}
           disabled={loading}
         />
       ),
@@ -902,84 +1126,97 @@ export default function SportRecommendationsManagement() {
     {
       header: "추천명",
       accessor: "title" as keyof SportRecommendation,
-      cell: (value: string, row: SportRecommendation) => (
+      cell: (value: unknown, row: SportRecommendation, index: number) => (
         <span
           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
           onClick={() => handleEditRecommendation(row)}
         >
-          {value}
+          {value as string}
         </span>
       ),
     },
     {
       header: "게임 수",
       accessor: "sportGameIds" as keyof SportRecommendation,
-      cell: (gameIds: number[] | undefined, row: SportRecommendation) => {
+      cell: (value: unknown, row: SportRecommendation, index: number) => {
+        // 수동 등록: manualGames가 있는 경우
+        if ((row as any).manualGames && (row as any).manualGames.length > 0) {
+          return <span>{(row as any).manualGames.length}개 (수동)</span>;
+        }
         // 1. sportGames 배열 확인 (API 응답에서 가장 정확한 데이터)
-        if ((row as any).sportGames && (row as any).sportGames.length > 0) {
-          return `${(row as any).sportGames.length}개`;
+        else if ((row as any).sportGames && (row as any).sportGames.length > 0) {
+          return <span>{(row as any).sportGames.length}개</span>;
         }
         // 2. games 배열 확인
         else if (row.games && row.games.length > 0) {
-          return `${row.games.length}개`;
+          return <span>{row.games.length}개</span>;
         }
         // 3. sportGameIds 배열 확인 (이전 코드 호환성)
-        else if (gameIds && gameIds.length > 0) {
-          return `${gameIds.length}개`;
+        else if (Array.isArray(value) && value.length > 0) {
+          return <span>{value.length}개</span>;
         }
         // 4. sportGameId 단일 값 확인 (이전 코드 호환성)
-        else if (row.sportGameId) {
-          return "1개";
+        else if ((row as any).sportGameId) {
+          return <span>1개</span>;
         }
         // 데이터가 없는 경우
-        return "0개";
+        return <span>0개</span>;
       },
     },
+
     {
       header: "시작 시간",
       accessor: "startTime" as keyof SportRecommendation,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: unknown, row: SportRecommendation, index: number) => {
+        // 수동 등록: manualGames에서 시간 가져오기
+        if ((row as any).manualGames && (row as any).manualGames.length > 0) {
+          const manualGame = (row as any).manualGames[0];
+          return <span>{formatDateForDisplay(manualGame.startTime)}</span>;
+        }
+        // 자동 등록: 추천 레벨의 startTime 사용
+        return <span>{formatDateForDisplay(value as string)}</span>;
+      },
     },
     {
       header: "종료 시간",
       accessor: "endTime" as keyof SportRecommendation,
-      cell: (value: string) => formatDateForDisplay(value),
+      cell: (value: unknown, row: SportRecommendation, index: number) => {
+        // 수동 등록: manualGames에서 시간 가져오기
+        if ((row as any).manualGames && (row as any).manualGames.length > 0) {
+          const manualGame = (row as any).manualGames[0];
+          return <span>{formatDateForDisplay(manualGame.endTime)}</span>;
+        }
+        // 자동 등록: 추천 레벨의 endTime 사용
+        return <span>{formatDateForDisplay(value as string)}</span>;
+      },
     },
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof SportRecommendation,
-      cell: (value: number, row: SportRecommendation) => {
+      cell: (value: unknown, row: SportRecommendation, index: number) => {
         const now = new Date();
         const startTime = row.startTime ? new Date(row.startTime) : null;
         const endTime = row.endTime ? new Date(row.endTime) : null;
-
-        // 비공개 상태
         if (value !== 1) {
           return <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">비공개</span>;
         }
-
-        // 공개 상태이지만 시작 시간이 미래인 경우 (공개 전)
         if (startTime && startTime > now) {
           return (
             <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">공개 전</span>
           );
         }
-
-        // 공개 상태이지만 종료 시간이 과거인 경우 (공개 종료)
         if (endTime && endTime < now) {
           return (
             <span className="px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">공개 종료</span>
           );
         }
-
-        // 현재 공개 중인 상태
         return <span className="px-2 py-1 rounded text-xs bg-green-100 text-green-800">공개</span>;
       },
     },
     {
       header: "관리",
       accessor: "id" as keyof SportRecommendation,
-      cell: (id: number, row: SportRecommendation) => (
+      cell: (value: unknown, row: SportRecommendation, index: number) => (
         <div className="flex space-x-2">
           <ActionButton
             label="수정"
@@ -992,7 +1229,7 @@ export default function SportRecommendationsManagement() {
             label="삭제"
             action="delete"
             color="red"
-            onClick={() => handleDeleteRecommendation(id)}
+            onClick={() => handleDeleteRecommendation(row.id)}
             disabled={loading}
           />
         </div>
@@ -1017,15 +1254,22 @@ export default function SportRecommendationsManagement() {
           onSearch={(value) => handleSearch("title", value)}
         />
         <div className="flex space-x-2">
+          <Button variant="primary" onClick={handleAddRecommendation} disabled={loading}>
+            추천 추가
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setShowManualEditModal(true)}
+            disabled={loading}
+          >
+            수동 등록
+          </Button>
           <Button
             variant="danger"
             onClick={handleBulkDelete}
             disabled={selectedRecommendationIds.length === 0 || loading}
           >
             {`선택 삭제 (${selectedRecommendationIds.length})`}
-          </Button>
-          <Button variant="primary" onClick={handleAddRecommendation} disabled={loading}>
-            추천 추가
           </Button>
         </div>
       </div>
@@ -1057,14 +1301,282 @@ export default function SportRecommendationsManagement() {
         />
       </div>
 
-      {/* Modal for Add/Edit */}
+      {/* 기존 추천 추가/수정 모달 */}
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={modalType === "add" ? "새 추천 추가" : "추천 수정"}
-        size="xl" // Use supported size 'xl'
+        size="xl"
       >
         {renderGameSelectionModal()}
+      </Modal>
+
+      {/* 수동 등록 모달 */}
+      <Modal
+        isOpen={showManualEditModal}
+        onClose={handleCloseManualEditModal}
+        title={editManualForm.id ? "스포츠 종목 추천 수동 등록 수정" : "스포츠 종목 추천 수동 등록"}
+        size="xl"
+      >
+        <div className="max-h-[80vh] overflow-y-auto space-y-6">
+          {/* 1. 최상단 라인: 버튼(좌) + 공개여부 체크박스(우) */}
+          <div className="flex justify-between items-center border-b pb-4">
+            {/* 왼쪽: 저장/취소 버튼 */}
+            <div className="flex space-x-2">
+              <Button
+                onClick={() => handleSaveManualEdit(editManualForm.id || 0)}
+                disabled={loading}
+              >
+                {loading ? "저장 중..." : "저장"}
+              </Button>
+              <Button variant="secondary" onClick={handleCloseManualEditModal} disabled={loading}>
+                취소
+              </Button>
+            </div>
+            {/* 오른쪽: 공개 여부 체크박스 */}
+            <div className="flex items-center">
+              <input
+                id="isPublicCheckbox"
+                type="checkbox"
+                checked={Boolean(editManualForm.isPublic === 1)}
+                onChange={(e) =>
+                  setEditManualForm((prev) => ({ ...prev, isPublic: e.target.checked ? 1 : 0 }))
+                }
+                className="form-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                disabled={loading}
+              />
+              <label
+                htmlFor="isPublicCheckbox"
+                className="ml-2 block text-sm font-medium text-gray-700"
+              >
+                공개 여부
+              </label>
+            </div>
+          </div>
+
+          {/* 2. 추천명 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">추천명</label>
+            <Input
+              type="text"
+              value={editManualForm.title}
+              onChange={(e) => setEditManualForm((prev) => ({ ...prev, title: e.target.value }))}
+              placeholder="추천명을 입력하세요"
+              disabled={loading}
+            />
+          </div>
+
+          {/* 3. 시작/종료 시간 (가로 배치) */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">시작 시간</label>
+              <input
+                type="datetime-local"
+                value={editManualForm.startTime}
+                onChange={(e) =>
+                  setEditManualForm((prev) => ({ ...prev, startTime: e.target.value }))
+                }
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                disabled={loading}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">종료 시간</label>
+              <input
+                type="datetime-local"
+                value={editManualForm.endTime}
+                onChange={(e) =>
+                  setEditManualForm((prev) => ({ ...prev, endTime: e.target.value }))
+                }
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                disabled={loading}
+              />
+            </div>
+          </div>
+
+          {/* 4. 선택된 스포츠 게임 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              선택된 스포츠 게임
+            </label>
+            <div className="border rounded-lg p-4 min-h-[100px] bg-gray-50">
+              <div className="space-y-2">
+                {editManualForm.games && editManualForm.games.length > 0 ? (
+                  editManualForm.games.map((game: SportGameDetail, index: number) => (
+                    <div
+                      key={game.id ?? index}
+                      className="flex items-center bg-white p-3 rounded border"
+                      draggable
+                      onDragStart={(e) => handleEditDragStart(index, e)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        handleEditDrop(index, e);
+                      }}
+                    >
+                      <div className="flex items-center space-x-3 flex-1">
+                        {/* 이미지 */}
+                        <div className="w-8 h-8 flex-shrink-0">
+                          {game.icon ? (
+                            <img
+                              src={game.icon}
+                              alt="icon"
+                              className="w-full h-full object-contain"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gray-200 rounded flex items-center justify-center">
+                              <svg
+                                className="w-4 h-4 text-gray-400"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 002 2z"
+                                />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 텍스트 정보 */}
+                        <div className="flex-1">
+                          <div className="font-medium">
+                            {game.home} vs {game.away}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {game.league} | {new Date(game.time).toLocaleDateString()}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleEditRemoveGameDetail(game.id!)}
+                        className="ml-4 text-red-600 hover:text-red-800"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center text-gray-500 py-4">
+                    등록된 스포츠 게임이 없습니다.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 5. 스포츠 게임 상세 */}
+          <div className="border-t pt-4">
+            <h3 className="text-lg font-medium mb-4">스포츠 게임 상세</h3>
+            <div className="space-y-4">
+              {/* Home */}
+              <div className="flex items-center">
+                <label className="block text-sm font-medium text-gray-700 w-24">Home</label>
+                <div className="flex-1">
+                  <Input
+                    type="text"
+                    value={editCurrentGameDetail.home}
+                    onChange={(e) => handleEditGameDetailChange("home", e.target.value)}
+                    placeholder="홈 팀"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Away */}
+              <div className="flex items-center">
+                <label className="block text-sm font-medium text-gray-700 w-24">Away</label>
+                <div className="flex-1">
+                  <Input
+                    type="text"
+                    value={editCurrentGameDetail.away}
+                    onChange={(e) => handleEditGameDetailChange("away", e.target.value)}
+                    placeholder="어웨이 팀"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* League */}
+              <div className="flex items-center">
+                <label className="block text-sm font-medium text-gray-700 w-24">League</label>
+                <div className="flex-1">
+                  <Input
+                    type="text"
+                    value={editCurrentGameDetail.league}
+                    onChange={(e) => handleEditGameDetailChange("league", e.target.value)}
+                    placeholder="리그"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Time */}
+              <div className="flex items-center">
+                <label className="block text-sm font-medium text-gray-700 w-24">Time</label>
+                <div className="flex-1">
+                  <input
+                    type="datetime-local"
+                    value={editCurrentGameDetail.time}
+                    onChange={(e) => handleEditGameDetailChange("time", e.target.value)}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Icon */}
+              <div className="flex items-center">
+                <label className="block text-sm font-medium text-gray-700 w-24">Icon</label>
+                <div className="flex-1">
+                  <FileUpload
+                    onFileSelect={(file) => {
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          handleEditGameDetailChange("icon", reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      } else {
+                        handleEditGameDetailChange("icon", "");
+                      }
+                    }}
+                    accept="image/*"
+                    disabled={loading}
+                    initialPreview={editCurrentGameDetail.icon}
+                    ref={editFileUploadRef}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-center">
+              <Button
+                onClick={handleEditAddGameDetail}
+                disabled={loading}
+                className="bg-green-600 hover:bg-green-700 text-white px-12 py-2.5 rounded-md w-2/3 text-lg font-medium"
+              >
+                스포츠 경기 등록
+              </Button>
+            </div>
+          </div>
+
+          {editGameDetailError && (
+            <Alert
+              type="error"
+              message={editGameDetailError}
+              onClose={() => setEditGameDetailError(null)}
+            />
+          )}
+        </div>
       </Modal>
     </div>
   );

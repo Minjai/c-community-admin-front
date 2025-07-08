@@ -482,3 +482,155 @@ export const getManualRegistrationDetail = async (id: number): Promise<any> => {
     throw error;
   }
 };
+
+// 수동 스포츠 게임 관련 API 함수들
+export const createSportManualGame = async (formData: FormData): Promise<any> => {
+  try {
+    const response = await axios.post("/sport-manual-games/admin", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    if (response.data && response.data.success) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error creating sport manual game:", error);
+    throw error;
+  }
+};
+
+export const updateSportManualGame = async (id: number, formData: FormData): Promise<any> => {
+  try {
+    const response = await axios.put(`/sport-manual-games/admin/${id}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    if (response.data && response.data.success) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Error updating sport manual game with id ${id}:`, error);
+    throw error;
+  }
+};
+
+export const getSportManualGameById = async (id: number): Promise<any> => {
+  try {
+    const response = await axios.get(`/sport-manual-games/admin/${id}`);
+
+    if (response.data && response.data.success) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`Error fetching sport manual game with id ${id}:`, error);
+    throw error;
+  }
+};
+
+// 수동 추천을 한번에 저장하는 API (기존 라우터 사용)
+export const createSportManualRecommendation = async (data: {
+  title: string;
+  startTime: string;
+  endTime: string;
+  isPublic: number;
+  games: Array<{
+    home: string;
+    away: string;
+    league: string;
+    time: string;
+    icon?: string;
+  }>;
+}): Promise<any> => {
+  try {
+    // 서버 응답 구조에 맞춰서 한번에 전송
+    const formData = new FormData();
+    formData.append("title", data.title);
+    formData.append("isPublic", data.isPublic.toString());
+    formData.append("startTime", data.startTime);
+    formData.append("endTime", data.endTime);
+    formData.append("games", JSON.stringify(data.games));
+
+    // 아이콘 파일들 처리
+    data.games.forEach((game, index) => {
+      if (game.icon && game.icon.startsWith("data:image/")) {
+        formData.append(`icon_${index}`, game.icon);
+      }
+    });
+
+    const response = await axios.post("/sport-manual-games/admin", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    if (response.data && response.data.success) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error creating sport manual recommendation:", error);
+    throw error;
+  }
+};
+
+// 수동 추천 수정 API
+export const updateSportManualRecommendation = async (
+  id: number,
+  data: {
+    title: string;
+    startTime: string;
+    endTime: string;
+    isPublic: number;
+    games: Array<{
+      home: string;
+      away: string;
+      league: string;
+      time: string;
+      icon?: string;
+      displayOrder?: number;
+    }>;
+  }
+): Promise<any> => {
+  try {
+    // 서버 응답 구조에 맞춰서 한번에 전송
+    const formData = new FormData();
+    formData.append("title", data.title);
+    formData.append("isPublic", data.isPublic.toString());
+    formData.append("startTime", data.startTime);
+    formData.append("endTime", data.endTime);
+    formData.append("games", JSON.stringify(data.games));
+
+    // 아이콘 파일들 처리
+    data.games.forEach((game, index) => {
+      if (game.icon && game.icon.startsWith("data:image/")) {
+        formData.append(`icon_${index}`, game.icon);
+      }
+    });
+
+    const response = await axios.put(`/sport-manual-games/admin/${id}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+
+    if (response.data && response.data.success) {
+      return response.data.data;
+    }
+
+    return null;
+  } catch (error) {
+    console.error("Error updating sport manual recommendation:", error);
+    throw error;
+  }
+};
