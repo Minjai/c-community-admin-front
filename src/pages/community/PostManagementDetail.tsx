@@ -9,6 +9,7 @@ import Button from "@/components/Button";
 import { formatDate } from "@/utils/dateUtils";
 import FileUpload from "@/components/forms/FileUpload";
 import { useScrollToTop } from "@/hooks/useScrollToTop";
+import { CloudArrowUpIcon } from "@heroicons/react/24/outline";
 
 // replaceAsync 유틸리티 함수 추가
 const replaceAsync = async (
@@ -139,6 +140,85 @@ interface TempUser {
   title: string;
   content: string;
 }
+
+// 템프유저 프로필 이미지용 커스텀 컴포넌트
+const TempUserImageUpload = ({
+  onChange,
+  value,
+  disabled = false,
+  className = "",
+}: {
+  onChange: (file: File | null) => void;
+  value?: string;
+  disabled?: boolean;
+  className?: string;
+}) => {
+  const [previewUrl, setPreviewUrl] = useState<string | null>(value || null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setPreviewUrl(value || null);
+  }, [value]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0] || null;
+
+    if (selectedFile) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(selectedFile);
+    }
+
+    onChange(selectedFile);
+  };
+
+  const handleClick = () => {
+    if (!disabled) {
+      fileInputRef.current?.click();
+    }
+  };
+
+  return (
+    <div className={className}>
+      <input
+        type="file"
+        ref={fileInputRef}
+        className="sr-only"
+        onChange={handleFileChange}
+        accept="image/*"
+        disabled={disabled}
+      />
+
+      {previewUrl ? (
+        <div
+          className={`relative border border-gray-300 rounded-md overflow-hidden ${
+            className.includes("h-10") ? "w-16 h-16" : "w-48 h-48"
+          }`}
+        >
+          <img
+            src={previewUrl}
+            alt="프로필 이미지"
+            className="w-full h-full object-cover cursor-pointer"
+            onClick={handleClick}
+          />
+        </div>
+      ) : (
+        <div
+          className={`flex justify-center items-center border-2 border-dashed rounded-md transition-colors cursor-pointer
+          ${disabled ? "border-gray-200 bg-gray-50" : "border-gray-300 hover:border-gray-400"}
+          ${className.includes("h-10") ? "w-16 h-16" : "w-48 h-48"}`}
+          onClick={handleClick}
+        >
+          <CloudArrowUpIcon
+            className={`${className.includes("h-10") ? "h-6 w-6" : "h-8 w-8"} text-gray-400`}
+          />
+        </div>
+      )}
+    </div>
+  );
+};
 
 const PostDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -555,6 +635,12 @@ const PostDetail = () => {
       return;
     }
 
+    // 템프 유저 작성란에서 닉네임 입력 검증
+    if (!commentCreateTempUser.nickname.trim()) {
+      alert("닉네임을 확인해주세요.");
+      return;
+    }
+
     try {
       const formData = new FormData();
       formData.append("content", commentContent.trim());
@@ -634,6 +720,12 @@ const PostDetail = () => {
   const handleUpdateComment = async (commentId: number) => {
     if (!editCommentContent.trim()) {
       alert("댓글 내용을 입력해주세요.");
+      return;
+    }
+
+    // 템프 유저 작성란에서 닉네임 입력 검증
+    if (!commentEditTempUser.nickname.trim()) {
+      alert("닉네임을 확인해주세요.");
       return;
     }
 
@@ -859,9 +951,8 @@ const PostDetail = () => {
           <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">프로필 이미지</label>
 
-            <FileUpload
+            <TempUserImageUpload
               onChange={handleProfileImageChange}
-              accept="image/*"
               value={tempUser.profileImageUrl}
               disabled={isEditMode && post?.author && !post?.tempUser}
             />
@@ -950,11 +1041,10 @@ const PostDetail = () => {
 
             {/* 프로필 이미지 */}
             <div className="w-20">
-              <FileUpload
+              <TempUserImageUpload
                 onChange={handleCommentCreateProfileImageChange}
-                accept="image/*"
+                disabled={saving}
                 className="w-full h-10"
-                showText={false}
               />
             </div>
 
@@ -1039,12 +1129,11 @@ const PostDetail = () => {
 
                             {/* 프로필 이미지 */}
                             <div className="w-20">
-                              <FileUpload
+                              <TempUserImageUpload
                                 onChange={handleCommentEditProfileImageChange}
-                                accept="image/*"
+                                value={comment.tempUser?.profileImageUrl}
+                                disabled={saving}
                                 className="w-full h-10"
-                                showText={false}
-                                value={comment.tempUser.profileImageUrl}
                               />
                             </div>
 
