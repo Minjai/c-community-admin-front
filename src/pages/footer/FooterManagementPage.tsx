@@ -112,7 +112,7 @@ function FooterManagementPage() {
   // useEffect 수정: currentPage, pageSize 변경 시 fetchFooters 호출
   useEffect(() => {
     fetchFooters(currentPage, pageSize, searchValue);
-  }, [currentPage, pageSize, searchValue]); // fetchFooters는 useCallback으로 감싸져 있으므로 넣지 않음
+  }, [currentPage, pageSize]); // fetchFooters는 useCallback으로 감싸져 있으므로 넣지 않음
 
   // 검색 핸들러 추가
   const handleSearch = (value: string) => {

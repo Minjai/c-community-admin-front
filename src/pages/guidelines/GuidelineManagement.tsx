@@ -84,6 +84,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
   const { path, title } = getPageInfo();
 
   const handleSearch = (value: string) => {
+    setSearchValue(value);
     fetchGuidelines(currentPage, pageSize, value);
   };
 
@@ -152,7 +153,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
 
   useEffect(() => {
     fetchGuidelines(currentPage, pageSize, searchValue);
-  }, [boardId, currentPage, pageSize, searchValue]); // useEffect 의존성 배열 복원
+  }, [boardId, currentPage, pageSize]); // searchValue 제거
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {

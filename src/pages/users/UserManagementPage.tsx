@@ -7,16 +7,29 @@ import Modal from "../../components/Modal";
 import Input from "../../components/forms/Input";
 import Select from "../../components/forms/Select";
 import Alert from "../../components/Alert";
+import { formatDate } from "../../utils/dateUtils";
+
+interface User {
+  id: number;
+  email: string;
+  nickname: string;
+  score: number;
+  createdAt: string;
+  status: string;
+  rank: any;
+  isDeleted: boolean;
+  isDeletedAt?: string;
+}
 
 const UserManagementPage: React.FC = () => {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [totalUsers, setTotalUsers] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [alertMessage, setAlertMessage] = useState<{
     type: "success" | "error";
@@ -25,14 +38,14 @@ const UserManagementPage: React.FC = () => {
   const [searchValue, setSearchValue] = useState<string>("");
 
   // 회원 상세 정보 모달 열기
-  const handleViewUser = (user: any) => {
+  const handleViewUser = (user: User) => {
     setCurrentUser(user);
     setIsEditing(false);
     setShowModal(true);
   };
 
   // 회원 수정 모달 열기
-  const handleEditUser = (user: any) => {
+  const handleEditUser = (user: User) => {
     setCurrentUser(user);
     setIsEditing(true);
     setShowModal(true);
@@ -71,26 +84,47 @@ const UserManagementPage: React.FC = () => {
 
   // 테이블 컬럼 정의
   const columns = [
-    { header: "이메일", accessor: "email" },
-    { header: "닉네임", accessor: "nickname" },
-    { header: "등급", accessor: "rank" },
-    { header: "상태", accessor: "status" },
-    { header: "포인트", accessor: "score" },
+    { header: "이메일", accessor: "email" as keyof User },
+    { header: "닉네임", accessor: "nickname" as keyof User },
+    { header: "등급", accessor: "rank" as keyof User },
+    {
+      header: "상태",
+      accessor: "status" as keyof User,
+      cell: (value: unknown, row: User) => {
+        const status = value as string;
+        const isDeleted = row.isDeleted;
+        return (
+          <div>
+            <span
+              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                isDeleted ? "bg-red-100 text-red-800" : "bg-gray-100 text-gray-800"
+              }`}
+            >
+              {isDeleted ? "삭제" : status}
+            </span>
+            {isDeleted && row.isDeletedAt && (
+              <div className="text-xs text-gray-500 mt-1">{formatDate(row.isDeletedAt)}</div>
+            )}
+          </div>
+        );
+      },
+    },
+    { header: "포인트", accessor: "score" as keyof User },
     {
       header: "가입일",
-      accessor: "createdAt",
-      cell: (value: string) => new Date(value).toLocaleDateString(),
+      accessor: "createdAt" as keyof User,
+      cell: (value: unknown) => formatDate(value as string),
     },
     {
       header: "관리",
-      accessor: "id",
-      cell: (value: number, row: any) => (
+      accessor: "id" as keyof User,
+      cell: (value: unknown, row: User) => (
         <div className="flex space-x-2">
           <ActionButton onClick={() => handleEditUser(row)} action="edit" label="수정" size="sm" />
           <ActionButton
             onClick={() => {
               if (window.confirm("정말로 이 회원을 삭제하시겠습니까?")) {
-                setUsers((prev) => prev.filter((u: any) => u.id !== row.id));
+                setUsers((prev) => prev.filter((u: User) => u.id !== row.id));
                 setAlertMessage({ type: "success", message: "회원이 삭제되었습니다." });
               }
             }}

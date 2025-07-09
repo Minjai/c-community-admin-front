@@ -681,7 +681,7 @@ const CasinoCompanyPage: React.FC = () => {
         <div className="flex space-x-2">
           <button
             onClick={() => handleOpenCommentModal(row)}
-            className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md focus:outline-none transition-colors w-20"
+            className="inline-flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md focus:outline-none transition-colors w-28"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

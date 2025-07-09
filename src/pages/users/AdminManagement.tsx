@@ -125,7 +125,7 @@ const AdminManagement: React.FC = () => {
 
   useEffect(() => {
     fetchAdmins(currentPage, pageSize, searchValue);
-  }, [currentPage, pageSize, searchValue]);
+  }, [currentPage, pageSize]);
 
   // 페이지 변경 핸들러
   const handlePageChange = (page: number) => {
@@ -369,6 +369,7 @@ const AdminManagement: React.FC = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
+    setSearchValue(value);
     fetchAdmins(currentPage, pageSize, value);
   };
 

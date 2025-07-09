@@ -29,6 +29,7 @@ interface User {
   profileImageUrl?: string;
   lastLoginAt?: string;
   isDeleted: boolean;
+  isDeletedAt?: string;
 }
 
 const UserManagement = () => {
@@ -332,14 +333,19 @@ const UserManagement = () => {
             const status = value as string;
             const isDeleted = row.isDeleted;
             return (
-              <span
-                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClassName(
-                  status,
-                  isDeleted
-                )}`}
-              >
-                {isDeleted ? "삭제" : status}
-              </span>
+              <div>
+                <span
+                  className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClassName(
+                    status,
+                    isDeleted
+                  )}`}
+                >
+                  {isDeleted ? "삭제" : status}
+                </span>
+                {isDeleted && row.isDeletedAt && (
+                  <div className="text-xs text-gray-500 mt-1">{formatDate(row.isDeletedAt)}</div>
+                )}
+              </div>
             );
           },
           className: "text-center",

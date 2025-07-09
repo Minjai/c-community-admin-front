@@ -26,6 +26,7 @@ interface User {
   profileImage?: string;
   profileImageUrl?: string;
   isDeleted: boolean;
+  isDeletedAt?: string;
   rank: {
     id: number;
     name: string;
@@ -600,14 +601,21 @@ const UserDetail: React.FC<UserDetailProps> = ({ isOpen, onClose, userId, onUser
               <div className="flex items-center justify-between">
                 <div className="w-24 font-medium text-sm text-gray-500">상태</div>
                 <div className="flex-1">
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs ${getStatusClassName(
-                      user.status,
-                      user.isDeleted
-                    )}`}
-                  >
-                    {user.isDeleted ? "삭제" : user.status}
-                  </span>
+                  <div>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs ${getStatusClassName(
+                        user.status,
+                        user.isDeleted
+                      )}`}
+                    >
+                      {user.isDeleted ? "삭제" : user.status}
+                    </span>
+                    {user.isDeleted && user.isDeletedAt && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        {formatDate(user.isDeletedAt)}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

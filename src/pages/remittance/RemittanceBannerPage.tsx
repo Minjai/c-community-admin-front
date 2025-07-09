@@ -47,6 +47,7 @@ const RemittanceBannerPage: React.FC = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
+    setSearchValue(value);
     fetchBanners(1, pageSize, value);
   };
 
@@ -112,7 +113,7 @@ const RemittanceBannerPage: React.FC = () => {
 
   useEffect(() => {
     fetchBanners(currentPage, pageSize, searchValue);
-  }, [fetchBanners, currentPage, pageSize, searchValue]);
+  }, [fetchBanners, currentPage, pageSize]);
 
   // 배너 추가 모달 열기
   const handleAddBanner = () => {

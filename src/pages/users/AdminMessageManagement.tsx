@@ -91,6 +91,7 @@ const AdminMessageManagement = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
+    setSearchValue(value);
     setCurrentPage(1); // 검색 시 첫 페이지로 이동
     fetchMessages(1, pageSize, value);
   };
@@ -368,7 +369,7 @@ const AdminMessageManagement = () => {
 
   useEffect(() => {
     fetchMessages(currentPage, pageSize, searchValue);
-  }, [fetchMessages, currentPage, pageSize, searchValue]);
+  }, [fetchMessages, currentPage, pageSize]);
 
   // 카테고리 필터 외부 클릭 시 닫기
   useEffect(() => {

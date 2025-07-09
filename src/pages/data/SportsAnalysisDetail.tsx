@@ -137,6 +137,23 @@ const SportsAnalysisDetail: React.FC = () => {
         return;
       }
 
+      // Home/Away 이미지 필수 체크
+      if (!homeTeamImage && !homeTeamImageUrl) {
+        setError("Home/Away 이미지 확인해주세요.");
+        return;
+      }
+
+      if (!awayTeamImage && !awayTeamImageUrl) {
+        setError("Home/Away 이미지 확인해주세요.");
+        return;
+      }
+
+      // 리그명 필수 체크
+      if (!leagueName.trim()) {
+        setError("대회(리그명) 확인해주세요.");
+        return;
+      }
+
       const formData = new FormData();
       formData.append("categoryId", sport);
       formData.append("homeTeam", homeTeam);
