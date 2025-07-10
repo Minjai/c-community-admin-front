@@ -634,3 +634,37 @@ export const updateSportManualRecommendation = async (
     throw error;
   }
 };
+
+// 사이트 통계 관리 - summary(금일/전일/주간/월간)
+export const getSiteSummary = async () => {
+  const res = await axios.get("/admin/visitor/summary");
+  if (res.data && res.data.success) return res.data.data;
+  throw new Error(res.data?.error || "사이트 통계 summary API 오류");
+};
+
+// 사이트 통계 관리 - 차트(daily/weekly/monthly)
+export const getSiteChart = async (type: "daily" | "weekly" | "monthly") => {
+  const url =
+    type === "daily"
+      ? "/admin/visitor/chart/daily"
+      : type === "weekly"
+      ? "/admin/visitor/chart/weekly"
+      : "/admin/visitor/chart/monthly";
+  const res = await axios.get(url);
+  if (res.data && res.data.success) return res.data.data;
+  throw new Error(res.data?.error || "사이트 통계 chart API 오류");
+};
+
+// 기간 내 현황
+export const getSitePeriodSummary = async (start: string, end: string) => {
+  const res = await axios.get(`/admin/visitor/period-summary?start=${start}&end=${end}`);
+  if (res.data && res.data.success) return res.data.data;
+  throw new Error(res.data?.error || "기간 내 현황 API 오류");
+};
+
+// 등급별 회원 현황
+export const getMemberGradeSummary = async () => {
+  const res = await axios.get("/admin/visitor/member/grade-summary");
+  if (res.data && res.data.success) return res.data.data;
+  throw new Error(res.data?.error || "등급별 회원 현황 API 오류");
+};

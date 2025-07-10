@@ -128,12 +128,17 @@ export default function SportRecommendationsManagement() {
     isPublic: 1,
     displayOrder: 0,
   });
+  // 제목을 별도 상태로 관리
+  // const [title, setTitle] = useState(""); // 롤백: 제거
 
   // 스포츠 게임 선택 관련 상태
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
   const [filteredGames, setFilteredGames] = useState<SportGame[]>([]);
   const [selectedGames, setSelectedGames] = useState<SportGame[]>([]);
+
+  // === 스텝 모달 상태 ===
+  // const [step, setStep] = useState(1); // 롤백: 제거
 
   // 스포츠 종목 매핑 자동 생성 (먼저 정의)
   const updateSportMappings = useCallback(
@@ -344,7 +349,9 @@ export default function SportRecommendationsManagement() {
           ? Math.max(...recommendations.map((rec) => rec.displayOrder || 0)) + 1
           : 1,
     });
+    // setTitle(""); // 롤백: 제거
     setSelectedGames([]);
+    // setStep(1); // Reset step to 1 for new recommendation // 롤백: 제거
     setShowModal(true);
   };
 
@@ -452,6 +459,9 @@ export default function SportRecommendationsManagement() {
         isPublic: detailData.isPublic === 1 ? 1 : 0,
         displayOrder: detailData.displayOrder || 0,
       });
+      // setTitle(detailData.title || ""); // 롤백: 제거
+      // setStep(1); // Reset step to 1 for existing recommendation // 롤백: 제거
+      setShowModal(true);
     } catch (err) {
       console.error("Error loading recommendation details:", err);
       setError("추천 상세 정보를 불러오는데 실패했습니다.");
@@ -468,6 +478,9 @@ export default function SportRecommendationsManagement() {
         isPublic: recommendation.isPublic === 1 ? 1 : 0,
         displayOrder: recommendation.displayOrder || 0,
       });
+      // setTitle(recommendation.title || ""); // 롤백: 제거
+      // setStep(1); // Reset step to 1 for existing recommendation // 롤백: 제거
+      setShowModal(true);
     } finally {
       setLoading(false);
     }
@@ -625,6 +638,7 @@ export default function SportRecommendationsManagement() {
 
     const payload = {
       ...formData,
+      title,
       games, // games 배열 추가
       sportGameIds: selectedGames.map((g) => g.id), // 기존 호환성을 위해 유지
       startTime: convertDateTimeLocalToISOUTC(formData.startTime),
@@ -713,206 +727,169 @@ export default function SportRecommendationsManagement() {
     return gameIds ? `${gameIds.length}개` : "0개";
   };
 
-  // 게임 선택 모달 내용 렌더링 함수 추가
-  const renderGameSelectionModal = () => {
-    return (
-      <div className="space-y-6">
-        {/* Modal Error Alert */}
-        {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
+  // 제목 입력 스텝 컴포넌트
+  // const TitleStep = ({
+  //   value,
+  //   onChange,
+  //   onNext,
+  //   loading,
+  // }: {
+  //   value: string;
+  //   onChange: (v: string) => void;
+  //   onNext: () => void;
+  //   loading: boolean;
+  // }) => (
+  //   <div className="space-y-6">
+  //     <div>
+  //       <label className="label">제목</label>
+  //       <input
+  //         type="text"
+  //         name="title"
+  //         value={value}
+  //         onChange={(e) => onChange(e.target.value)}
+  //         className="input"
+  //         placeholder="예: 이번 주 주목할 경기"
+  //         disabled={loading}
+  //       />
+  //     </div>
+  //     <div className="flex justify-end">
+  //       <Button onClick={onNext} disabled={loading || !value.trim()}>
+  //         다음
+  //       </Button>
+  //     </div>
+  //   </div>
+  // );
 
-        {/* Top Control Area */}
-        <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
-          {/* Buttons (Left) */}
-          <div className="flex space-x-3">
-            <Button onClick={handleSaveRecommendation} disabled={loading}>
-              {loading ? "저장 중..." : modalType === "add" ? "등록" : "저장"}
-            </Button>
-            <Button variant="outline" onClick={() => setShowModal(false)} disabled={loading}>
-              취소
-            </Button>
-          </div>
-          {/* Public Toggle (Right) */}
-          <div className="flex space-x-4">
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                name="isPublic"
-                value={1}
-                checked={formData.isPublic === 1}
-                onChange={handleInputChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                disabled={loading}
-              />
-              <span className="ml-2 text-sm text-gray-700">공개</span>
-            </label>
-            <label className="inline-flex items-center">
-              <input
-                type="radio"
-                name="isPublic"
-                value={0}
-                checked={formData.isPublic === 0}
-                onChange={handleInputChange}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                disabled={loading}
-              />
-              <span className="ml-2 text-sm text-gray-700">비공개</span>
-            </label>
-          </div>
-        </div>
-
-        {/* 1. 제목 입력 */}
-        <div>
-          <label className="label">제목</label>
-          <input
-            type="text"
-            name="title"
-            value={formData.title}
-            onChange={handleInputChange}
-            className="input"
-            placeholder="예: 이번 주 주목할 경기"
-            disabled={loading}
-          />
-        </div>
-
-        {/* 2. 선택된 스포츠 게임 표시 */}
-        <div>
-          <label className="label">선택된 스포츠 게임 ({selectedGames.length})</label>
-          <div
-            className="border border-gray-300 rounded-md p-3 bg-gray-50"
-            style={{ minHeight: "100px", maxHeight: "200px", overflowY: "auto" }}
-          >
-            {selectedGames.length > 0 ? (
-              <div className="space-y-2">
-                {selectedGames.map((game, index) => (
-                  <div
-                    key={game.id}
-                    className="flex justify-between items-center border-b pb-2 last:border-b-0"
-                    draggable
-                    onDragStart={() => handleAutoDragStart(index)}
-                    onDragOver={handleAutoDragOver}
-                    onDrop={() => handleAutoDrop(index)}
-                    style={{ cursor: "grab" }}
-                  >
-                    <div>
-                      <div className="font-medium text-sm">{game.matchName}</div>
-                      <div className="flex items-center space-x-4">
-                        <p className="text-xs text-gray-500">{game.league}</p>
-                        <div className="text-xs text-gray-600">
-                          {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveSelectedGame(game.id)}
-                      className="text-red-500 hover:text-red-700 text-xs p-1"
-                      disabled={loading}
-                    >
-                      삭제
-                    </button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
-                아래 목록에서 스포츠 게임을 선택해주세요.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 3. 스포츠 게임 선택 */}
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <label className="label">스포츠 게임 선택</label>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="게임 검색 (팀명, 리그, 종목...)"
-              className="input w-64"
-              disabled={loading}
-            />
-          </div>
-          <div
-            className="border border-gray-300 rounded-md p-3"
-            style={{ maxHeight: "300px", overflowY: "auto" }}
-          >
-            {loading && filteredGames.length === 0 ? (
-              <div className="text-center text-gray-500">게임 목록 로딩 중...</div>
-            ) : filteredGames.length > 0 ? (
-              <div className="space-y-2">
-                {filteredGames.map((game) => (
-                  <div
-                    key={game.id}
-                    className={`p-2 border rounded-md cursor-pointer flex items-start ${
-                      selectedGames.some((g) => g.id === game.id)
-                        ? "bg-blue-50 border-blue-300"
-                        : "border-gray-200 hover:bg-gray-50"
-                    }`}
-                    onClick={() => !loading && handleToggleGame(game)}
-                  >
-                    <input
-                      type="checkbox"
-                      name={`game-${game.id}`}
-                      checked={selectedGames.some((g) => g.id === game.id)}
-                      onChange={() => {}}
-                      onClick={(e) => {
-                        e.stopPropagation(); // Prevent row click
-                        !loading && handleToggleGame(game);
-                      }}
-                      className="h-4 w-4 text-blue-600 mr-3 mt-1 rounded focus:ring-blue-500"
-                      disabled={loading}
-                    />
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">{game.matchName}</div>
-                      <div className="text-xs">
-                        {game.homeTeam} vs {game.awayTeam}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-1">
-                        {game.league} ({game.sport}) |{" "}
-                        {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center p-6 text-gray-500">
-                {searchQuery.trim() ? "검색 결과가 없습니다." : "등록된 게임이 없습니다."}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 4. 기간 설정 */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="label">시작 시간</label>
-            <input
-              type="datetime-local"
-              name="startTime"
-              value={formData.startTime}
-              onChange={handleInputChange}
-              className="input"
-              disabled={loading}
-            />
-          </div>
-          <div>
-            <label className="label">종료 시간</label>
-            <input
-              type="datetime-local"
-              name="endTime"
-              value={formData.endTime}
-              onChange={handleInputChange}
-              className="input"
-              disabled={loading}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  };
+  // 게임 선택 스텝 컴포넌트
+  // const GameStep = ({
+  //   selectedGames,
+  //   onChange,
+  //   onPrev,
+  //   onSave,
+  //   loading,
+  //   searchQuery,
+  //   setSearchQuery,
+  //   filteredGames,
+  //   handleToggleGame,
+  //   handleRemoveSelectedGame,
+  // }: any) => (
+  //   <div className="space-y-6">
+  //     {/* 2. 선택된 스포츠 게임 표시 */}
+  //     <div>
+  //       <label className="label">선택된 스포츠 게임 ({selectedGames.length})</label>
+  //       <div
+  //         className="border border-gray-300 rounded-md p-3 bg-gray-50"
+  //         style={{ minHeight: "100px", maxHeight: "200px", overflowY: "auto" }}
+  //       >
+  //         {selectedGames.length > 0 ? (
+  //           <div className="space-y-2">
+  //             {selectedGames.map((game: any, index: number) => (
+  //               <div
+  //                 key={`selected-${game.id}-${index}`}
+  //                 className="flex justify-between items-center border-b pb-2 last:border-b-0"
+  //                 draggable
+  //                 style={{ cursor: "grab" }}
+  //               >
+  //                 <div>
+  //                   <div className="font-medium text-sm">{game.matchName}</div>
+  //                   <div className="flex items-center space-x-4">
+  //                     <p className="text-xs text-gray-500">{game.league}</p>
+  //                     <div className="text-xs text-gray-600">
+  //                       {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
+  //                     </div>
+  //                   </div>
+  //                 </div>
+  //                 <button
+  //                   type="button"
+  //                   onClick={() => handleRemoveSelectedGame(game.id)}
+  //                   className="text-red-500 hover:text-red-700 text-xs p-1"
+  //                   disabled={loading}
+  //                 >
+  //                   삭제
+  //                 </button>
+  //               </div>
+  //             ))}
+  //           </div>
+  //         ) : (
+  //           <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+  //             아래 목록에서 스포츠 게임을 선택해주세요.
+  //           </div>
+  //         )}
+  //       </div>
+  //     </div>
+  //     {/* 3. 스포츠 게임 선택 */}
+  //     <div>
+  //       <div className="flex justify-between items-center mb-2">
+  //         <label className="label">스포츠 게임 선택</label>
+  //         <input
+  //           type="text"
+  //           value={searchQuery}
+  //           onChange={(e) => setSearchQuery(e.target.value)}
+  //           placeholder="게임 검색 (팀명, 리그, 종목...)"
+  //           className="input w-64"
+  //           disabled={loading}
+  //         />
+  //       </div>
+  //       <div
+  //         className="border border-gray-300 rounded-md p-3"
+  //         style={{ maxHeight: "300px", overflowY: "auto" }}
+  //       >
+  //         {loading && filteredGames.length === 0 ? (
+  //           <div className="text-center text-gray-500">게임 목록 로딩 중...</div>
+  //         ) : filteredGames.length > 0 ? (
+  //           <div className="space-y-2">
+  //             {filteredGames.map((game: any, index: number) => (
+  //               <div
+  //                 key={`filtered-${game.id}-${index}`}
+  //                 className={`p-2 border rounded-md cursor-pointer flex items-start ${
+  //                   selectedGames.some((g: any) => g.id === game.id)
+  //                     ? "bg-blue-50 border-blue-300"
+  //                     : "border-gray-200 hover:bg-gray-50"
+  //                 }`}
+  //                 onClick={() => !loading && handleToggleGame(game)}
+  //               >
+  //                 <input
+  //                   type="checkbox"
+  //                   name={`game-${game.id}`}
+  //                   checked={selectedGames.some((g: any) => g.id === game.id)}
+  //                   onChange={() => {}}
+  //                   onClick={(e) => {
+  //                     e.stopPropagation();
+  //                     !loading && handleToggleGame(game);
+  //                   }}
+  //                   className="h-4 w-4 text-blue-600 mr-3 mt-1 rounded focus:ring-blue-500"
+  //                   disabled={loading}
+  //                 />
+  //                 <div className="flex-1">
+  //                   <div className="font-medium text-sm">{game.matchName}</div>
+  //                   <div className="text-xs">
+  //                     {game.homeTeam} vs {game.awayTeam}
+  //                   </div>
+  //                   <div className="text-xs text-gray-500 mt-1">
+  //                     {game.league} ({game.sport}) |{" "}
+  //                     {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
+  //                   </div>
+  //                 </div>
+  //               </div>
+  //             ))}
+  //           </div>
+  //         ) : (
+  //           <div className="text-center p-6 text-gray-500">
+  //             {searchQuery.trim() ? "검색 결과가 없습니다." : "등록된 게임이 없습니다."}
+  //           </div>
+  //         )}
+  //       </div>
+  //     </div>
+  //     <div className="flex justify-between mt-4">
+  //       <Button variant="outline" onClick={onPrev} disabled={loading}>
+  //         이전
+  //       </Button>
+  //       <Button onClick={onSave} disabled={loading}>
+  //         저장
+  //       </Button>
+  //     </div>
+  //   </div>
+  // );
 
   // === 수동 추천 수정 상태/함수/모달 ===
   const [showManualEditModal, setShowManualEditModal] = useState(false);
@@ -1077,12 +1054,20 @@ export default function SportRecommendationsManagement() {
           displayOrder: index,
         })),
       };
-      await updateSportManualRecommendation(id, recommendationData);
+
+      // id가 있으면 수정, 없으면 새로 등록
+      if (editManualForm.id) {
+        await updateSportManualRecommendation(editManualForm.id, recommendationData);
+        setSuccess("수동 추천이 수정되었습니다.");
+      } else {
+        await createSportManualRecommendation(recommendationData);
+        setSuccess("수동 추천이 등록되었습니다.");
+      }
+
       handleCloseManualEditModal();
       fetchRecommendations();
-      setSuccess("수동 추천이 수정되었습니다.");
     } catch (error: any) {
-      setError(error.response?.data?.message || "수정 중 오류가 발생했습니다.");
+      setError(error.response?.data?.message || "저장 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -1244,6 +1229,204 @@ export default function SportRecommendationsManagement() {
     }
   };
 
+  // renderGameSelectionModal 함수 복원
+  const renderGameSelectionModal = () => {
+    return (
+      <div className="space-y-6">
+        {/* Modal Error Alert */}
+        {error && <Alert type="error" message={error} onClose={() => setError(null)} />}
+        {/* Top Control Area */}
+        <div className="flex justify-between items-center pt-2 pb-4 border-b border-gray-200 mb-6">
+          {/* Buttons (Left) */}
+          <div className="flex space-x-3">
+            <Button onClick={handleSaveRecommendation} disabled={loading}>
+              {loading ? "저장 중..." : modalType === "add" ? "등록" : "저장"}
+            </Button>
+            <Button variant="outline" onClick={() => setShowModal(false)} disabled={loading}>
+              취소
+            </Button>
+          </div>
+          {/* Public Toggle (Right) */}
+          <div className="flex space-x-4">
+            <label className="inline-flex items-center">
+              <input
+                type="radio"
+                name="isPublic"
+                value={1}
+                checked={formData.isPublic === 1}
+                onChange={handleInputChange}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                disabled={loading}
+              />
+              <span className="ml-2 text-sm text-gray-700">공개</span>
+            </label>
+            <label className="inline-flex items-center">
+              <input
+                type="radio"
+                name="isPublic"
+                value={0}
+                checked={formData.isPublic === 0}
+                onChange={handleInputChange}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                disabled={loading}
+              />
+              <span className="ml-2 text-sm text-gray-700">비공개</span>
+            </label>
+          </div>
+        </div>
+        {/* 1. 제목 입력 */}
+        <div>
+          <label className="label">제목</label>
+          <input
+            type="text"
+            name="title"
+            value={formData.title}
+            onChange={handleInputChange}
+            className="input"
+            placeholder="예: 이번 주 주목할 경기"
+            disabled={loading}
+          />
+        </div>
+        {/* 2. 선택된 스포츠 게임 표시 */}
+        <div>
+          <label className="label">선택된 스포츠 게임 ({selectedGames.length})</label>
+          <div
+            className="border border-gray-300 rounded-md p-3 bg-gray-50"
+            style={{
+              minHeight: "100px",
+              maxHeight: "200px",
+              overflowY: "auto",
+              overflowX: "hidden",
+            }}
+          >
+            {selectedGames.length > 0 ? (
+              <div className="space-y-2">
+                {selectedGames.map((game, index) => (
+                  <div
+                    key={`selected-${game.id}-${index}`}
+                    className="flex justify-between items-center border-b pb-2 last:border-b-0"
+                    draggable
+                    style={{ cursor: "grab" }}
+                  >
+                    <div className="flex-1 min-w-0 overflow-hidden mr-2">
+                      <div className="font-medium text-sm truncate">{game.matchName}</div>
+                      <div className="flex items-center space-x-4">
+                        <p className="text-xs text-gray-500 truncate flex-1">{game.league}</p>
+                        <div className="text-xs text-gray-600 flex-shrink-0">
+                          {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveSelectedGame(game.id)}
+                      className="text-red-500 hover:text-red-700 text-xs p-1 flex-shrink-0"
+                      disabled={loading}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                아래 목록에서 스포츠 게임을 선택해주세요.
+              </div>
+            )}
+          </div>
+        </div>
+        {/* 3. 스포츠 게임 선택 */}
+        <div>
+          <div className="flex justify-between items-center mb-2">
+            <label className="label">스포츠 게임 선택</label>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="게임 검색 (팀명, 리그, 종목...)"
+              className="input w-64"
+              disabled={loading}
+            />
+          </div>
+          <div
+            className="border border-gray-300 rounded-md p-3"
+            style={{ maxHeight: "300px", overflowY: "auto" }}
+          >
+            {loading && filteredGames.length === 0 ? (
+              <div className="text-center text-gray-500">게임 목록 로딩 중...</div>
+            ) : filteredGames.length > 0 ? (
+              <div className="space-y-2">
+                {filteredGames.map((game, index) => (
+                  <div
+                    key={`filtered-${game.id}-${index}`}
+                    className={`p-2 border rounded-md cursor-pointer flex items-start ${
+                      selectedGames.some((g) => g.id === game.id)
+                        ? "bg-blue-50 border-blue-300"
+                        : "border-gray-200 hover:bg-gray-50"
+                    }`}
+                    onClick={() => !loading && handleToggleGame(game)}
+                  >
+                    <input
+                      type="checkbox"
+                      name={`game-${game.id}`}
+                      checked={selectedGames.some((g) => g.id === game.id)}
+                      onChange={() => {}}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        !loading && handleToggleGame(game);
+                      }}
+                      className="h-4 w-4 text-blue-600 mr-3 mt-1 rounded focus:ring-blue-500"
+                      disabled={loading}
+                    />
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">{game.matchName}</div>
+                      <div className="text-xs">
+                        {game.homeTeam} vs {game.awayTeam}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">
+                        {game.league} ({game.sport}) |{" "}
+                        {formatDateForDisplay(game.dateTime?.replace("FRO", ""))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center p-6 text-gray-500">
+                {searchQuery.trim() ? "검색 결과가 없습니다." : "등록된 게임이 없습니다."}
+              </div>
+            )}
+          </div>
+        </div>
+        {/* 4. 기간 설정 */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="label">시작 시간</label>
+            <input
+              type="datetime-local"
+              name="startTime"
+              value={formData.startTime}
+              onChange={handleInputChange}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+          <div>
+            <label className="label">종료 시간</label>
+            <input
+              type="datetime-local"
+              name="endTime"
+              value={formData.endTime}
+              onChange={handleInputChange}
+              className="input"
+              disabled={loading}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
@@ -1254,15 +1437,27 @@ export default function SportRecommendationsManagement() {
           onSearch={(value) => handleSearch("title", value)}
         />
         <div className="flex space-x-2">
-          <Button variant="primary" onClick={handleAddRecommendation} disabled={loading}>
-            추천 추가
-          </Button>
           <Button
-            variant="secondary"
-            onClick={() => setShowManualEditModal(true)}
+            variant="primary"
+            onClick={() => {
+              // 새로 등록할 때는 editManualForm 초기화
+              setEditManualForm({
+                title: "",
+                startTime: "",
+                endTime: "",
+                games: [],
+                isPublic: 1,
+              });
+              setEditCurrentGameDetail({ home: "", away: "", league: "", time: "", icon: "" });
+              setEditGameDetailError(null);
+              setShowManualEditModal(true);
+            }}
             disabled={loading}
           >
             수동 등록
+          </Button>
+          <Button variant="primary" onClick={handleAddRecommendation} disabled={loading}>
+            추천 추가
           </Button>
           <Button
             variant="danger"
@@ -1372,6 +1567,7 @@ export default function SportRecommendationsManagement() {
               <label className="block text-sm font-medium text-gray-700 mb-1">시작 시간</label>
               <input
                 type="datetime-local"
+                name="startTime"
                 value={editManualForm.startTime}
                 onChange={(e) =>
                   setEditManualForm((prev) => ({ ...prev, startTime: e.target.value }))
@@ -1384,6 +1580,7 @@ export default function SportRecommendationsManagement() {
               <label className="block text-sm font-medium text-gray-700 mb-1">종료 시간</label>
               <input
                 type="datetime-local"
+                name="endTime"
                 value={editManualForm.endTime}
                 onChange={(e) =>
                   setEditManualForm((prev) => ({ ...prev, endTime: e.target.value }))
@@ -1399,7 +1596,10 @@ export default function SportRecommendationsManagement() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               선택된 스포츠 게임
             </label>
-            <div className="border rounded-lg p-4 min-h-[100px] bg-gray-50">
+            <div
+              className="border rounded-lg p-4 min-h-[100px] bg-gray-50"
+              style={{ overflowX: "hidden" }}
+            >
               <div className="space-y-2">
                 {editManualForm.games && editManualForm.games.length > 0 ? (
                   editManualForm.games.map((game: SportGameDetail, index: number) => (
@@ -1417,7 +1617,7 @@ export default function SportRecommendationsManagement() {
                         handleEditDrop(index, e);
                       }}
                     >
-                      <div className="flex items-center space-x-3 flex-1">
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
                         {/* 이미지 */}
                         <div className="w-8 h-8 flex-shrink-0">
                           {game.icon ? (
@@ -1446,11 +1646,11 @@ export default function SportRecommendationsManagement() {
                         </div>
 
                         {/* 텍스트 정보 */}
-                        <div className="flex-1">
-                          <div className="font-medium">
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <div className="font-medium truncate">
                             {game.home} vs {game.away}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-gray-500 truncate">
                             {game.league} | {new Date(game.time).toLocaleDateString()}
                           </div>
                         </div>
@@ -1458,7 +1658,7 @@ export default function SportRecommendationsManagement() {
 
                       <button
                         onClick={() => handleEditRemoveGameDetail(game.id!)}
-                        className="ml-4 text-red-600 hover:text-red-800"
+                        className="ml-4 text-red-600 hover:text-red-800 flex-shrink-0"
                       >
                         삭제
                       </button>

@@ -37,6 +37,7 @@ import FooterManagementPage from "./pages/footer/FooterManagementPage";
 import NewsSportsPage from "@pages/news/news-sports/NewsSportsPage.tsx";
 import HomeManagementPage from "./pages/exposure/HomeManagementPage";
 import SportsAnalysisDetail from "./pages/data/SportsAnalysisDetail";
+import SiteStatisticsPage from "./pages/statistics/SiteStatisticsPage";
 
 // 추후 구현할 페이지들을 위한 임시 컴포넌트
 const NotImplemented = ({ pageName }: { pageName: string }) => (
@@ -385,6 +386,16 @@ function App() {
               />
               <Route path="/footer" element={<FooterManagementPage />} />
               <Route path="/exposure/home" element={<HomeManagementPage />} />
+
+              {/* 페이지 통계 관리 */}
+              <Route
+                path="statistics/site"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <SiteStatisticsPage />
+                  </RoleBasedRoute>
+                }
+              />
             </Route>
 
             <Route path="*" element={<Navigate to="/banners/main" replace />} />

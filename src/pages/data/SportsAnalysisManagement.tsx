@@ -220,7 +220,7 @@ const SportsAnalysisManagement = () => {
       },
     },
     {
-      header: "Home팀",
+      header: "홈팀",
       accessor: "homeTeam",
       className: "text-center w-[220px]",
       cell: (value: unknown, row: SportGameAnalysis) => (
@@ -229,15 +229,21 @@ const SportsAnalysisManagement = () => {
             <img
               src={row.homeTeamImageUrl}
               alt={`${row.homeTeam} 로고`}
-              className="w-12 h-12 object-cover rounded"
+              className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80"
+              onClick={() => handleEdit(row.id)}
             />
           )}
-          <span className="text-sm font-medium truncate w-[120px] text-center">{row.homeTeam}</span>
+          <span
+            className="text-sm font-medium truncate w-[120px] text-center cursor-pointer hover:text-blue-600 hover:underline"
+            onClick={() => handleEdit(row.id)}
+          >
+            {row.homeTeam}
+          </span>
         </div>
       ),
     },
     {
-      header: "Away팀",
+      header: "원정팀",
       accessor: "awayTeam",
       className: "text-center w-[220px]",
       cell: (value: unknown, row: SportGameAnalysis) => (
@@ -246,23 +252,29 @@ const SportsAnalysisManagement = () => {
             <img
               src={row.awayTeamImageUrl}
               alt={`${row.awayTeam} 로고`}
-              className="w-12 h-12 object-cover rounded"
+              className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80"
+              onClick={() => handleEdit(row.id)}
             />
           )}
-          <span className="text-sm font-medium truncate w-[120px] text-center">{row.awayTeam}</span>
+          <span
+            className="text-sm font-medium truncate w-[120px] text-center cursor-pointer hover:text-blue-600 hover:underline"
+            onClick={() => handleEdit(row.id)}
+          >
+            {row.awayTeam}
+          </span>
         </div>
       ),
     },
     {
       header: "경기 일자",
       accessor: "gameDate",
-      className: "text-center w-[120px]",
+      className: "text-center w-[150px]",
       cell: (value: unknown, row: SportGameAnalysis) => formatDate(row.gameDate),
     },
     {
       header: "노출 기간",
       accessor: "startTime",
-      className: "text-center w-[250px]",
+      className: "text-center w-[300px]",
       cell: (value: unknown, row: SportGameAnalysis) => (
         <div>
           {formatDate(row.startTime)} ~ {formatDate(row.endTime)}
@@ -306,7 +318,7 @@ const SportsAnalysisManagement = () => {
     {
       header: "관리",
       accessor: "id",
-      className: "text-center w-[120px]",
+      className: "text-center w-[150px]",
       cell: (value: unknown, row: SportGameAnalysis) => (
         <div className="flex space-x-1 justify-center">
           <ActionButton label="수정" action="edit" size="sm" onClick={() => handleEdit(row.id)} />
@@ -389,7 +401,7 @@ const SportsAnalysisManagement = () => {
             {`선택 삭제 (${selectedIds.length})`}
           </Button>
           <Button variant="primary" onClick={() => handleOpenModal("add")} disabled={loading}>
-            경기 분석 추가
+            분석 분석 추가
           </Button>
         </div>
       </div>

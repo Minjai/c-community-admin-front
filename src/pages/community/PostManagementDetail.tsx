@@ -249,13 +249,13 @@ const PostDetail = () => {
     content: "",
   });
   const [userRanks, setUserRanks] = useState<UserRank[]>([]);
-  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImageFile, setProfileImageFile] = useState<string | null>(null);
 
   // 댓글 작성 관련 상태 추가
   const [commentCreateTempUser, setCommentCreateTempUser] = useState({
     nickname: "",
     rank: "",
-    profileImageFile: null as File | null,
+    profileImageFile: null as string | null,
   });
   const [commentContent, setCommentContent] = useState("");
 
@@ -263,8 +263,9 @@ const PostDetail = () => {
   const [commentEditTempUser, setCommentEditTempUser] = useState({
     nickname: "",
     rank: "",
-    profileImageFile: null as File | null,
+    profileImageFile: null as string | null,
   });
+  const [editingComment, setEditingComment] = useState<Comment | null>(null);
 
   // 스크롤을 맨 위로 이동
   useScrollToTop();
@@ -312,23 +313,53 @@ const PostDetail = () => {
 
   // 프로필 이미지 파일 변경 처리
   const handleProfileImageChange = (file: File | null) => {
-    setProfileImageFile(file);
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setProfileImageFile(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setProfileImageFile(null);
+    }
   };
 
   // 댓글 작성용 프로필 이미지 파일 변경 처리
   const handleCommentCreateProfileImageChange = (file: File | null) => {
-    setCommentCreateTempUser((prev) => ({
-      ...prev,
-      profileImageFile: file,
-    }));
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCommentCreateTempUser((prev) => ({
+          ...prev,
+          profileImageFile: reader.result as string,
+        }));
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setCommentCreateTempUser((prev) => ({
+        ...prev,
+        profileImageFile: null,
+      }));
+    }
   };
 
   // 댓글 수정용 프로필 이미지 파일 변경 처리
   const handleCommentEditProfileImageChange = (file: File | null) => {
-    setCommentEditTempUser((prev) => ({
-      ...prev,
-      profileImageFile: file,
-    }));
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCommentEditTempUser((prev) => ({
+          ...prev,
+          profileImageFile: reader.result as string,
+        }));
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setCommentEditTempUser((prev) => ({
+        ...prev,
+        profileImageFile: null,
+      }));
+    }
   };
 
   const handleSubmit = async (e?: React.FormEvent<HTMLFormElement>) => {
@@ -343,10 +374,16 @@ const PostDetail = () => {
         return;
       }
 
-      // 닉네임 유효성 검사 (새 게시물이거나 템프유저 정보가 있는 경우)
-      if ((!isEditMode || (isEditMode && tempUser.nickname.trim())) && !tempUser.nickname.trim()) {
-        setError("닉네임을 입력해주세요.");
-        return;
+      // 더미유저 필수 필드 검사
+      if (tempUser.nickname.trim()) {
+        if (!tempUser.rank.trim()) {
+          setError("더미유저 등급을 선택해주세요.");
+          return;
+        }
+        if (!tempUser.profileImageUrl.trim() && !profileImageFile) {
+          setError("더미유저 프로필 이미지를 등록해주세요.");
+          return;
+        }
       }
 
       // 에디터 내용 분석
@@ -363,21 +400,24 @@ const PostDetail = () => {
       // tempUser 정보 처리
       if (isEditMode && post?.tempUser && post.tempUser.nickname) {
         // 수정 모드이고 기존에 tempUser로 작성된 게시물인 경우
-        // 기존 tempUser 정보를 그대로 유지 (새로 입력한 정보는 무시)
-        formData.append("tempUserNickname", post.tempUser.nickname);
-        formData.append("tempUserRank", post.tempUser.rank || "");
-        formData.append("tempUserTitle", "");
-        formData.append("tempUserContent", "");
+        // 사용자가 수정한 정보를 우선적으로 사용
+        const updatedNickname = tempUser.nickname.trim() || post.tempUser.nickname;
+        const updatedRank = tempUser.rank || post.tempUser.rank || "";
 
-        // 프로필 이미지 처리: 새 파일이 있으면 파일을, 없으면 기존 URL을 전송
+        formData.append("tempUser[nickname]", updatedNickname);
+        formData.append("tempUser[rank]", updatedRank);
+        formData.append("tempUser[title]", "");
+        formData.append("tempUser[content]", "");
+
+        // 프로필 이미지 처리: 새 파일이 있으면 base64를, 없으면 기존 URL을 전송
         if (profileImageFile) {
-          formData.append("images", profileImageFile);
+          formData.append("tempUser[profileImage]", profileImageFile);
         } else if (post.tempUser.profileImageUrl) {
-          formData.append("tempUserProfileImageUrl", post.tempUser.profileImageUrl);
+          formData.append("tempUser[profileImageUrl]", post.tempUser.profileImageUrl);
         }
       } else if (!isEditMode && tempUser.nickname.trim()) {
         // 새 게시물이고 새로 입력한 tempUser 정보가 있는 경우
-        formData.append("tempUserNickname", tempUser.nickname.trim());
+        formData.append("tempUser[nickname]", tempUser.nickname.trim());
 
         // 등급이 선택되지 않았으면 가장 낮은 등급(스코어 0)을 자동 설정
         let selectedRank = tempUser.rank;
@@ -387,14 +427,14 @@ const PostDetail = () => {
           );
           selectedRank = lowestRank.rankName;
         }
-        formData.append("tempUserRank", selectedRank || "");
+        formData.append("tempUser[rank]", selectedRank || "");
 
-        formData.append("tempUserTitle", tempUser.title);
-        formData.append("tempUserContent", tempUser.content);
+        formData.append("tempUser[title]", tempUser.title);
+        formData.append("tempUser[content]", tempUser.content);
 
-        // 프로필 이미지 파일이 있으면 추가
+        // 프로필 이미지 base64가 있으면 추가
         if (profileImageFile) {
-          formData.append("images", profileImageFile);
+          formData.append("tempUser[profileImage]", profileImageFile);
         }
       } else if (isEditMode && post?.authorId) {
         // 수정 모드이고 기존에 실제 사용자가 작성한 게시물인 경우
@@ -508,7 +548,9 @@ const PostDetail = () => {
           setTempUser({
             nickname: postData.tempUser.nickname || "",
             profileImageUrl: postData.tempUser.profileImageUrl || "",
-            rank: postData.tempUser.rank || "",
+            rank:
+              (postData.tempUser.rank as any)?.rankName ||
+              (typeof postData.tempUser.rank === "string" ? postData.tempUser.rank : ""),
             title: "", // tempUser 타입에 title이 없으므로 빈 문자열
             content: "", // tempUser 타입에 content가 없으므로 빈 문자열
           });
@@ -520,7 +562,7 @@ const PostDetail = () => {
             rank:
               typeof postData.author.rank === "string"
                 ? postData.author.rank
-                : postData.author.rank?.rankName || "",
+                : (postData.author.rank as any)?.rankName || "",
             title: "", // tempUser 타입에 title이 없으므로 빈 문자열
             content: "", // tempUser 타입에 content가 없으므로 빈 문자열
           });
@@ -635,10 +677,16 @@ const PostDetail = () => {
       return;
     }
 
-    // 템프 유저 작성란에서 닉네임 입력 검증
-    if (!commentCreateTempUser.nickname.trim()) {
-      alert("닉네임을 확인해주세요.");
-      return;
+    // 더미유저 댓글 필수 필드 검사
+    if (commentCreateTempUser.nickname.trim()) {
+      if (!commentCreateTempUser.rank.trim()) {
+        alert("더미유저 등급을 선택해주세요.");
+        return;
+      }
+      if (!commentCreateTempUser.profileImageFile) {
+        alert("더미유저 프로필 이미지를 등록해주세요.");
+        return;
+      }
     }
 
     try {
@@ -689,6 +737,7 @@ const PostDetail = () => {
   const startEditComment = (comment: Comment) => {
     setEditingCommentId(comment.id);
     setEditCommentContent(comment.content);
+    setEditingComment(comment);
 
     // 템프유저 댓글인 경우 기존 정보를 수정 폼에 설정
     if (comment.tempUser) {
@@ -714,6 +763,7 @@ const PostDetail = () => {
   const cancelEditComment = () => {
     setEditingCommentId(null);
     setEditCommentContent("");
+    setEditingComment(null);
   };
 
   // 댓글 수정 저장
@@ -723,10 +773,16 @@ const PostDetail = () => {
       return;
     }
 
-    // 템프 유저 작성란에서 닉네임 입력 검증
-    if (!commentEditTempUser.nickname.trim()) {
-      alert("닉네임을 확인해주세요.");
-      return;
+    // 더미유저 댓글 수정 필수 필드 검사
+    if (commentEditTempUser.nickname.trim()) {
+      if (!commentEditTempUser.rank.trim()) {
+        alert("더미유저 등급을 선택해주세요.");
+        return;
+      }
+      if (!commentEditTempUser.profileImageFile && !editingComment?.tempUser?.profileImageUrl) {
+        alert("더미유저 프로필 이미지를 등록해주세요.");
+        return;
+      }
     }
 
     try {
@@ -742,6 +798,8 @@ const PostDetail = () => {
 
         if (commentEditTempUser.profileImageFile) {
           formData.append("tempUserProfileImage", commentEditTempUser.profileImageFile);
+        } else if (editingComment?.tempUser?.profileImageUrl) {
+          formData.append("tempUserProfileImageUrl", editingComment.tempUser.profileImageUrl);
         }
       }
       // 실제 사용자 댓글인 경우 내용만 전송 (작성자 정보는 변경하지 않음)
@@ -761,6 +819,7 @@ const PostDetail = () => {
           rank: "",
           profileImageFile: null,
         });
+        setEditingComment(null);
         getPostDetail(); // 댓글 목록 새로고침
       } else {
         alert("댓글 수정에 실패했습니다.");
@@ -1099,7 +1158,7 @@ const PostDetail = () => {
       {/* Comments Section (only in edit mode and when comments exist) */}
       {isEditMode && post && comments.length > 0 && (
         <div className="mt-4">
-          {/* Comments list */}
+          {/* Comments list - 템프유저 댓글만 표시 */}
           <div className="space-y-3">
             {comments.map((comment) => (
               <div key={comment.id} className="bg-gray-50 p-3 rounded-md shadow-sm">
@@ -1289,13 +1348,14 @@ const PostDetail = () => {
                           </p>
                           {/* 등급 표시 */}
                           <p className="text-xs text-gray-500">
-                            {typeof comment.tempUser?.rank === "string"
-                              ? comment.tempUser.rank
-                              : (comment.tempUser?.rank &&
-                                  (comment.tempUser.rank as any)?.rankName) ||
-                                (typeof (comment.author as any)?.rank === "string"
-                                  ? (comment.author as any).rank
-                                  : (comment.author as any)?.rank?.rankName || "")}
+                            {(comment.tempUser?.rank as any)?.rankName ||
+                              (typeof comment.tempUser?.rank === "string"
+                                ? comment.tempUser.rank
+                                : "") ||
+                              (comment.author as any)?.rank?.rankName ||
+                              (typeof (comment.author as any)?.rank === "string"
+                                ? (comment.author as any).rank
+                                : "")}
                           </p>
                         </div>
                       </div>
