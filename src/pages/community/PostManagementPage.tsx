@@ -21,9 +21,18 @@ interface PostColumnDef {
   className?: string;
 }
 
+interface ContentViewStats {
+  [key: string]: {
+    anonymousUsers: number;
+    loggedInUsers: number;
+    totalViews: number;
+  };
+}
+
 const PostManagementPage: React.FC = () => {
   const [posts, setPosts] = useState<Post[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
+  const [contentViewStats, setContentViewStats] = useState<ContentViewStats>({});
   const [totalPosts, setTotalPosts] = useState<number>(0);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
@@ -42,6 +51,26 @@ const PostManagementPage: React.FC = () => {
 
   // 스크롤을 맨 위로 이동
   useScrollToTop();
+
+  // 조회수 표시 함수
+  const formatViewCount = (postId: number) => {
+    const stats = contentViewStats[postId.toString()];
+    if (!stats) return "0";
+
+    const total = stats.totalViews;
+    const loggedIn = stats.loggedInUsers;
+
+    if (loggedIn === 0) {
+      return total.toString();
+    }
+
+    return (
+      <span>
+        <span className="text-gray-600">{total}</span>
+        <span className="text-blue-600">({loggedIn})</span>
+      </span>
+    );
+  };
 
   // 게시판 목록 조회
   const fetchBoards = async () => {
@@ -78,18 +107,21 @@ const PostManagementPage: React.FC = () => {
 
       const response = await axios.get("/admin/post", { params });
 
-      if (response.data && response.data.posts && Array.isArray(response.data.posts)) {
+      // 새로운 API 응답 구조에 맞게 처리
+      if (response.data.posts && Array.isArray(response.data.posts)) {
         setPosts(response.data.posts);
-        setTotalPosts(response.data.totalPosts || response.data.total || 0);
+        setContentViewStats(response.data.contentViewStats || {});
+        setTotalPosts(response.data.totalPosts || 0);
       } else {
-        console.error("Invalid format for posts data:", response.data);
         setPosts([]);
+        setContentViewStats({});
         setTotalPosts(0);
       }
     } catch (err) {
       setError("게시물 목록을 불러오는 중 오류가 발생했습니다.");
       console.error("Error fetching posts:", err);
       setPosts([]);
+      setContentViewStats({});
       setTotalPosts(0);
     } finally {
       setLoading(false);
@@ -167,7 +199,24 @@ const PostManagementPage: React.FC = () => {
       accessor: "authorId",
       cell: (value: any, row: Post) => row.author?.nickname || "-",
     },
-    { header: "조회수", accessor: "viewCount" },
+    {
+      header: "조회",
+      accessor: "id",
+      cell: (value: unknown, row: Post) => (
+        <span className="text-sm text-gray-600">{formatViewCount(row.id)}</span>
+      ),
+      className: "text-center",
+    },
+    {
+      header: "댓글/추천",
+      accessor: "id",
+      cell: (value: unknown, row: Post) => (
+        <span className="text-sm text-gray-600">
+          {`${row._count?.comments || 0}/${row._count?.likes || 0}`}
+        </span>
+      ),
+      className: "text-center",
+    },
     {
       header: "인기 여부",
       accessor: "isPopular",
@@ -309,7 +358,17 @@ const PostManagementPage: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Input label="조회수" value={currentPost.viewCount?.toString() || "0"} disabled />
+              <Input
+                label="조회수"
+                value={(() => {
+                  const stats = contentViewStats[currentPost.id?.toString() || ""];
+                  if (!stats) return "0";
+                  const total = stats.totalViews;
+                  const loggedIn = stats.loggedInUsers;
+                  return loggedIn === 0 ? total.toString() : `${total}(${loggedIn})`;
+                })()}
+                disabled
+              />
 
               <Input
                 label="인기글 여부"

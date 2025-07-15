@@ -10,14 +10,24 @@ import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
 
+interface ContentViewStats {
+  [key: string]: {
+    anonymousUsers: number;
+    loggedInUsers: number;
+    totalViews: number;
+  };
+}
+
 const NoticeManagement = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [notices, setNotices] = useState<Post[]>([]);
+  const [contentViewStats, setContentViewStats] = useState<ContentViewStats>({});
   const navigate = useNavigate();
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
     total: 0,
+    totalPages: 1,
   });
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [alertMessage, setAlertMessage] = useState<{
@@ -43,6 +53,26 @@ const NoticeManagement = () => {
     getAllNotices(1, value);
   };
 
+  // 조회수 표시 함수
+  const formatViewCount = (postId: number) => {
+    const stats = contentViewStats[postId.toString()];
+    if (!stats) return "0";
+
+    const total = stats.totalViews;
+    const loggedIn = stats.loggedInUsers;
+
+    if (loggedIn === 0) {
+      return total.toString();
+    }
+
+    return (
+      <span>
+        <span className="text-gray-600">{total}</span>
+        <span className="text-blue-600">({loggedIn})</span>
+      </span>
+    );
+  };
+
   // 전체 공지사항 목록 가져오기 (검색 파라미터 추가)
   const getAllNotices = async (page = 1, searchValue: string = "") => {
     setLoading(true);
@@ -61,33 +91,33 @@ const NoticeManagement = () => {
 
       console.log("공지사항 API 응답:", response.data);
 
-      // 응답 데이터 형식에 따라 처리
-      let noticesData: Post[] = [];
-      let totalItems = 0;
-
+      // 새로운 API 응답 구조에 맞게 처리
       if (response.data.posts && Array.isArray(response.data.posts)) {
-        noticesData = response.data.posts;
-        totalItems = response.data.totalPosts || response.data.total || noticesData.length;
-      } else if (Array.isArray(response.data)) {
-        noticesData = response.data;
-        totalItems = noticesData.length;
-      } else if (response.data.data && Array.isArray(response.data.data)) {
-        noticesData = response.data.data;
-        totalItems = response.data.total || noticesData.length;
+        setNotices(response.data.posts);
+        setContentViewStats(response.data.contentViewStats || {});
+        setPagination({
+          ...pagination,
+          page: response.data.currentPage || page,
+          total: response.data.totalPosts || 0,
+          totalPages: response.data.totalPages || 1,
+        });
+      } else {
+        setNotices([]);
+        setContentViewStats({});
+        setPagination({
+          ...pagination,
+          page,
+          total: 0,
+          totalPages: 1,
+        });
       }
 
-      setNotices(noticesData);
       // displayOrder 상태 초기화
       const orderMap: Record<number, number> = {};
-      noticesData.forEach((n) => {
+      response.data.posts?.forEach((n: Post) => {
         orderMap[n.id] = n.displayOrder;
       });
       setDisplayOrders(orderMap);
-      setPagination({
-        ...pagination,
-        page,
-        total: totalItems,
-      });
     } catch (error) {
       console.error("공지사항 목록 조회 오류:", error);
     } finally {
@@ -260,6 +290,12 @@ const NoticeManagement = () => {
       cell: (isPublic: number) => (isPublic === 1 ? "공개" : "비공개"),
     },
     {
+      header: "조회",
+      accessor: "id" as keyof Post,
+      cell: (id: number) => <span className="text-sm text-gray-600">{formatViewCount(id)}</span>,
+      className: "text-center",
+    },
+    {
       header: "순서",
       accessor: "displayOrder" as keyof Post,
       cell: (value: number, row: Post) => (
@@ -274,7 +310,6 @@ const NoticeManagement = () => {
       ),
       className: "w-24 px-2 text-center",
     },
-
     {
       header: "관리",
       accessor: "id" as keyof Post,

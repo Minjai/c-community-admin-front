@@ -59,6 +59,11 @@ const CasinoGameManagement = () => {
   // 검색 value 상태
   const [searchValue, setSearchValue] = useState<string>("");
 
+  // 조회수 통계 상태 추가
+  const [viewStats, setViewStats] = useState<{
+    [key: number]: { anonymousUsers: number; loggedInUsers: number; totalViews: number };
+  }>({});
+
   const handleSearch = (value: string) => {
     fetchGames(currentPage, pageSize, value);
   };
@@ -113,6 +118,11 @@ const CasinoGameManagement = () => {
         setTotalPages(paginationData.totalPages || 1);
         setPageSize(paginationData.pageSize || limit);
         setTotalItems(paginationData.totalItems || 0); // totalItems 상태 업데이트
+
+        // 조회수 통계 저장
+        if (response.data.contentViewStats) {
+          setViewStats(response.data.contentViewStats);
+        }
       } else {
         setGames([]);
         setAlertMessage({
@@ -456,6 +466,24 @@ const CasinoGameManagement = () => {
       header: "등록일자",
       accessor: "createdAt" as keyof CasinoGame,
       cell: (value: unknown) => formatDateForDisplay(value as string),
+    },
+    {
+      header: "조회",
+      accessor: "id" as keyof CasinoGame,
+      cell: (value: unknown, row: CasinoGame) => {
+        const stats = viewStats[row.id];
+        const totalViews = stats ? stats.totalViews : 0;
+        const loggedInUsers = stats ? stats.loggedInUsers : 0;
+        return (
+          <span className="text-sm text-gray-600">
+            {totalViews.toLocaleString()}
+            {loggedInUsers > 0 && (
+              <span className="text-blue-600">({loggedInUsers.toLocaleString()})</span>
+            )}
+          </span>
+        );
+      },
+      className: "w-20 text-center",
     },
     {
       header: "공개 여부",

@@ -42,6 +42,11 @@ const SportsAnalysisManagement = () => {
   const [total, setTotal] = useState(0);
   const [searchValue, setSearchValue] = useState("");
 
+  // 조회수 통계 상태 추가
+  const [viewStats, setViewStats] = useState<{
+    [key: number]: { anonymousUsers: number; loggedInUsers: number; totalViews: number };
+  }>({});
+
   const handleSearch = (value: string) => {
     fetchAnalyses(value);
   };
@@ -59,6 +64,12 @@ const SportsAnalysisManagement = () => {
       if (response.success) {
         setAnalyses(response.data || []);
         setOriginalAnalyses(response.data ? [...response.data] : []);
+
+        // 조회수 통계 저장
+        if (response.contentViewStats) {
+          setViewStats(response.contentViewStats);
+        }
+
         setError(null);
       } else if (!response.success && response.message) {
         setError(response.message);
@@ -222,7 +233,7 @@ const SportsAnalysisManagement = () => {
     {
       header: "홈팀",
       accessor: "homeTeam",
-      className: "text-center w-[220px]",
+      className: "text-center w-[150px]",
       cell: (value: unknown, row: SportGameAnalysis) => (
         <div className="flex flex-col items-center space-y-2 py-3">
           {row.homeTeamImageUrl && (
@@ -245,7 +256,7 @@ const SportsAnalysisManagement = () => {
     {
       header: "원정팀",
       accessor: "awayTeam",
-      className: "text-center w-[220px]",
+      className: "text-center w-[150px]",
       cell: (value: unknown, row: SportGameAnalysis) => (
         <div className="flex flex-col items-center space-y-2 py-3">
           {row.awayTeamImageUrl && (
@@ -274,12 +285,31 @@ const SportsAnalysisManagement = () => {
     {
       header: "노출 기간",
       accessor: "startTime",
-      className: "text-center w-[300px]",
+      className: "text-center w-[200px]",
       cell: (value: unknown, row: SportGameAnalysis) => (
-        <div>
-          {formatDate(row.startTime)} ~ {formatDate(row.endTime)}
+        <div className="flex flex-col">
+          <div>{formatDate(row.startTime)}</div>
+          <div>~ {formatDate(row.endTime)}</div>
         </div>
       ),
+    },
+    {
+      header: "조회",
+      accessor: "id" as keyof SportGameAnalysis,
+      className: "text-center w-[80px]",
+      cell: (value: unknown, row: SportGameAnalysis) => {
+        const stats = viewStats[row.id];
+        const totalViews = stats ? stats.totalViews : 0;
+        const loggedInUsers = stats ? stats.loggedInUsers : 0;
+        return (
+          <span className="text-sm text-gray-600">
+            {totalViews.toLocaleString()}
+            {loggedInUsers > 0 && (
+              <span className="text-blue-600">({loggedInUsers.toLocaleString()})</span>
+            )}
+          </span>
+        );
+      },
     },
     {
       header: "공개 여부",

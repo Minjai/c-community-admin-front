@@ -15,15 +15,25 @@ interface PostColumnDef {
   className?: string;
 }
 
+interface ContentViewStats {
+  [key: string]: {
+    anonymousUsers: number;
+    loggedInUsers: number;
+    totalViews: number;
+  };
+}
+
 const PostManagement = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [contentViewStats, setContentViewStats] = useState<ContentViewStats>({});
   const [selectedPosts, setSelectedPosts] = useState<number[]>([]);
   const navigate = useNavigate();
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 10,
     total: 0,
+    totalPages: 1,
   });
 
   // 검색 value 상태
@@ -31,6 +41,26 @@ const PostManagement = () => {
 
   // 스크롤을 맨 위로 이동
   useScrollToTop();
+
+  // 조회수 표시 함수
+  const formatViewCount = (postId: number) => {
+    const stats = contentViewStats[postId.toString()];
+    if (!stats) return "0";
+
+    const total = stats.totalViews;
+    const loggedIn = stats.loggedInUsers;
+
+    if (loggedIn === 0) {
+      return total.toString();
+    }
+
+    return (
+      <span>
+        <span className="text-gray-600">{total}</span>
+        <span className="text-blue-600">({loggedIn})</span>
+      </span>
+    );
+  };
 
   // 게시물 상세 페이지로 이동
   const handleClick = (id: number) => {
@@ -66,32 +96,25 @@ const PostManagement = () => {
 
       console.log("게시물 API 응답:", response.data);
 
-      // 서버 응답 형식에 맞게 처리
-      if (response.data) {
-        // 응답이 posts 배열을 포함하는 객체인지 확인
-        if (response.data.posts && Array.isArray(response.data.posts)) {
-          setPosts(response.data.posts);
-          // 페이지네이션 정보가 있는 경우 업데이트
-          setPagination({
-            page: response.data.currentPage || page,
-            limit: pagination.limit,
-            total: response.data.totalPosts || 0,
-          });
-        }
-        // 응답이 직접 배열인 경우
-        else if (Array.isArray(response.data)) {
-          setPosts(response.data);
-          // 페이지네이션 정보 업데이트 (배열 길이 기반)
-          setPagination((prev) => ({
-            ...prev,
-            page,
-            total: response.data.length > 0 ? response.data.length * 5 : 0, // 임시 값
-          }));
-        } else {
-          console.error("게시물 불러오기 실패: 잘못된 응답 형식", response.data);
-        }
+      // 새로운 API 응답 구조에 맞게 처리
+      if (response.data.posts && Array.isArray(response.data.posts)) {
+        setPosts(response.data.posts);
+        setContentViewStats(response.data.contentViewStats || {});
+        setPagination({
+          page: response.data.currentPage || page,
+          limit: pagination.limit,
+          total: response.data.totalPosts || 0,
+          totalPages: response.data.totalPages || 1,
+        });
       } else {
-        console.error("게시물 불러오기 실패: 응답 데이터 없음");
+        setPosts([]);
+        setContentViewStats({});
+        setPagination({
+          page,
+          limit: pagination.limit,
+          total: 0,
+          totalPages: 1,
+        });
       }
     } catch (error) {
       console.error("게시물 불러오기 오류:", error);
@@ -200,11 +223,19 @@ const PostManagement = () => {
       cell: (value: unknown) => new Date(value as string).toLocaleDateString(),
     },
     {
-      header: "조회/댓글/추천",
+      header: "조회",
       accessor: "id" as keyof Post,
       cell: (value: unknown, row: Post) => (
-        <span className="text-center">
-          {`${row.viewCount || 0}/${row._count?.comments || 0}/${row._count?.likes || 0}`}
+        <span className="text-sm text-gray-600">{formatViewCount(row.id)}</span>
+      ),
+      className: "text-center",
+    },
+    {
+      header: "댓글/추천",
+      accessor: "id" as keyof Post,
+      cell: (value: unknown, row: Post) => (
+        <span className="text-sm text-gray-600">
+          {`${row._count?.comments || 0}/${row._count?.likes || 0}`}
         </span>
       ),
       className: "text-center",

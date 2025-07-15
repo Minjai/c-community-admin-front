@@ -161,12 +161,20 @@ export interface PaginationParams {
   total?: number;
 }
 
+// 조회수 통계 타입
+export interface ViewStats {
+  anonymousUsers: number;
+  loggedInUsers: number;
+  totalViews: number;
+}
+
 // 응답 타입
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
   message?: string; // error -> message 로 변경하고 optional 로
   pagination?: PaginationInfo; // PaginationParams -> PaginationInfo 로 변경
+  contentViewStats?: { [key: number]: ViewStats }; // 조회수 통계 추가
 }
 
 // 스포츠 종목 관련 타입

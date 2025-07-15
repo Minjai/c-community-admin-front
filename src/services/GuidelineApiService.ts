@@ -32,45 +32,9 @@ export class GuidelineApiService {
           search: searchValue,
         },
       });
-      console.log("Guideline API Response:", response); // Log the full response
 
-      if (
-        response.data &&
-        response.data.success &&
-        response.data.data &&
-        Array.isArray(response.data.data.items)
-      ) {
-        // Extract pagination details from response.data.data
-        const { items, total, page: currentPage, limit: pageSize, totalPages } = response.data.data;
-        console.log("Parsed Pagination:", { totalItems: total, currentPage, pageSize, totalPages }); // Log parsed pagination
-
-        const pagination: PaginationInfo = {
-          totalItems: total,
-          currentPage,
-          pageSize,
-          totalPages,
-        };
-        console.log("Parsed Pagination:", pagination); // Log parsed pagination
-
-        return {
-          success: true,
-          data: items,
-          pagination: pagination,
-          message: response.data.message || "Guidelines fetched successfully",
-        };
-      } else {
-        console.error("Invalid response structure:", response.data);
-        return {
-          success: false,
-          message:
-            response.data?.message ||
-            "Failed to fetch guidelines due to invalid response structure.",
-          data: [],
-          pagination: undefined,
-        };
-      }
+      return response.data;
     } catch (error: any) {
-      console.error(`Error fetching guidelines for boardId ${boardId}:`, error);
       const errorMessage =
         error.response?.data?.message || "An error occurred while fetching guidelines.";
       return {
@@ -93,7 +57,6 @@ export class GuidelineApiService {
 
       return response.data;
     } catch (error) {
-      console.error(`가이드라인 상세 조회 오류 (ID: ${id}):`, error);
       throw error;
     }
   }
@@ -114,17 +77,6 @@ export class GuidelineApiService {
     position?: number;
   }) {
     try {
-      console.log("가이드라인 생성 데이터:", {
-        title: data.title,
-        content: data.content.substring(0, 100) + "...", // 내용 일부만 로그
-        boardId: data.boardId,
-        hasImage: !!data.image,
-        tags: data.tags,
-        isPublic: data.isPublic,
-        displayOrder: data.displayOrder,
-        position: data.position,
-      });
-
       // 이미지 파일이 있는 경우 FormData로 처리
       if (data.image) {
         const formData = new FormData();
@@ -149,18 +101,6 @@ export class GuidelineApiService {
           formData.append("position", String(data.position));
         }
 
-        // FormData 내용 로그
-        console.log("FormData로 전송되는 필드:");
-        for (let [key, value] of formData.entries()) {
-          if (key === "image") {
-            console.log(`${key}: [File 객체]`);
-          } else if (key === "content") {
-            console.log(`${key}: ${String(value).substring(0, 100)}...`);
-          } else {
-            console.log(`${key}: ${value}`);
-          }
-        }
-
         const response = await axios.post("/guidelines", formData, {
           headers: {
             "Content-Type": "multipart/form-data",
@@ -168,15 +108,11 @@ export class GuidelineApiService {
         });
         return response.data;
       } else {
-        // JSON 데이터 로그
-        console.log("JSON으로 전송되는 데이터:", data);
-
         // 일반 JSON 데이터로 처리
         const response = await axios.post("/guidelines", data);
         return response.data;
       }
     } catch (error) {
-      console.error(`가이드라인 생성 오류:`, error);
       throw error;
     }
   }
@@ -201,26 +137,6 @@ export class GuidelineApiService {
     }
   ) {
     try {
-      console.log(`가이드라인(ID: ${id}) 수정 데이터:`, {
-        title: data.title,
-        content: data.content ? data.content.substring(0, 100) + "..." : undefined,
-        boardId: data.boardId,
-        hasImage: !!data.image,
-        imageInfo: data.image
-          ? {
-              name: data.image.name,
-              type: data.image.type,
-              size: `${(data.image.size / 1024 / 1024).toFixed(2)}MB`,
-              isGif:
-                data.image.type === "image/gif" || data.image.name.toLowerCase().endsWith(".gif"),
-            }
-          : null,
-        tags: data.tags,
-        isPublic: data.isPublic,
-        displayOrder: data.displayOrder,
-        position: data.position,
-      });
-
       // 이미지 파일이 있는 경우 FormData로 처리
       if (data.image) {
         const formData = new FormData();
@@ -229,13 +145,6 @@ export class GuidelineApiService {
         if (data.content) formData.append("content", data.content);
         if (data.boardId) formData.append("boardId", String(data.boardId));
 
-        // 이미지 파일 추가 및 디버깅 정보 출력
-        console.log("수정 시 이미지 파일 정보:", {
-          name: data.image.name,
-          type: data.image.type,
-          size: `${(data.image.size / 1024 / 1024).toFixed(2)}MB`,
-          lastModified: new Date(data.image.lastModified).toISOString(),
-        });
         formData.append("image", data.image);
 
         if (data.tags && data.tags.length > 0) {
@@ -254,20 +163,6 @@ export class GuidelineApiService {
           formData.append("position", String(data.position));
         }
 
-        // FormData 내용 로그
-        console.log(`FormData로 가이드라인(ID: ${id}) 수정 필드:`);
-        for (let [key, value] of formData.entries()) {
-          if (key === "image") {
-            console.log(
-              `${key}: [File 객체: ${(value as File).name}, 타입: ${(value as File).type}]`
-            );
-          } else if (key === "content") {
-            console.log(`${key}: ${String(value).substring(0, 100)}...`);
-          } else {
-            console.log(`${key}: ${value}`);
-          }
-        }
-
         const response = await axios.put(`/guidelines/${id}`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
@@ -276,14 +171,12 @@ export class GuidelineApiService {
         return response.data;
       } else {
         // JSON 데이터 로그
-        console.log(`JSON으로 가이드라인(ID: ${id}) 수정 데이터:`, data);
 
         // 일반 JSON 데이터로 처리
         const response = await axios.put(`/guidelines/${id}`, data);
         return response.data;
       }
     } catch (error) {
-      console.error(`가이드라인 수정 오류 (ID: ${id}):`, error);
       throw error;
     }
   }

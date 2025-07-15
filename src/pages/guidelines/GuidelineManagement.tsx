@@ -15,10 +15,9 @@ import { toast } from "react-toastify";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import SearchInput from "@components/SearchInput.tsx";
 
-// Guideline 타입에 position과 displayOrder, tags 추가 (복원)
+// Guideline 타입에 position과 tags 추가 (복원)
 interface GuidelineWithOrder extends Guideline {
   position?: number;
-  displayOrder?: number;
   tags?: string[]; // Explicitly add tags as string array
 }
 
@@ -53,6 +52,14 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
   // 검색 value 상태
   const [searchValue, setSearchValue] = useState<string>("");
 
+  // 조회수 통계 상태 추가
+  const [viewStats, setViewStats] = useState<{
+    [key: number]: { anonymousUsers: number; loggedInUsers: number; totalViews: number };
+  }>({});
+
+  // 원본 position 값 저장용 ref
+  const originalGuidelinesRef = useRef<GuidelineWithOrder[]>([]);
+
   const handleEditorContentChange = useCallback(
     (content: string) => {
       if (currentGuideline) {
@@ -84,7 +91,6 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
   const { path, title } = getPageInfo();
 
   const handleSearch = (value: string) => {
-    setSearchValue(value);
     fetchGuidelines(currentPage, pageSize, value);
   };
 
@@ -99,9 +105,14 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     try {
       const response = await GuidelineApiService.getGuidelines(boardId, page, limit, searchValue);
 
-      if (response && response.success && Array.isArray(response.data)) {
-        // Process tags: Convert comma-separated string to array (복원)
-        const processedGuidelines = response.data.map((guideline: any) => ({
+      if (
+        response &&
+        response.success &&
+        response.data &&
+        Array.isArray((response.data as any).items)
+      ) {
+        // Process tags: Convert comma-separated string to array
+        const processedGuidelines = (response.data as any).items.map((guideline: any) => ({
           ...guideline,
           tags:
             typeof guideline.tags === "string"
@@ -109,8 +120,9 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
                   .split(",")
                   .map((tag: string) => tag.trim())
                   .filter((tag: string) => tag !== "")
-              : guideline.tags || [], // Handle null/undefined or already array
+              : guideline.tags || [],
         }));
+
         // position 기준 오름차순 정렬 (작은 값이 위로), position이 같으면 createdAt 내림차순(최신이 위)
         const sortedGuidelines = [...processedGuidelines].sort((a, b) => {
           if ((a.position || 0) !== (b.position || 0)) {
@@ -120,19 +132,27 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
         setGuidelines(sortedGuidelines);
-        originalGuidelinesRef.current = sortedGuidelines; // fetchGuidelines에서만 원본 저장
+        originalGuidelinesRef.current = sortedGuidelines;
 
-        if (response.pagination) {
-          setTotalPages(response.pagination.totalPages);
-          setCurrentPage(response.pagination.currentPage);
-          setPageSize(response.pagination.pageSize);
-          setTotalItems(response.pagination.totalItems);
+        // 조회수 통계 저장
+        if (response.contentViewStats) {
+          setViewStats(response.contentViewStats);
+        }
+
+        // 페이지네이션 정보 업데이트 (API 응답 사용)
+        if (response.data) {
+          setTotalPages((response.data as any).totalPages);
+          setCurrentPage((response.data as any).page);
+          setPageSize((response.data as any).limit);
+          setTotalItems((response.data as any).total);
         } else {
+          // 페이지네이션 정보가 없는 경우 (API 오류 등) 기본값 처리
           setTotalPages(1);
           setCurrentPage(1);
-          setTotalItems(processedGuidelines.length); // Use processed data length (복원)
+          setTotalItems(sortedGuidelines.length);
         }
       } else {
+        // API 요청 실패 또는 data 형식이 배열이 아닌 경우
         setGuidelines([]);
         setError(response?.message || "가이드라인 데이터를 불러오는 중 오류가 발생했습니다.");
         setTotalPages(1);
@@ -140,8 +160,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
         setTotalItems(0);
       }
     } catch (err: any) {
-      console.error("가이드라인 조회 오류:", err);
-      setError(err.message || "가이드라인 목록 조회 중 오류가 발생했습니다.");
+      setError(err?.message || "가이드라인 목록 조회 중 오류가 발생했습니다.");
       setGuidelines([]);
       setTotalPages(1);
       setCurrentPage(1);
@@ -153,7 +172,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
 
   useEffect(() => {
     fetchGuidelines(currentPage, pageSize, searchValue);
-  }, [boardId, currentPage, pageSize]); // searchValue 제거
+  }, [boardId, currentPage, pageSize, searchValue]); // useEffect 의존성 배열 복원
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
@@ -296,7 +315,6 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
       fetchGuidelines(currentPage, pageSize);
       setSelectedGuidelineIds([]);
     } catch (error: any) {
-      console.error("가이드라인 일괄 삭제 중 오류 발생:", error);
       toast.error("가이드라인 삭제 중 일부 오류가 발생했습니다. 목록을 확인해주세요.");
       fetchGuidelines(currentPage, pageSize);
       setSelectedGuidelineIds([]);
@@ -360,9 +378,6 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     }
   };
 
-  // 원본 position 값 저장용 ref
-  const originalGuidelinesRef = useRef<GuidelineWithOrder[]>([]);
-
   const handleCloseModal = () => {
     setModalError(null);
     setShowModal(false);
@@ -420,12 +435,12 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
         />
       ),
       accessor: "id" as keyof GuidelineWithOrder,
-      cell: (id: number) => (
+      cell: (value: unknown, row: GuidelineWithOrder) => (
         <input
           type="checkbox"
           className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedGuidelineIds.includes(id)}
-          onChange={() => handleSelectGuideline(id)}
+          checked={selectedGuidelineIds.includes(value as number)}
+          onChange={() => handleSelectGuideline(value as number)}
         />
       ),
       className: "w-px px-4",
@@ -433,23 +448,27 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     {
       header: "제목",
       accessor: "title" as keyof GuidelineWithOrder,
-      cell: (value: string, row: GuidelineWithOrder) => (
+      cell: (value: unknown, row: GuidelineWithOrder) => (
         <span
           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
           onClick={() => handleEditGuideline(row)}
         >
-          {value}
+          {value as string}
         </span>
       ),
     },
     {
       header: "이미지",
       accessor: "imageUrl" as keyof GuidelineWithOrder,
-      cell: (value: string | undefined) => {
+      cell: (value: unknown) => {
         return (
           <div className="h-12 flex items-center justify-center">
             {value ? (
-              <img src={value} alt="썸네일" className="max-h-full max-w-full object-contain" />
+              <img
+                src={value as string}
+                alt="썸네일"
+                className="max-h-full max-w-full object-contain"
+              />
             ) : null}
           </div>
         );
@@ -457,9 +476,30 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
       className: "text-center px-2",
     },
     {
+      header: "등록일",
+      accessor: "createdAt" as keyof GuidelineWithOrder,
+      cell: (value: unknown) => formatDateForDisplay(value as string | undefined),
+    },
+    {
+      header: "조회",
+      accessor: "id" as keyof GuidelineWithOrder,
+      cell: (value: unknown, row: GuidelineWithOrder) => {
+        const stats = viewStats[row.id];
+        const totalViews = stats ? stats.totalViews : 0;
+        const loggedInUsers = stats ? stats.loggedInUsers : 0;
+        return (
+          <span className="text-sm text-gray-600">
+            {totalViews.toLocaleString()}
+            <span className="text-blue-600">({loggedInUsers.toLocaleString()})</span>
+          </span>
+        );
+      },
+      className: "w-20 text-center",
+    },
+    {
       header: "공개 여부",
       accessor: "isPublic" as keyof GuidelineWithOrder,
-      cell: (value: number | boolean | undefined) => {
+      cell: (value: unknown) => {
         const isPublic = value === 1 || value === true;
         return (
           <span
@@ -474,19 +514,14 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
       className: "text-center",
     },
     {
-      header: "등록일",
-      accessor: "createdAt" as keyof GuidelineWithOrder,
-      cell: (value: string | undefined) => formatDateForDisplay(value),
-    },
-    {
       header: "순서",
       accessor: "position" as keyof GuidelineWithOrder,
-      cell: (value: number, row: GuidelineWithOrder, index: number) => (
+      cell: (value: unknown, row: GuidelineWithOrder, index: number) => (
         <input
           type="number"
           min={1}
           className="w-16 border rounded px-2 py-1 text-center"
-          value={value}
+          value={value as number}
           onChange={(e) => handlePositionInputChange(index, Number(e.target.value))}
           style={{ background: "#fff" }}
         />
@@ -496,7 +531,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
     {
       header: "관리",
       accessor: "id" as keyof GuidelineWithOrder,
-      cell: (id: number, row: GuidelineWithOrder, index: number) => (
+      cell: (value: unknown, row: GuidelineWithOrder, index: number) => (
         <div className="flex items-center space-x-1 justify-center">
           <ActionButton
             label="수정"
@@ -508,7 +543,7 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
             label="삭제"
             action="delete"
             size="sm"
-            onClick={() => handleDeleteGuideline(id)}
+            onClick={() => handleDeleteGuideline(value as number)}
           />
         </div>
       ),

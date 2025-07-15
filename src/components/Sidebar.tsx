@@ -88,10 +88,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
       title: "사이트 노출 관리",
       subItems: [{ name: "홈 화면 관리", path: "/exposure/home" }],
     },
-    {
-      title: "페이지 통계 관리",
-      subItems: [{ name: "사이트 통계 관리", path: "/statistics/site" }],
-    },
   ];
 
   // 현재 경로에 따라 활성 메뉴 설정

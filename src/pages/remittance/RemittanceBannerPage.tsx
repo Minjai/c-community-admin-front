@@ -23,9 +23,18 @@ function formatDate(dateStr: string) {
   return `${year}.${month}.${day} ${hours}:${minutes}`;
 }
 
+interface ContentViewStats {
+  [key: string]: {
+    anonymousUsers: number;
+    loggedInUsers: number;
+    totalViews: number;
+  };
+}
+
 const RemittanceBannerPage: React.FC = () => {
   const [banners, setBanners] = useState<RemittanceBanner[]>([]);
   const [originalBanners, setOriginalBanners] = useState<RemittanceBanner[]>([]);
+  const [contentViewStats, setContentViewStats] = useState<ContentViewStats>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -45,9 +54,28 @@ const RemittanceBannerPage: React.FC = () => {
   const [totalItems, setTotalItems] = useState<number>(0);
   const [searchValue, setSearchValue] = useState<string>("");
 
+  // 조회수 표시 함수
+  const formatViewCount = (bannerId: number) => {
+    const stats = contentViewStats[bannerId.toString()];
+    if (!stats) return "0";
+
+    const total = stats.totalViews;
+    const loggedIn = stats.loggedInUsers;
+
+    if (loggedIn === 0) {
+      return total.toString();
+    }
+
+    return (
+      <span>
+        <span className="text-gray-600">{total}</span>
+        <span className="text-blue-600">({loggedIn})</span>
+      </span>
+    );
+  };
+
   // 검색 핸들러
   const handleSearch = (value: string) => {
-    setSearchValue(value);
     fetchBanners(1, pageSize, value);
   };
 
@@ -84,6 +112,7 @@ const RemittanceBannerPage: React.FC = () => {
           });
           setBanners(sortedBanners);
           setOriginalBanners(sortedBanners);
+          setContentViewStats(response.contentViewStats || {});
           setTotalItems(pagination.totalItems || 0);
           setTotalPages(pagination.totalPages || 0);
           setCurrentPage(pagination.currentPage || page);
@@ -92,6 +121,7 @@ const RemittanceBannerPage: React.FC = () => {
         } else {
           setBanners([]);
           setOriginalBanners([]);
+          setContentViewStats({});
           setTotalItems(0);
           setTotalPages(0);
           setCurrentPage(1);
@@ -101,6 +131,7 @@ const RemittanceBannerPage: React.FC = () => {
         setError("송금 배너를 불러오는데 실패했습니다.");
         setBanners([]);
         setOriginalBanners([]);
+        setContentViewStats({});
         setTotalItems(0);
         setTotalPages(0);
         setCurrentPage(1);
@@ -113,7 +144,7 @@ const RemittanceBannerPage: React.FC = () => {
 
   useEffect(() => {
     fetchBanners(currentPage, pageSize, searchValue);
-  }, [fetchBanners, currentPage, pageSize]);
+  }, [fetchBanners, currentPage, pageSize, searchValue]);
 
   // 배너 추가 모달 열기
   const handleAddBanner = () => {
@@ -479,7 +510,7 @@ const RemittanceBannerPage: React.FC = () => {
     }
   };
 
-  // DataTable 컬럼 정의
+  // 테이블 컬럼 정의
   const columns = useMemo(
     () => [
       {
@@ -487,24 +518,17 @@ const RemittanceBannerPage: React.FC = () => {
           <input
             type="checkbox"
             className="form-checkbox h-4 w-4 text-blue-600"
+            checked={selectedBannerIds.length === banners.length && banners.length > 0}
             onChange={handleSelectAllBanners}
-            checked={banners.length > 0 && selectedBannerIds.length === banners.length}
-            ref={(input) => {
-              if (input) {
-                input.indeterminate =
-                  selectedBannerIds.length > 0 && selectedBannerIds.length < banners.length;
-              }
-            }}
-            disabled={loading || banners.length === 0}
           />
         ),
         accessor: "id" as keyof RemittanceBanner,
-        cell: (id: number) => (
+        cell: (value: unknown, row: RemittanceBanner) => (
           <input
             type="checkbox"
             className="form-checkbox h-4 w-4 text-blue-600"
-            checked={selectedBannerIds.includes(id)}
-            onChange={() => handleSelectBanner(id)}
+            checked={selectedBannerIds.includes(row.id)}
+            onChange={() => handleSelectBanner(row.id)}
           />
         ),
         className: "w-px px-4",
@@ -512,9 +536,9 @@ const RemittanceBannerPage: React.FC = () => {
       {
         header: "로고",
         accessor: "imageUrl" as keyof RemittanceBanner,
-        cell: (imageUrl: string, row: RemittanceBanner) => (
+        cell: (value: unknown, row: RemittanceBanner) => (
           <img
-            src={imageUrl || "/placeholder-image.png"}
+            src={row.imageUrl || "/placeholder-image.png"}
             alt={row.name}
             className="h-8 w-auto object-contain"
             onError={(e) => (e.currentTarget.src = "/placeholder-image.png")}
@@ -524,6 +548,20 @@ const RemittanceBannerPage: React.FC = () => {
       },
       { header: "사이트명", accessor: "name" as keyof RemittanceBanner },
       { header: "이동링크", accessor: "link" as keyof RemittanceBanner },
+      { header: "생성일", accessor: "createdAt" as keyof RemittanceBanner, cell: formatDate },
+      {
+        header: "수정일",
+        accessor: "updatedAt" as keyof RemittanceBanner,
+        cell: formatDate,
+      },
+      {
+        header: "조회",
+        accessor: "id" as keyof RemittanceBanner,
+        cell: (value: unknown, row: RemittanceBanner) => (
+          <span className="text-sm text-gray-600">{formatViewCount(row.id)}</span>
+        ),
+        className: "text-center",
+      },
       {
         header: "공개여부",
         accessor: "isPublic" as keyof RemittanceBanner,
@@ -537,12 +575,6 @@ const RemittanceBannerPage: React.FC = () => {
           </span>
         ),
         className: "text-center",
-      },
-      { header: "생성일", accessor: "createdAt" as keyof RemittanceBanner, cell: formatDate },
-      {
-        header: "수정일",
-        accessor: "updatedAt" as keyof RemittanceBanner,
-        cell: formatDate,
       },
       {
         header: "순서",
@@ -581,7 +613,7 @@ const RemittanceBannerPage: React.FC = () => {
         className: "text-center",
       },
     ],
-    [banners, selectedBannerIds, loading]
+    [banners, selectedBannerIds, loading, contentViewStats]
   );
 
   return (

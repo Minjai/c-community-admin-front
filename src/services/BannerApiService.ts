@@ -60,37 +60,7 @@ const BannerApiService = {
       const response = await axios.get("/banner/bottom", {
         params: { page, limit, search: searchValue },
       });
-      // API 응답 구조 수정: 루트 레벨의 pagination 객체를 사용하도록 변경
-      if (response.data && response.data.success) {
-        // 서버 응답의 pagination 객체를 직접 사용하거나, 없으면 기본값 생성
-        const pagination = response.data.pagination || {
-          totalItems: response.data.data?.length || 0, // 데이터 길이로 추정
-          totalPages: 1,
-          currentPage: page,
-          pageSize: limit,
-        };
-
-        // pagination.totalItems 값이 count와 다를 수 있으므로 확인 후 사용
-        if (response.data.count !== undefined && pagination.totalItems === 0) {
-          pagination.totalItems = response.data.count;
-          pagination.totalPages = Math.ceil(response.data.count / limit);
-        }
-
-        return {
-          success: true,
-          data: response.data.data || [],
-          message: response.data.message,
-          pagination: pagination, // 서버의 pagination 객체 또는 생성된 기본값 사용
-        };
-      } else {
-        // API 요청 실패 또는 success: false 인 경우
-        return {
-          success: false,
-          message: response.data?.message || "하단 배너 조회 중 오류 발생",
-          data: [],
-          pagination: { totalItems: 0, totalPages: 1, currentPage: 1, pageSize: limit },
-        };
-      }
+      return response.data;
     } catch (error: any) {
       console.error("하단 배너 조회 오류:", error);
       return {

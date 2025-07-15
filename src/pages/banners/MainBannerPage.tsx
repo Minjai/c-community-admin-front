@@ -46,7 +46,6 @@ const MainBannerPage: React.FC = () => {
   const [selectedBannerIds, setSelectedBannerIds] = useState<number[]>([]);
 
   const handleSearch = (type: string, value: string) => {
-    console.log("MainBannerPage: 검색 핸들러 호출됨, 타입:", type, "검색어:", value);
     if (type === "title") {
       fetchBanners(currentPage, pageSize, value).then((r) => {
         // 검색 후 선택된 배너 ID 초기화
@@ -54,6 +53,11 @@ const MainBannerPage: React.FC = () => {
       });
     }
   };
+
+  // 조회수 통계 상태 추가
+  const [viewStats, setViewStats] = useState<{
+    [key: number]: { anonymousUsers: number; loggedInUsers: number; totalViews: number };
+  }>({});
 
   // 배너 목록 조회 (페이지네이션 적용)
   const fetchBanners = async (page: number = 1, limit: number = 10, searchValue: string = "") => {
@@ -68,7 +72,6 @@ const MainBannerPage: React.FC = () => {
         limit,
         searchValue
       );
-      console.log("API Response:", response); // 응답 로깅 (디버깅용)
 
       // API 응답 구조에 맞게 데이터와 페이지네이션 정보 추출
       if (response && response.success && Array.isArray(response.data)) {
@@ -82,6 +85,11 @@ const MainBannerPage: React.FC = () => {
         });
         setBanners(sortedBanners); // 정렬된 배열을 상태에 저장
         originalBannersRef.current = sortedBanners; // fetchBanners에서만 원본 저장
+
+        // 조회수 통계 저장
+        if (response.contentViewStats) {
+          setViewStats(response.contentViewStats);
+        }
 
         // 페이지네이션 정보 업데이트 (API 응답 사용)
         if (response.pagination) {
@@ -154,7 +162,6 @@ const MainBannerPage: React.FC = () => {
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
     setModalError(null);
-    console.log("수정할 배너 데이터:", banner);
 
     const formattedStartDate = formatDateForInput(banner.startDate);
     const formattedEndDate = formatDateForInput(banner.endDate);
@@ -201,30 +208,6 @@ const MainBannerPage: React.FC = () => {
           // 날짜 형식 변환 - 로컬 시간 -> UTC ISO 문자열
           const startDate = new Date(currentBanner.startDate).toISOString();
           const endDate = new Date(currentBanner.endDate).toISOString();
-
-          console.log("날짜 변환 전/후 비교:", {
-            원래_시작일: currentBanner.startDate,
-            변환된_시작일: startDate,
-            원래_종료일: currentBanner.endDate,
-            변환된_종료일: endDate,
-          });
-
-          // 서버 측 500 에러 디버깅을 위해 추가 로깅
-          console.log("Banner data being sent:", {
-            id: currentBanner.id,
-            title: currentBanner.title,
-            pDescription: currentBanner.pDescription,
-            mDescription: currentBanner.mDescription,
-            linkUrl: currentBanner.linkUrl,
-            startDate: startDate,
-            endDate: endDate,
-            isPublic: currentBanner.isPublic,
-            position: currentBanner.position,
-            bannerType: "main",
-            showButton: currentBanner.showButton,
-            buttonText: currentBanner.buttonText,
-            buttonColor: currentBanner.buttonColor,
-          });
 
           // 이미지 업로드 문제 확인을 위해 임시로 이미지 없이 업데이트 시도
           await BannerApiService.updateMainBanner(
@@ -532,6 +515,27 @@ const MainBannerPage: React.FC = () => {
       header: "종료일",
       accessor: "endDate" as keyof Banner,
       cell: (value: unknown) => formatDateForDisplay(value as string),
+    },
+    {
+      header: "조회",
+      accessor: "id" as keyof Banner,
+      cell: (value: unknown, row: Banner) => {
+        const stats = viewStats[row.id] || viewStats[String(row.id) as any];
+        if (!stats) {
+          return <span className="text-sm text-gray-600">0</span>;
+        }
+        const totalViews = stats.totalViews;
+        const loggedInUsers = stats.loggedInUsers;
+        return (
+          <span className="text-sm text-gray-600">
+            {totalViews.toLocaleString()}
+            {loggedInUsers > 0 && (
+              <span className="text-sm text-blue-500 ml-1">({loggedInUsers.toLocaleString()})</span>
+            )}
+          </span>
+        );
+      },
+      className: "w-24 text-center",
     },
     {
       header: "공개 여부",

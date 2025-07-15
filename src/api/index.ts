@@ -362,7 +362,15 @@ export const getAllSportGameAnalyses = async (
       ? `/sport-analyses?${queryParams.toString()}`
       : "/sport-analyses";
     const response = await axios.get(url);
-    return response.data;
+
+    // 서버 응답 구조에 맞게 contentViewStats와 pagination 정보 포함
+    return {
+      success: response.data.success,
+      data: response.data.data || [],
+      contentViewStats: response.data.contentViewStats,
+      pagination: response.data.pagination,
+      message: response.data.message,
+    };
   } catch (error) {
     console.error("Error fetching sport game analyses:", error);
     throw error;

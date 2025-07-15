@@ -70,6 +70,11 @@ const CasinoCompanyPage: React.FC = () => {
   // 검색 value 상태
   const [searchValue, setSearchValue] = useState<string>("");
 
+  // 조회수 통계 상태 추가
+  const [viewStats, setViewStats] = useState<{
+    [key: number]: { anonymousUsers: number; loggedInUsers: number; totalViews: number };
+  }>({});
+
   // 초기 상태 설정
   const initialCompanyState: Partial<CasinoCompany> = {
     companyName: "",
@@ -131,6 +136,11 @@ const CasinoCompanyPage: React.FC = () => {
             countsMap[company.id] = (company as any).reviewCount || 0;
           });
           setReviewCounts(countsMap);
+
+          // 조회수 통계 저장
+          if (response.contentViewStats) {
+            setViewStats(response.contentViewStats);
+          }
         } else {
           setCompanies([]);
           setOriginalCompanies([]);
@@ -638,6 +648,29 @@ const CasinoCompanyPage: React.FC = () => {
       size: 120,
     },
     {
+      header: "등록일자",
+      accessor: "createdAt" as keyof CasinoCompany,
+      cell: (value: unknown) => formatDate(value as string),
+    },
+    {
+      header: "조회",
+      accessor: "id" as keyof CasinoCompany,
+      cell: (value: unknown, row: CasinoCompany) => {
+        const stats = viewStats[row.id];
+        const totalViews = stats ? stats.totalViews : 0;
+        const loggedInUsers = stats ? stats.loggedInUsers : 0;
+        return (
+          <span className="text-sm text-gray-600">
+            {totalViews.toLocaleString()}
+            {loggedInUsers > 0 && (
+              <span className="text-blue-600">({loggedInUsers.toLocaleString()})</span>
+            )}
+          </span>
+        );
+      },
+      className: "w-20 text-center",
+    },
+    {
       header: "상태",
       accessor: "isPublic" as keyof CasinoCompany,
       cell: (value: unknown) => (
@@ -653,12 +686,6 @@ const CasinoCompanyPage: React.FC = () => {
       ),
       size: 80,
     },
-    {
-      header: "등록일자",
-      accessor: "createdAt" as keyof CasinoCompany,
-      cell: (value: unknown) => formatDate(value as string),
-    },
-    // 순서 컬럼: 관리 컬럼 왼쪽, 등록일자 다음
     {
       header: "순서",
       accessor: "displayOrder" as keyof CasinoCompany,
@@ -681,7 +708,7 @@ const CasinoCompanyPage: React.FC = () => {
         <div className="flex space-x-2">
           <button
             onClick={() => handleOpenCommentModal(row)}
-            className="inline-flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md focus:outline-none transition-colors w-28"
+            className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md focus:outline-none transition-colors w-20"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

@@ -46,6 +46,11 @@ const BottomBannerPage: React.FC = () => {
   // 원본 배너 데이터 참조 (순서 변경 시 비교용)
   const originalBannersRef = useRef<Banner[]>([]);
 
+  // 조회수 통계 상태 추가
+  const [viewStats, setViewStats] = useState<{
+    [key: number]: { anonymousUsers: number; loggedInUsers: number; totalViews: number };
+  }>({});
+
   const handleSearch = (type: string, value: string) => {
     if (type === "title") {
       fetchBanners(currentPage, pageSize, value).then((r) => {
@@ -73,6 +78,17 @@ const BottomBannerPage: React.FC = () => {
         });
         setBanners(sortedBanners);
         originalBannersRef.current = sortedBanners; // fetchBanners에서만 원본 저장
+
+        // 조회수 통계 저장
+        if (response.contentViewStats) {
+          const convertedStats: {
+            [key: number]: { anonymousUsers: number; loggedInUsers: number; totalViews: number };
+          } = {};
+          Object.keys(response.contentViewStats).forEach((key) => {
+            convertedStats[Number(key)] = response.contentViewStats![key as any];
+          });
+          setViewStats(convertedStats);
+        }
 
         if (response.pagination) {
           setTotalPages(response.pagination.totalPages);
@@ -143,7 +159,6 @@ const BottomBannerPage: React.FC = () => {
   // 배너 수정 모달 열기
   const handleEditBanner = (banner: Banner) => {
     setModalError(null);
-    console.log("수정할 배너 데이터:", banner);
 
     const formattedStartDate = formatDateForInput(banner.startDate);
     const formattedEndDate = formatDateForInput(banner.endDate);
@@ -515,6 +530,27 @@ const BottomBannerPage: React.FC = () => {
       header: "종료일",
       accessor: "endDate" as keyof Banner,
       cell: (value: unknown) => formatDateForDisplay(value as string),
+    },
+    {
+      header: "조회",
+      accessor: "id" as keyof Banner,
+      cell: (value: unknown, row: Banner) => {
+        const stats = viewStats[row.id];
+        if (!stats) {
+          return <span className="text-sm text-gray-600">0</span>;
+        }
+        const totalViews = stats.totalViews;
+        const loggedInUsers = stats.loggedInUsers;
+        return (
+          <span className="text-sm text-gray-600">
+            {totalViews.toLocaleString()}
+            {loggedInUsers > 0 && (
+              <span className="text-sm text-blue-500 ml-1">({loggedInUsers.toLocaleString()})</span>
+            )}
+          </span>
+        );
+      },
+      className: "w-24 text-center",
     },
     {
       header: "공개 여부",

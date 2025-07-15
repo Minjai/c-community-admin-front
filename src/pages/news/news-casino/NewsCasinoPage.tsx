@@ -52,6 +52,11 @@ const NewsCasinoPage = () => {
   // 검색 value 상태
   const [searchValue, setSearchValue] = useState<string>("");
 
+  // 조회수 통계 상태 추가
+  const [viewStats, setViewStats] = useState<{
+    [key: number]: { anonymousUsers: number; loggedInUsers: number; totalViews: number };
+  }>({});
+
   // 뉴스 데이터 상태 (API 필드 반영)
   const [title, setTitle] = useState<string>("");
   const [link, setLink] = useState<string>("");
@@ -124,6 +129,11 @@ const NewsCasinoPage = () => {
         setSelectedNewsIds(
           currentSelected.filter((id) => mappedNewsData.some((item) => item.id === id))
         );
+
+        // 조회수 통계 저장
+        if (response.data.contentViewStats) {
+          setViewStats(response.data.contentViewStats);
+        }
       } else {
         console.warn("뉴스 데이터를 찾지 못했거나 형식이 다릅니다. 응답:", response.data);
         setNews([]);
@@ -510,6 +520,30 @@ const NewsCasinoPage = () => {
       // size: auto (default)
     },
     {
+      header: "등록일자", // "등록일" 대신 "등록일자"
+      accessor: "createdAt" as keyof NewsItem,
+      cell: (value: string) => formatDate(value),
+      size: 120,
+    },
+    {
+      header: "조회",
+      accessor: "id" as keyof NewsItem,
+      cell: (value: unknown, row: NewsItem) => {
+        const stats = viewStats[row.id];
+        const totalViews = stats ? stats.totalViews : 0;
+        const loggedInUsers = stats ? stats.loggedInUsers : 0;
+        return (
+          <span className="text-sm text-gray-600">
+            {totalViews.toLocaleString()}
+            {loggedInUsers > 0 && (
+              <span className="text-blue-600">({loggedInUsers.toLocaleString()})</span>
+            )}
+          </span>
+        );
+      },
+      size: 80,
+    },
+    {
       header: "공개 여부", // "상태" 대신 "공개 여부"
       accessor: "isPublic" as keyof NewsItem,
       cell: (value: number, row: NewsItem) => (
@@ -536,12 +570,6 @@ const NewsCasinoPage = () => {
         </span>
       ),
       size: 80,
-    },
-    {
-      header: "등록일자", // "등록일" 대신 "등록일자"
-      accessor: "createdAt" as keyof NewsItem,
-      cell: (value: string) => formatDate(value),
-      size: 120,
     },
     {
       header: "관리",

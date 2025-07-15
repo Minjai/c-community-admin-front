@@ -1,6 +1,14 @@
 import axios from "../api/axios";
 import { RemittanceBanner } from "../types";
 
+interface ContentViewStats {
+  [key: string]: {
+    anonymousUsers: number;
+    loggedInUsers: number;
+    totalViews: number;
+  };
+}
+
 // 암호화폐 송금 배너 API 서비스
 const RemittanceBannerService = {
   // 송금 배너 목록 조회 (페이지네이션 적용, 검색 파라미터 추가)
@@ -9,7 +17,11 @@ const RemittanceBannerService = {
     limit: number = 10,
     searchValue: string = ""
     // 반환 타입을 실제 API 응답 구조로 변경
-  ): Promise<{ data: RemittanceBanner[]; pagination: any }> => {
+  ): Promise<{
+    data: RemittanceBanner[];
+    pagination: any;
+    contentViewStats: ContentViewStats;
+  }> => {
     try {
       const params: any = { page, limit };
 
@@ -24,7 +36,7 @@ const RemittanceBannerService = {
       const response = await axios.get(`/crypto-transfers/admin`, { params });
       console.log("송금 배너 응답 데이터:", response.data);
 
-      // 응답 구조 ({ success, data, pagination }) 확인 및 반환
+      // 응답 구조 ({ success, data, pagination, contentViewStats }) 확인 및 반환
       if (response.data && response.data.success) {
         return {
           data: response.data.data || [],
@@ -34,6 +46,7 @@ const RemittanceBannerService = {
             currentPage: 1,
             pageSize: limit,
           },
+          contentViewStats: response.data.contentViewStats || {},
         };
       }
       // 실패 시 빈 데이터와 기본 페이지 정보 반환 또는 에러 throw
@@ -41,6 +54,7 @@ const RemittanceBannerService = {
       return {
         data: [],
         pagination: { totalItems: 0, totalPages: 0, currentPage: 1, pageSize: limit },
+        contentViewStats: {},
       };
       // throw new Error(response.data.message || "송금 배너 조회에 실패했습니다."); // 필요 시 에러 throw
     } catch (error: any) {
@@ -61,6 +75,7 @@ const RemittanceBannerService = {
       return {
         data: [],
         pagination: { totalItems: 0, totalPages: 0, currentPage: 1, pageSize: limit },
+        contentViewStats: {},
       };
       // throw error; // 필요 시 에러 다시 throw
     }
