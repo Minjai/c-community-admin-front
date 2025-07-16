@@ -26,6 +26,7 @@ import CasinoRecommendationManagement from "./pages/data/CasinoRecommendationMan
 import SportsManagement from "./pages/data/SportsManagement";
 import SportRecommendationsManagement from "./pages/data/SportRecommendationsManagement";
 import SportsAnalysisManagement from "./pages/data/SportsAnalysisManagement";
+import SportsWidgetManagement from "./pages/data/SportsWidgetManagement";
 import UserManagement from "./pages/users/UserManagement";
 import UserRankManagement from "./pages/users/UserRankManagement";
 import AdminManagement from "./pages/users/AdminManagement";
@@ -178,6 +179,14 @@ function App() {
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
                     <SportsManagement />
+                  </RoleBasedRoute>
+                }
+              />
+              <Route
+                path="data/sports-widgets"
+                element={
+                  <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
+                    <SportsWidgetManagement />
                   </RoleBasedRoute>
                 }
               />

@@ -37,6 +37,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
         { name: "카지노 게임 관리", path: "/data/casino-games" },
         { name: "카지노 게임 추천", path: "/data/casino-recommendations" },
         { name: "스포츠 종목 관리", path: "/data/sports" },
+        { name: "스포츠 위젯 관리", path: "/data/sports-widgets" },
         { name: "스포츠 종목 추천", path: "/data/sports-recommendations" },
         { name: "스포츠 경기 분석", path: "/data/sports-analysis" },
       ],
