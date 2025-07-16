@@ -6,6 +6,7 @@ import ActionButton from "@/components/ActionButton";
 import DataTable from "@/components/DataTable";
 import SearchInput from "@/components/SearchInput";
 import { useScrollToTop } from "@/hooks/useScrollToTop";
+import ExcelDownloadButton from "@/components/ExcelDownloadButton";
 
 // Define column type based on DataTable.tsx
 interface PostColumnDef {
@@ -300,6 +301,9 @@ const PostManagement = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          <ExcelDownloadButton type="posts" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <button
             onClick={handleDeleteSelected}
             disabled={selectedPosts.length === 0}

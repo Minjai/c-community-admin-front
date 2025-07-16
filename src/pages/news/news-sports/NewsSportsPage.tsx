@@ -7,6 +7,7 @@ import Modal from "@components/Modal.tsx";
 import Input from "@components/forms/Input.tsx";
 import Alert from "@components/Alert.tsx";
 import SearchInput from "@components/SearchInput.tsx";
+import ExcelDownloadButton from "../../../components/ExcelDownloadButton";
 import { formatDate } from "@utils/dateUtils.ts";
 import { toast } from "react-toastify";
 import LoadingOverlay from "@components/LoadingOverlay.tsx";
@@ -587,6 +588,10 @@ const NewsSportsPage = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <ExcelDownloadButton type="newsSports" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button
             variant="danger"
             onClick={handleBulkDelete}

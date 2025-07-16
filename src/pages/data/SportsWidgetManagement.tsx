@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
 import SearchInput from "@/components/SearchInput";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 import { formatDate } from "@/utils/dateUtils";
 
 // 스포츠 위젯 타입 정의
@@ -419,6 +420,10 @@ const SportsWidgetManagement = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <ExcelDownloadButton type="sportWidgets" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button onClick={handleSaveOrder} className="bg-blue-500 hover:bg-blue-600">
             순서저장
           </Button>

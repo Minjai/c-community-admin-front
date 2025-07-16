@@ -12,6 +12,7 @@ import ActionButton from "@/components/ActionButton";
 import { getSportRecommendations } from "@/api";
 import { toast } from "react-hot-toast";
 import { DragManager } from "../data/components/drag/DragManager";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 
 interface HomeTemplate {
   id: number;
@@ -775,6 +776,10 @@ const HomeManagementPage: React.FC = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <ExcelDownloadButton type="homeSections" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button
             onClick={handleBulkDelete}
             variant="danger"

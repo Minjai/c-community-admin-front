@@ -16,6 +16,7 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import { toast } from "react-toastify";
 import { DragManager } from "./components/drag/DragManager";
 import SearchInput from "@/components/SearchInput";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 
 // Add a utility function to determine the display status based on dates
 const getDisplayStatus = (startDateStr: string, endDateStr: string): string => {
@@ -930,6 +931,10 @@ const CasinoRecommendationManagement = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <ExcelDownloadButton type="casinoRecommends" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           {/* 순서 저장 버튼 */}
           <Button
             onClick={handleBulkDisplayOrderSave}

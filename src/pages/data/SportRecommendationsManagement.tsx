@@ -19,6 +19,7 @@ import ActionButton from "@/components/ActionButton";
 import Modal from "@/components/Modal";
 import Alert from "@/components/Alert";
 import SearchInput from "@/components/SearchInput";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 import {
   formatDateForDisplay,
   formatISODateToDateTimeLocal,
@@ -1437,6 +1438,9 @@ export default function SportRecommendationsManagement() {
           onSearch={(value) => handleSearch("title", value)}
         />
         <div className="flex space-x-2">
+          <ExcelDownloadButton type="sportRecommends" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button
             variant="primary"
             onClick={() => {

@@ -14,6 +14,7 @@ import { formatDate, formatDateForDisplay } from "@/utils/dateUtils";
 import { toast } from "react-toastify";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import SearchInput from "@components/SearchInput.tsx";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 
 // Guideline 타입에 position과 tags 추가 (복원)
 interface GuidelineWithOrder extends Guideline {
@@ -561,6 +562,20 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <ExcelDownloadButton
+            type={
+              boardId === 3
+                ? "guidelineCasino"
+                : boardId === 4
+                ? "guidelineSports"
+                : "guidelineCrypto"
+            }
+            variant="outline"
+            size="sm"
+          >
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button onClick={handleBulkPositionSave} variant="primary" disabled={loading || isSaving}>
             순서 저장
           </Button>

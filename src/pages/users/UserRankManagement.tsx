@@ -10,6 +10,7 @@ import Alert from "@/components/Alert";
 import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import ExcelDownloadButton from "@/components/ExcelDownloadButton";
 
 // 회원 등급 타입 정의
 interface UserRank {
@@ -132,7 +133,7 @@ const UserRankManagement: React.FC = () => {
 
   useEffect(() => {
     fetchRanks(currentPage, pageSize, searchValue);
-  }, [fetchRanks, currentPage, pageSize]);
+  }, [fetchRanks, currentPage, pageSize, searchValue]);
 
   // 페이지 변경 핸들러 추가
   const handlePageChange = (page: number) => {
@@ -392,7 +393,6 @@ const UserRankManagement: React.FC = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
-    setSearchValue(value);
     fetchRanks(currentPage, pageSize, value);
   };
 
@@ -491,6 +491,9 @@ const UserRankManagement: React.FC = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          <ExcelDownloadButton type="userRanks" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button variant="primary" onClick={handleSaveOrder} disabled={loading}>
             순서저장
           </Button>

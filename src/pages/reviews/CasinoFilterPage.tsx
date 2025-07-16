@@ -8,6 +8,7 @@ import Select from "../../components/forms/Select";
 import DatePicker from "../../components/forms/DatePicker";
 import Alert from "../../components/Alert";
 import SearchInput from "../../components/SearchInput";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 import { formatDate } from "../../utils/dateUtils";
 import LoadingOverlay from "../../components/LoadingOverlay";
 import axios from "../../api/axios";
@@ -1021,6 +1022,9 @@ const CasinoFilterPage: React.FC = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-3">
+          <ExcelDownloadButton type="casinoFilters" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button onClick={handleDisplayOrderSave} variant="primary">
             순서 저장
           </Button>

@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from "react";
-import axios from "@api/axios.ts";
-import DataTable from "@components/DataTable.tsx";
-import Button from "@components/Button.tsx";
-import ActionButton from "@components/ActionButton.tsx";
-import Modal from "@components/Modal.tsx";
-import Input from "@components/forms/Input.tsx";
-import Alert from "@components/Alert.tsx";
-import SearchInput from "@components/SearchInput.tsx";
-import { formatDate } from "@utils/dateUtils.ts";
+import axios from "@/api/axios";
+import DataTable from "@/components/DataTable";
+import Button from "@/components/Button";
+import ActionButton from "@/components/ActionButton";
+import Modal from "@/components/Modal";
+import Input from "@/components/forms/Input";
+import Alert from "@/components/Alert";
+import SearchInput from "@/components/SearchInput";
+import ExcelDownloadButton from "@/components/ExcelDownloadButton";
+import { formatDate } from "@/utils/dateUtils";
 import { toast } from "react-toastify";
-import LoadingOverlay from "@components/LoadingOverlay.tsx";
+import LoadingOverlay from "@/components/LoadingOverlay";
 
 // 뉴스 아이템 타입 정의 (API 응답 기준)
 interface NewsItem {
@@ -464,7 +465,6 @@ const NewsCasinoPage = () => {
 
   // DataTable 컬럼 정의 (원래 구조 복원 + 체크박스)
   const columns = [
-    // 체크박스 컬럼 추가
     {
       header: (
         <input
@@ -481,49 +481,45 @@ const NewsCasinoPage = () => {
           disabled={loading || news.length === 0 || saving}
         />
       ),
-      accessor: "id" as keyof NewsItem, // ID는 체크박스 로직에 필요
-      cell: (id: number) => (
+      accessor: "id" as keyof NewsItem,
+      cell: (value: unknown, row: NewsItem) => (
         <input
           type="checkbox"
           className="form-checkbox h-4 w-4 text-blue-600"
-          checked={selectedNewsIds.includes(id)}
-          onChange={() => handleSelectNews(id)}
+          checked={selectedNewsIds.includes(row.id)}
+          onChange={() => handleSelectNews(row.id)}
           disabled={loading || saving}
         />
       ),
-      className: "w-px px-4", // 체크박스 컬럼 너비 최소화
-      size: 50, // 명시적 크기 설정
+      className: "w-px px-4",
     },
-    // 원래 컬럼들 복원
     {
       header: "썸네일",
       accessor: "thumbnailUrl" as keyof NewsItem,
-      cell: (value: string | null) =>
-        value ? <img src={value} alt="썸네일" className="h-10 w-auto object-contain" /> : "-", // "없음" 대신 "-" 표시
-      size: 100,
+      cell: (value: unknown, row: NewsItem) =>
+        row.thumbnailUrl ? (
+          <img src={row.thumbnailUrl} alt="썸네일" className="h-10 w-auto object-contain" />
+        ) : (
+          "-"
+        ),
     },
     {
-      header: "타이틀", // "제목" 대신 "타이틀"
+      header: "제목",
       accessor: "title" as keyof NewsItem,
-      cell: (
-        value: string,
-        row: NewsItem // value 타입 string으로 유지하되 row 사용
-      ) => (
+      cell: (value: unknown, row: NewsItem) => (
         <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-md truncate" // max-w-md 복원
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block max-w-md truncate"
           onClick={() => handleEditNews(row)}
-          title={row.title} // row.title 사용
+          title={row.title}
         >
-          {row.title} {/* row.title 사용 */}
+          {row.title}
         </span>
       ),
-      // size: auto (default)
     },
     {
-      header: "등록일자", // "등록일" 대신 "등록일자"
+      header: "등록일",
       accessor: "createdAt" as keyof NewsItem,
-      cell: (value: string) => formatDate(value),
-      size: 120,
+      cell: (value: unknown, row: NewsItem) => formatDate(row.createdAt),
     },
     {
       header: "조회",
@@ -541,26 +537,24 @@ const NewsCasinoPage = () => {
           </span>
         );
       },
-      size: 80,
     },
     {
-      header: "공개 여부", // "상태" 대신 "공개 여부"
+      header: "공개 여부",
       accessor: "isPublic" as keyof NewsItem,
-      cell: (value: number, row: NewsItem) => (
+      cell: (value: unknown, row: NewsItem) => (
         <button
           onClick={() => handleTogglePublic(row.id, row.isPublic)}
           className={`px-2 py-1 text-xs rounded ${
             row.isPublic === 1 ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"
-          }`} // 원래 클래스 복원
-          disabled={loading || saving} // 비활성화 추가
+          }`}
+          disabled={loading || saving}
         >
           {row.isPublic === 1 ? "공개" : "비공개"}
         </button>
       ),
-      size: 80,
     },
     {
-      header: "인기 여부", // 누락된 컬럼 복원
+      header: "인기 여부",
       accessor: "isSelected" as keyof NewsItem,
       cell: (value: unknown, row: NewsItem) => (
         <span
@@ -569,35 +563,28 @@ const NewsCasinoPage = () => {
           {(value as number) === 1 ? "Y" : "N"}
         </span>
       ),
-      size: 80,
     },
     {
       header: "관리",
       accessor: "id" as keyof NewsItem,
-      cell: (
-        id: number,
-        row: NewsItem // id 대신 row.id 사용
-      ) => (
+      cell: (value: unknown, row: NewsItem) => (
         <div className="flex space-x-1">
-          {" "}
-          {/* space-x-1 복원 */}
           <ActionButton
             label="수정"
             action="edit"
             size="sm"
             onClick={() => handleEditNews(row)}
-            disabled={loading || saving} // 비활성화 추가
+            disabled={loading || saving}
           />
           <ActionButton
             label="삭제"
             action="delete"
             size="sm"
-            onClick={() => handleDeleteNews(row.id)} // row.id 사용
-            disabled={loading || saving} // 비활성화 추가
+            onClick={() => handleDeleteNews(row.id)}
+            disabled={loading || saving}
           />
         </div>
       ),
-      size: 120,
     },
   ];
 
@@ -611,6 +598,10 @@ const NewsCasinoPage = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <ExcelDownloadButton type="newsCasino" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button
             variant="danger"
             onClick={handleBulkDelete}

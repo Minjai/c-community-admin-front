@@ -10,14 +10,14 @@ import { formatDate } from "@/utils/dateUtils";
 import FooterFormModal from "./FooterFormModal";
 import type { Footer } from "./types";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 
 // Define column type based on DataTable.tsx
 interface FooterColumnDef {
   header: string | ReactNode;
-  accessor: keyof Footer | ((item: Footer) => ReactNode);
+  accessor: keyof Footer;
   cell?: (value: any, row: Footer, index?: number) => React.ReactNode;
   className?: string; // Match DataTable prop
-  // size?: number; // Removed size as it's not in DataTable props
 }
 
 // Helper function to strip HTML tags and truncate text
@@ -112,7 +112,7 @@ function FooterManagementPage() {
   // useEffect 수정: currentPage, pageSize 변경 시 fetchFooters 호출
   useEffect(() => {
     fetchFooters(currentPage, pageSize, searchValue);
-  }, [currentPage, pageSize]); // fetchFooters는 useCallback으로 감싸져 있으므로 넣지 않음
+  }, [currentPage, pageSize, searchValue]); // fetchFooters는 useCallback으로 감싸져 있으므로 넣지 않음
 
   // 검색 핸들러 추가
   const handleSearch = (value: string) => {
@@ -352,6 +352,9 @@ function FooterManagementPage() {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          <ExcelDownloadButton type="footers" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button
             variant="danger"
             onClick={handleDeleteSelectedClick}

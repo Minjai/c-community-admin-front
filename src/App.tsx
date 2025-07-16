@@ -32,10 +32,10 @@ import UserRankManagement from "./pages/users/UserRankManagement";
 import AdminManagement from "./pages/users/AdminManagement";
 import InquiryManagement from "./pages/users/InquiryManagement";
 import AdminMessageManagement from "./pages/users/AdminMessageManagement";
-import NewsCasinoListPage from "@pages/news/news-casino/NewsCasinoListPage.tsx";
+import NewsCasinoPage from "./pages/news/news-casino/NewsCasinoPage";
 import RemittanceBannerPage from "./pages/remittance/RemittanceBannerPage";
 import FooterManagementPage from "./pages/footer/FooterManagementPage";
-import NewsSportsPage from "@pages/news/news-sports/NewsSportsPage.tsx";
+import NewsSportsPage from "./pages/news/news-sports/NewsSportsPage";
 import HomeManagementPage from "./pages/exposure/HomeManagementPage";
 import SportsAnalysisDetail from "./pages/data/SportsAnalysisDetail";
 
@@ -246,7 +246,7 @@ function App() {
                 path="news/casino/list"
                 element={
                   <RoleBasedRoute allowedRoles={["admin", "superadmin"]}>
-                    <NewsCasinoListPage />
+                    <NewsCasinoPage />
                   </RoleBasedRoute>
                 }
               />

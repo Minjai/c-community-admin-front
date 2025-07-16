@@ -9,6 +9,7 @@ import Input from "../../components/forms/Input";
 import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
 import SearchInput from "../../components/SearchInput";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 import LoadingOverlay from "../../components/LoadingOverlay";
 
 // 날짜 포맷 변환 함수 (컴포넌트 밖으로 이동)
@@ -626,6 +627,9 @@ const RemittanceBannerPage: React.FC = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          <ExcelDownloadButton type="remittanceBanners" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button onClick={handleBulkDisplayOrderSave} variant="primary" disabled={loading}>
             순서 저장
           </Button>

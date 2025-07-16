@@ -7,6 +7,7 @@ import Modal from "@/components/Modal";
 import Input from "@/components/forms/Input";
 import Alert from "@/components/Alert";
 import SearchInput from "@/components/SearchInput";
+import ExcelDownloadButton from "@/components/ExcelDownloadButton";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import TextEditor from "@/components/forms/TextEditor";
@@ -128,7 +129,6 @@ const InquiryManagement = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
-    setSearchValue(value);
     setCurrentPage(1); // 검색 시 첫 페이지로 이동
     fetchInquiries(1, pageSize, value);
   };
@@ -200,12 +200,12 @@ const InquiryManagement = () => {
     fetchInquiries(1, 10, "");
   }, []);
 
-  // 페이지, 카테고리 변경 시 데이터 로딩
+  // 페이지, 검색, 카테고리 변경 시 데이터 로딩
   useEffect(() => {
     if (currentPage > 0) {
       fetchInquiries(currentPage, pageSize, searchValue);
     }
-  }, [currentPage, pageSize, selectedCategory]);
+  }, [currentPage, pageSize, selectedCategory, searchValue]);
 
   // 카테고리 필터 외부 클릭 시 닫기
   useEffect(() => {
@@ -753,6 +753,9 @@ const InquiryManagement = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          <ExcelDownloadButton type="inquiries" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button
             variant="danger"
             onClick={handleDeleteSelected}

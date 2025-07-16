@@ -1,8 +1,12 @@
 import React from "react";
-import NewsSportsPage from "@pages/news/news-sports/NewsSportsPage.tsx";
+import ExcelDownloadButton from "../../../components/ExcelDownloadButton";
 
 const NewsSportsListPage = () => {
-    return <NewsSportsPage />;
+  return (
+    <div>
+      <ExcelDownloadButton type="newsSports" />
+    </div>
+  );
 };
 
 export default NewsSportsListPage;

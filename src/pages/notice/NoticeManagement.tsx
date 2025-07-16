@@ -9,6 +9,7 @@ import DataTable from "@/components/DataTable";
 import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import ExcelDownloadButton from "@/components/ExcelDownloadButton";
 
 interface ContentViewStats {
   [key: string]: {
@@ -252,11 +253,11 @@ const NoticeManagement = () => {
         />
       ),
       accessor: "id" as keyof Post,
-      cell: (id: number) => (
+      cell: (value: unknown, row: Post) => (
         <input
           type="checkbox"
-          checked={selectedIds.has(id)}
-          onChange={(e) => handleSelect(id, e.target.checked)}
+          checked={selectedIds.has(row.id)}
+          onChange={(e) => handleSelect(row.id, e.target.checked)}
           className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
           onClick={(e) => e.stopPropagation()} // Prevent row click
           disabled={loading || deleting}
@@ -267,7 +268,7 @@ const NoticeManagement = () => {
     {
       header: "제목",
       accessor: "title" as keyof Post,
-      cell: (title: string, row: Post) => (
+      cell: (value: unknown, row: Post) => (
         <span
           className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
           onClick={(e) => {
@@ -275,34 +276,36 @@ const NoticeManagement = () => {
             handleClick(row.id);
           }}
         >
-          {title}
+          {row.title}
         </span>
       ),
     },
     {
       header: "작성일",
       accessor: "createdAt" as keyof Post,
-      cell: (value: string) => formatDate(value),
+      cell: (value: unknown, row: Post) => formatDate(row.createdAt),
     },
     {
       header: "공개 여부",
       accessor: "isPublic" as keyof Post,
-      cell: (isPublic: number) => (isPublic === 1 ? "공개" : "비공개"),
+      cell: (value: unknown, row: Post) => (row.isPublic === 1 ? "공개" : "비공개"),
     },
     {
       header: "조회",
       accessor: "id" as keyof Post,
-      cell: (id: number) => <span className="text-sm text-gray-600">{formatViewCount(id)}</span>,
+      cell: (value: unknown, row: Post) => (
+        <span className="text-sm text-gray-600">{formatViewCount(row.id)}</span>
+      ),
       className: "text-center",
     },
     {
       header: "순서",
       accessor: "displayOrder" as keyof Post,
-      cell: (value: number, row: Post) => (
+      cell: (value: unknown, row: Post) => (
         <input
           type="number"
           className="w-20 border rounded px-2 py-1 text-center"
-          value={displayOrders[row.id] ?? value ?? 0}
+          value={displayOrders[row.id] ?? row.displayOrder ?? 0}
           onChange={(e) => handleOrderChange(row.id, Number(e.target.value))}
           disabled={loading || deleting}
           style={{ minWidth: 60 }}
@@ -348,6 +351,10 @@ const NoticeManagement = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <ExcelDownloadButton type="notices" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button variant="primary" onClick={handleSaveOrder} disabled={loading || deleting}>
             순서저장
           </Button>

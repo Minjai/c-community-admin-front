@@ -17,6 +17,7 @@ import LoadingOverlay from "@/components/LoadingOverlay";
 import Input from "@/components/forms/Input";
 import Select from "@/components/forms/Select";
 import SearchInput from "@components/SearchInput.tsx";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 import DatePicker from "@/components/forms/DatePicker";
 import FileUpload, { FileUploadRef } from "@/components/forms/FileUpload";
 import { DragManager } from "./components/drag/DragManager";
@@ -827,6 +828,10 @@ export default function SportsManagement() {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <ExcelDownloadButton type="sportCategories" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button onClick={handleOpenManualModal} disabled={loading}>
             수동 등록
           </Button>

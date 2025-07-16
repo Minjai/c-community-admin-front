@@ -9,6 +9,7 @@ import Alert from "@/components/Alert";
 import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
+import ExcelDownloadButton from "@/components/ExcelDownloadButton";
 
 // 관리자 계정 타입 정의
 interface Rank {
@@ -125,7 +126,7 @@ const AdminManagement: React.FC = () => {
 
   useEffect(() => {
     fetchAdmins(currentPage, pageSize, searchValue);
-  }, [currentPage, pageSize]);
+  }, [currentPage, pageSize, searchValue]);
 
   // 페이지 변경 핸들러
   const handlePageChange = (page: number) => {
@@ -369,7 +370,6 @@ const AdminManagement: React.FC = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
-    setSearchValue(value);
     fetchAdmins(currentPage, pageSize, value);
   };
 
@@ -495,6 +495,9 @@ const AdminManagement: React.FC = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          <ExcelDownloadButton type="adminAccounts" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button
             variant="danger"
             onClick={handleBulkDelete}

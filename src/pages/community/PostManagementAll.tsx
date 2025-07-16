@@ -1,11 +1,19 @@
-
-
-import React, { useState } from 'react';
-import TextEditor from '../../components/forms/TextEditor';
+import React, { useState, useEffect } from "react";
+import axios from "@/api/axios";
+import DataTable from "@/components/DataTable";
+import Button from "@/components/Button";
+import ActionButton from "@/components/ActionButton";
+import Modal from "@/components/Modal";
+import Input from "@/components/forms/Input";
+import Alert from "@/components/Alert";
+import SearchInput from "@/components/SearchInput";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
+import { formatDate } from "@/utils/dateUtils";
+import TextEditor from "../../components/forms/TextEditor";
 
 const PostManagementAll: React.FC = () => {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -16,7 +24,7 @@ const PostManagementAll: React.FC = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-2xl font-bold mb-6">게시물 관리</h1>
-      
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div>
           <label htmlFor="title" className="block text-sm font-medium text-gray-700">
@@ -33,9 +41,7 @@ const PostManagementAll: React.FC = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            내용
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
           <div className="h-[400px]">
             <TextEditor content={content} setContent={setContent} />
           </div>
@@ -60,4 +66,4 @@ const PostManagementAll: React.FC = () => {
   );
 };
 
-export default PostManagementAll; 
+export default PostManagementAll;

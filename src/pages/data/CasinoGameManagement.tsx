@@ -12,6 +12,7 @@ import { formatDate, formatDateForDisplay } from "@/utils/dateUtils";
 import { extractDataArray } from "../../api/util";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import SearchInput from "@components/SearchInput.tsx";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 
 // 카지노 게임 타입 정의
 interface CasinoGame {
@@ -606,6 +607,10 @@ const CasinoGameManagement = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <ExcelDownloadButton type="casinoGames" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button
             onClick={handleBulkDelete}
             variant="danger"

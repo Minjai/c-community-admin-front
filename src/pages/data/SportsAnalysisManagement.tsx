@@ -7,6 +7,7 @@ import DataTable from "@/components/DataTable";
 import LoadingOverlay from "@/components/LoadingOverlay";
 import ActionButton from "@/components/ActionButton";
 import SearchInput from "@/components/SearchInput";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 import { SportGameAnalysis, SportCategory } from "@/types";
 import {
   getAllSportGameAnalyses,
@@ -420,6 +421,9 @@ const SportsAnalysisManagement = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          <ExcelDownloadButton type="sportGameAnalysis" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button variant="primary" onClick={handleSaveOrder} disabled={loading}>
             순서저장
           </Button>

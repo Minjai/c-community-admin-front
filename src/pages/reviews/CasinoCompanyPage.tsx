@@ -9,6 +9,7 @@ import Input from "../../components/forms/Input";
 import FileUpload from "../../components/forms/FileUpload";
 import Alert from "../../components/Alert";
 import SearchInput from "../../components/SearchInput";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 import { formatDate } from "../../utils/dateUtils";
 import axios from "@/api/axios";
 import { extractDataArray } from "../../api/util";
@@ -748,6 +749,10 @@ const CasinoCompanyPage: React.FC = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <ExcelDownloadButton type="reviewCompanies" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button
             onClick={handleBulkDisplayOrderSave}
             variant="primary"

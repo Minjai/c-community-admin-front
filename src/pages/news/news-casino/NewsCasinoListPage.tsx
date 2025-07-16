@@ -1,8 +1,12 @@
 import React from "react";
-import NewsCasinoPage from "./NewsCasinoPage.tsx";
+import ExcelDownloadButton from "../../../components/ExcelDownloadButton";
 
 const NewsCasinoListPage = () => {
-  return <NewsCasinoPage />;
+  return (
+    <div>
+      <ExcelDownloadButton type="newsCasino" />
+    </div>
+  );
 };
 
 export default NewsCasinoListPage;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, ReactNode } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigation } from "@/services/NavigationService";
 // import { getPosts, getBoards } from "@/api"; // Remove non-existent functions import
 import axios from "@/api/axios";
@@ -10,8 +10,10 @@ import Input from "@/components/forms/Input";
 import Select from "@/components/forms/Select";
 import Alert from "@/components/Alert";
 import SearchInput from "@/components/SearchInput";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 import { useScrollToTop } from "@/hooks/useScrollToTop";
 import type { Post, Board } from "@/types";
+import { formatDate } from "@/utils/dateUtils";
 
 // Define column type based on DataTable.tsx
 interface PostColumnDef {
@@ -278,6 +280,9 @@ const PostManagementPage: React.FC = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          <ExcelDownloadButton type="posts" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Select
             value={selectedBoard ? selectedBoard.toString() : "all"}
             onChange={(e) => handleBoardChange(e.target.value)}

@@ -10,6 +10,7 @@ import SearchInput from "@/components/SearchInput";
 import { formatDate } from "@/utils/dateUtils";
 import UserDetail from "./UserDetail";
 import BulkPointModal from "./BulkPointModal";
+import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 
 // 회원 타입 정의
 interface UserRank {
@@ -406,6 +407,10 @@ const UserManagement = () => {
           onSearch={handleSearch}
         />
         <div className="flex space-x-2">
+          {/* 엑셀 다운로드 버튼 */}
+          <ExcelDownloadButton type="userAccounts" variant="outline" size="sm">
+            엑셀 다운로드
+          </ExcelDownloadButton>
           <Button onClick={handleOpenPointModal} disabled={selectedUsers.length === 0 || loading}>
             포인트 일괄 지급
           </Button>
