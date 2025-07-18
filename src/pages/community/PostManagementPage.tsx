@@ -195,7 +195,20 @@ const PostManagementPage: React.FC = () => {
         return board ? board.name : "-";
       },
     },
-    { header: "제목", accessor: "title" },
+    {
+      header: "제목",
+      accessor: "title" as keyof Post,
+      cell: (value: string, row: Post) => (
+        <span
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block truncate max-w-xs"
+          onClick={() => handleViewPost(row)}
+          title={value}
+        >
+          {value}
+        </span>
+      ),
+      className: "max-w-xs",
+    },
     {
       header: "작성자",
       accessor: "authorId",

@@ -990,7 +990,8 @@ export default function SportRecommendationsManagement() {
       !editCurrentGameDetail.home ||
       !editCurrentGameDetail.away ||
       !editCurrentGameDetail.league ||
-      !editCurrentGameDetail.time
+      !editCurrentGameDetail.time ||
+      !editCurrentGameDetail.icon
     ) {
       setEditGameDetailError("모든 필드를 입력해주세요.");
       return;
@@ -1114,12 +1115,14 @@ export default function SportRecommendationsManagement() {
       accessor: "title" as keyof SportRecommendation,
       cell: (value: unknown, row: SportRecommendation, index: number) => (
         <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block truncate max-w-xs"
           onClick={() => handleEditRecommendation(row)}
+          title={value as string}
         >
           {value as string}
         </span>
       ),
+      className: "max-w-xs",
     },
     {
       header: "게임 수",

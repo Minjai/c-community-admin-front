@@ -11,12 +11,21 @@ import { formatDate } from "@/utils/dateUtils";
 import UserDetail from "./UserDetail";
 import BulkPointModal from "./BulkPointModal";
 import ExcelDownloadButton from "../../components/ExcelDownloadButton";
+import StatusBadge, { statusNumberColor } from "@/components/StatusBadge";
 
 // 회원 타입 정의
 interface UserRank {
   rankId: number;
   rankName: string;
   image: string;
+}
+
+interface UserCount {
+  posts: number;
+  comments: number;
+  likes: number;
+  reviews: number;
+  inquiries: number;
 }
 
 interface User {
@@ -31,6 +40,31 @@ interface User {
   lastLoginAt?: string;
   isDeleted: boolean;
   isDeletedAt?: string;
+  _count?: UserCount;
+  activities?: string;
+}
+
+interface UserStatistics {
+  userStatus: {
+    online: number;
+    offline: number;
+    deleted: number;
+  };
+  rankDistribution: Array<{
+    rankName: string;
+    count: number;
+  }>;
+}
+
+interface UserResponse {
+  data: User[];
+  pagination: {
+    totalItems: number;
+    totalPages: number;
+    currentPage: number;
+    pageSize: number;
+  };
+  statistics: UserStatistics;
 }
 
 const UserManagement = () => {
@@ -45,6 +79,12 @@ const UserManagement = () => {
     type: "success" | "error" | "info";
     message: string;
   } | null>(null);
+
+  // 통계 정보 상태
+  const [statistics, setStatistics] = useState<UserStatistics>({
+    userStatus: { online: 0, offline: 0, deleted: 0 },
+    rankDistribution: [],
+  });
 
   // 모달 관련 상태
   const [showModal, setShowModal] = useState<boolean>(false);
@@ -61,58 +101,79 @@ const UserManagement = () => {
   // 검색 value 상태
   const [searchValue, setSearchValue] = useState<string>("");
 
+  // 필터 상태
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+
   // 회원 목록 조회
-  const fetchUsers = useCallback(async (page: number, limit: number, searchValue: string = "") => {
-    setLoading(true);
-    setError(null);
+  const fetchUsers = useCallback(
+    async (
+      page: number,
+      limit: number,
+      searchValue: string = "",
+      statusFilter: string | null = null
+    ) => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const params: any = {
-        page: page,
-        limit: limit,
-      };
+      try {
+        const params: any = {
+          page: page,
+          limit: limit,
+        };
 
-      if (searchValue.trim()) {
-        params.search = searchValue;
-      }
+        if (searchValue.trim()) {
+          params.search = searchValue;
+        }
 
-      const response = await axios.get(`/admin/users`, { params });
-      console.log("회원 정보 API 응답:", response.data);
+        if (statusFilter) {
+          params.status = statusFilter;
+        }
 
-      if (response.data && response.data.data && response.data.pagination) {
-        const fetchedUsers = response.data.data || [];
-        const pagination = response.data.pagination;
+        const response = await axios.get(`/admin/users`, { params });
+        console.log("회원 정보 API 응답:", response.data);
 
-        setUsers(fetchedUsers);
-        setTotalItems(pagination.totalItems || 0);
-        setTotalPages(pagination.totalPages || 0);
-        setCurrentPage(pagination.currentPage || page);
-        setPageSize(pagination.pageSize || limit);
-        setSelectedUsers([]);
-        setAllSelected(false);
-      } else {
-        console.error("회원 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
+        if (response.data && response.data.data && response.data.pagination) {
+          const fetchedUsers = response.data.data || [];
+          const pagination = response.data.pagination;
+          const responseStatistics = response.data.statistics;
+
+          setUsers(fetchedUsers);
+          setTotalItems(pagination.totalItems || 0);
+          setTotalPages(pagination.totalPages || 0);
+          setCurrentPage(pagination.currentPage || page);
+          setPageSize(pagination.pageSize || limit);
+          setSelectedUsers([]);
+          setAllSelected(false);
+
+          // 통계 정보 설정
+          if (responseStatistics) {
+            setStatistics(responseStatistics);
+          }
+        } else {
+          console.error("회원 불러오기 실패: 응답 형식이 예상과 다릅니다", response.data);
+          setUsers([]);
+          setTotalItems(0);
+          setTotalPages(0);
+          setCurrentPage(1);
+          setError("회원 데이터 형식이 올바르지 않습니다.");
+        }
+      } catch (err) {
+        console.error("Error fetching users:", err);
+        setError("회원 목록을 불러오는데 실패했습니다.");
         setUsers([]);
         setTotalItems(0);
         setTotalPages(0);
         setCurrentPage(1);
-        setError("회원 데이터 형식이 올바르지 않습니다.");
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error("Error fetching users:", err);
-      setError("회원 목록을 불러오는데 실패했습니다.");
-      setUsers([]);
-      setTotalItems(0);
-      setTotalPages(0);
-      setCurrentPage(1);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
-    fetchUsers(currentPage, pageSize, searchValue);
-  }, [fetchUsers, currentPage, pageSize, searchValue]);
+    fetchUsers(currentPage, pageSize, searchValue, statusFilter);
+  }, [fetchUsers, currentPage, pageSize, searchValue, statusFilter]);
 
   // handlePageChange 구현
   const handlePageChange = (page: number) => {
@@ -207,7 +268,7 @@ const UserManagement = () => {
         message: `${selectedUsers.length}명의 회원에게 ${pointAmount}P가 지급되었습니다.`,
       });
 
-      fetchUsers(currentPage, pageSize, searchValue);
+      fetchUsers(currentPage, pageSize, searchValue, statusFilter);
     } catch (err) {
       console.error("Error distributing points:", err);
       setAlertMessage({
@@ -247,7 +308,7 @@ const UserManagement = () => {
         message: "회원이 성공적으로 삭제 처리되었습니다.",
       });
 
-      fetchUsers(currentPage, pageSize, searchValue);
+      fetchUsers(currentPage, pageSize, searchValue, statusFilter);
     } catch (err) {
       console.error("Error deleting user:", err);
       setAlertMessage({
@@ -265,137 +326,156 @@ const UserManagement = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
-    fetchUsers(currentPage, pageSize, value);
+    fetchUsers(currentPage, pageSize, value, statusFilter);
+  };
+
+  // 상태 필터 핸들러
+  const handleStatusFilter = (status: string | null) => {
+    setStatusFilter(status);
+    setCurrentPage(1); // 필터 변경 시 첫 페이지로 이동
   };
 
   // DataTable 컬럼 정의
-  const columns = useMemo(
-    () =>
-      [
-        {
-          header: (
+  const columns = useMemo(() => {
+    const baseColumns = [
+      {
+        header: (
+          <input
+            type="checkbox"
+            className="form-checkbox h-4 w-4 text-blue-600"
+            onChange={handleToggleAll}
+            checked={users.length > 0 && selectedUsers.length === users.length}
+            ref={(input) => {
+              if (input) {
+                input.indeterminate =
+                  selectedUsers.length > 0 && selectedUsers.length < users.length;
+              }
+            }}
+            disabled={loading || users.length === 0}
+          />
+        ),
+        accessor: "id" as keyof User,
+        cell: (value: unknown, row: User) => (
+          <div className="flex items-center justify-center">
             <input
               type="checkbox"
               className="form-checkbox h-4 w-4 text-blue-600"
-              onChange={handleToggleAll}
-              checked={users.length > 0 && selectedUsers.length === users.length}
-              ref={(input) => {
-                if (input) {
-                  input.indeterminate =
-                    selectedUsers.length > 0 && selectedUsers.length < users.length;
-                }
-              }}
-              disabled={loading || users.length === 0}
+              checked={selectedUsers.includes(row.id)}
+              onChange={() => handleToggleSelect(row.id)}
             />
-          ),
-          accessor: "id" as keyof User,
-          cell: (value: unknown, row: User) => (
-            <div className="flex items-center justify-center">
-              <input
-                type="checkbox"
-                className="form-checkbox h-4 w-4 text-blue-600"
-                checked={selectedUsers.includes(row.id)}
-                onChange={() => handleToggleSelect(row.id)}
-              />
+          </div>
+        ),
+        className: "w-px px-4",
+      },
+      {
+        header: "이메일",
+        accessor: "email" as keyof User,
+        cell: (value: unknown, row: User) => (
+          <span
+            className="text-blue-600 hover:underline cursor-pointer"
+            onClick={() => handleEditUser(row.id)}
+          >
+            {value as string}
+          </span>
+        ),
+      },
+      { header: "닉네임", accessor: "nickname" as keyof User },
+      {
+        header: "등급",
+        accessor: "rank" as keyof User,
+        cell: (value: unknown, row: User) => {
+          const rank = value as UserRank;
+          return (
+            <div className="flex items-center space-x-2">
+              {rank?.image && <img src={rank.image} alt={rank.rankName} className="h-6 w-6" />}
+              <span>{rank?.rankName || "-"}</span>
             </div>
-          ),
-          className: "w-px px-4",
+          );
         },
-        {
-          header: "이메일",
-          accessor: "email" as keyof User,
-          cell: (value: unknown, row: User) => (
-            <span
-              className="text-blue-600 hover:underline cursor-pointer"
-              onClick={() => handleEditUser(row.id)}
-            >
-              {value as string}
-            </span>
-          ),
-        },
-        { header: "닉네임", accessor: "nickname" as keyof User },
-        {
-          header: "등급",
-          accessor: "rank" as keyof User,
-          cell: (value: unknown, row: User) => {
-            const rank = value as UserRank;
-            return (
-              <div className="flex items-center space-x-2">
-                {rank?.image && <img src={rank.image} alt={rank.rankName} className="h-6 w-6" />}
-                <span>{rank?.rankName || "-"}</span>
-              </div>
-            );
-          },
-        },
-        {
-          header: "상태",
-          accessor: "status" as keyof User,
-          cell: (value: unknown, row: User) => {
-            const status = value as string;
-            const isDeleted = row.isDeleted;
-            return (
-              <div>
-                <span
-                  className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClassName(
-                    status,
-                    isDeleted
-                  )}`}
-                >
-                  {isDeleted ? "삭제" : status}
-                </span>
-                {isDeleted && row.isDeletedAt && (
-                  <div className="text-xs text-gray-500 mt-1">{formatDate(row.isDeletedAt)}</div>
-                )}
-              </div>
-            );
-          },
-          className: "text-center",
-        },
-        {
-          header: "포인트",
-          accessor: "score" as keyof User,
-          cell: (value: unknown, row: User) => {
-            const score = value as number;
-            return score.toLocaleString();
-          },
-        },
-        {
-          header: "가입일",
-          accessor: "createdAt" as keyof User,
-          cell: (value: unknown, row: User) => {
-            const dateValue = value as string;
-            return formatDate(dateValue);
-          },
-        },
-        {
-          header: "관리",
-          accessor: "id" as keyof User,
-          cell: (value: unknown, row: User) => (
-            <div className="flex space-x-2">
-              <ActionButton
-                label="수정"
-                action="edit"
-                onClick={() => handleEditUser(row.id)}
-                disabled={loading || saving}
-              />
-              <ActionButton
-                label="삭제"
-                action="delete"
-                onClick={() => handleDeleteUser(row.id)}
-                disabled={loading || saving || row.isDeleted}
-              />
+      },
+      {
+        header: "상태",
+        accessor: "status" as keyof User,
+        cell: (value: unknown, row: User) => {
+          const status = value as string;
+          const isDeleted = row.isDeleted;
+          return (
+            <div>
+              <span
+                className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClassName(
+                  status,
+                  isDeleted
+                )}`}
+              >
+                {isDeleted ? "삭제" : status}
+              </span>
+              {isDeleted && row.isDeletedAt && (
+                <div className="text-xs text-gray-500 mt-1">{formatDate(row.isDeletedAt)}</div>
+              )}
             </div>
-          ),
-          className: "w-24 text-center",
+          );
         },
-      ].filter(
-        (column) =>
-          column.accessor !== "id" ||
-          typeof column.header !== "string" ||
-          column.header.toLowerCase() !== "id"
+        className: "text-center",
+      },
+      {
+        header: "포인트",
+        accessor: "score" as keyof User,
+        cell: (value: unknown, row: User) => {
+          const score = value as number;
+          return score.toLocaleString();
+        },
+      },
+      {
+        header: "가입일",
+        accessor: "createdAt" as keyof User,
+        cell: (value: unknown, row: User) => {
+          const dateValue = value as string;
+          return formatDate(dateValue);
+        },
+      },
+    ];
+    // 활동 칼럼
+    const activityColumn = {
+      header: "등록/댓글/추천/리뷰/문의",
+      accessor: "activities" as keyof User,
+      cell: (value: unknown, row: User) => {
+        if (row.activities) {
+          const activities = row.activities.split("/");
+          return `${activities[0] || 0}/${activities[1] || 0}/${activities[2] || 0}/${
+            activities[3] || 0
+          }/${activities[4] || 0}`;
+        }
+        return `${row._count?.posts || 0}/${row._count?.comments || 0}/${row._count?.likes || 0}/${
+          row._count?.reviews || 0
+        }/${row._count?.inquiries || 0}`;
+      },
+      className: "text-center",
+    };
+    // 관리 칼럼
+    const manageColumn = {
+      header: "관리",
+      accessor: "id" as keyof User,
+      cell: (value: unknown, row: User) => (
+        <div className="flex space-x-2">
+          <ActionButton
+            label="수정"
+            action="edit"
+            onClick={() => handleEditUser(row.id)}
+            disabled={loading || saving}
+          />
+          <ActionButton
+            label="삭제"
+            action="delete"
+            onClick={() => handleDeleteUser(row.id)}
+            disabled={loading || saving || row.isDeleted}
+          />
+        </div>
       ),
-    [users, selectedUsers, loading, currentPage, pageSize]
-  );
+      className: "w-24 text-center",
+    };
+    // 최종 컬럼 배열: baseColumns + 활동 + 관리
+    return [...baseColumns, activityColumn, manageColumn];
+  }, [users, selectedUsers, loading, currentPage, pageSize]);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -414,6 +494,46 @@ const UserManagement = () => {
           <Button onClick={handleOpenPointModal} disabled={selectedUsers.length === 0 || loading}>
             포인트 일괄 지급
           </Button>
+        </div>
+      </div>
+
+      {/* 통계 정보 섹션 */}
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">회원 통계</h2>
+
+        {/* 상태별 통계 */}
+        <div className="flex flex-row gap-x-2 mb-6">
+          <div className="flex items-center">
+            <StatusBadge status="온라인" />
+            <span className={`ml-2 ${statusNumberColor["온라인"]}`}>
+              {statistics.userStatus.online.toLocaleString()}
+            </span>
+          </div>
+          <div className="flex items-center">
+            <StatusBadge status="오프라인" />
+            <span className={`ml-2 ${statusNumberColor["오프라인"]}`}>
+              {statistics.userStatus.offline.toLocaleString()}
+            </span>
+          </div>
+          <div className="flex items-center">
+            <StatusBadge status="삭제" />
+            <span className={`ml-2 ${statusNumberColor["삭제"]}`}>
+              {statistics.userStatus.deleted.toLocaleString()}
+            </span>
+          </div>
+        </div>
+
+        {/* 등급별 통계 */}
+        <div>
+          <h3 className="text-md font-semibold text-gray-900 mb-3">등급별 분포</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            {statistics.rankDistribution.map((rank, index) => (
+              <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="text-sm font-medium text-gray-800">{rank.rankName}</p>
+                <p className="text-lg font-bold text-gray-900">{rank.count}명</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -458,7 +578,7 @@ const UserManagement = () => {
             type: "success",
             message: `포인트 지급이 완료되었습니다.`,
           });
-          fetchUsers(currentPage, pageSize, searchValue);
+          fetchUsers(currentPage, pageSize, searchValue, statusFilter);
         }}
       />
 
@@ -471,7 +591,7 @@ const UserManagement = () => {
             setSelectedUserId(undefined);
           }}
           onUserUpdated={() => {
-            fetchUsers(currentPage, pageSize, searchValue);
+            fetchUsers(currentPage, pageSize, searchValue, statusFilter);
             setAlertMessage({ type: "success", message: "회원 정보가 수정되었습니다." });
           }}
         />

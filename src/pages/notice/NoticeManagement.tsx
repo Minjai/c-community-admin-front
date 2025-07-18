@@ -270,15 +270,17 @@ const NoticeManagement = () => {
       accessor: "title" as keyof Post,
       cell: (value: unknown, row: Post) => (
         <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block truncate max-w-xs"
           onClick={(e) => {
             e.stopPropagation(); // Prevent default row click if any
             handleClick(row.id);
           }}
+          title={row.title}
         >
           {row.title}
         </span>
       ),
+      className: "max-w-xs",
     },
     {
       header: "작성일",

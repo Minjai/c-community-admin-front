@@ -451,12 +451,14 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
       accessor: "title" as keyof GuidelineWithOrder,
       cell: (value: unknown, row: GuidelineWithOrder) => (
         <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block truncate max-w-xs"
           onClick={() => handleEditGuideline(row)}
+          title={value as string}
         >
           {value as string}
         </span>
       ),
+      className: "max-w-xs",
     },
     {
       header: "이미지",

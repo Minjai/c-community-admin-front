@@ -440,8 +440,9 @@ const CasinoGameManagement = () => {
       accessor: "title" as keyof CasinoGame,
       cell: (value: unknown, row: CasinoGame, index: number) => (
         <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer block truncate"
           onClick={() => handleEditGame(row)}
+          title={value as string}
         >
           {value as string}
         </span>

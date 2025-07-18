@@ -570,12 +570,14 @@ export default function SportsManagement() {
         cell: (value: unknown, row: SportCategory) => (
           <button
             type="button"
-            className="text-blue-600 hover:text-blue-800 hover:underline focus:outline-none"
+            className="text-blue-600 hover:text-blue-800 hover:underline focus:outline-none block truncate max-w-xs"
             onClick={() => handleEditCategory(row)}
+            title={row.displayName}
           >
             {row.displayName}
           </button>
         ),
+        className: "max-w-xs",
       },
       {
         header: "종목 명",
@@ -584,14 +586,17 @@ export default function SportsManagement() {
           // 수동 등록 카테고리면 "숫자개 (수동)" 표시
           const isManual = row.category === "sport";
           const gameCount = (row as any).games ? (row as any).games.length : (row as any).gameCount;
+          const displayText =
+            isManual && typeof gameCount === "number"
+              ? `${gameCount}개 (수동)`
+              : getKoreanSportName(value as string);
           return (
-            <span>
-              {isManual && typeof gameCount === "number"
-                ? `${gameCount}개 (수동)`
-                : getKoreanSportName(value as string)}
+            <span className="block truncate max-w-xs" title={displayText}>
+              {displayText}
             </span>
           );
         },
+        className: "max-w-xs",
       },
       {
         header: "공개 여부",
@@ -696,7 +701,8 @@ export default function SportsManagement() {
       !currentGameDetail.home ||
       !currentGameDetail.away ||
       !currentGameDetail.league ||
-      !currentGameDetail.time
+      !currentGameDetail.time ||
+      !currentGameDetail.icon
     ) {
       setGameDetailError("모든 필드를 입력해주세요.");
       return;
