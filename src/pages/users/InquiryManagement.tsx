@@ -129,6 +129,7 @@ const InquiryManagement = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
+    setSearchValue(value);
     setCurrentPage(1); // 검색 시 첫 페이지로 이동
     fetchInquiries(1, pageSize, value);
   };
@@ -200,12 +201,12 @@ const InquiryManagement = () => {
     fetchInquiries(1, 10, "");
   }, []);
 
-  // 페이지, 검색, 카테고리 변경 시 데이터 로딩
+  // 페이지, 카테고리 변경 시 데이터 로딩
   useEffect(() => {
     if (currentPage > 0) {
       fetchInquiries(currentPage, pageSize, searchValue);
     }
-  }, [currentPage, pageSize, selectedCategory, searchValue]);
+  }, [currentPage, pageSize, selectedCategory]);
 
   // 카테고리 필터 외부 클릭 시 닫기
   useEffect(() => {

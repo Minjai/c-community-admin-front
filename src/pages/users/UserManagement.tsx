@@ -173,7 +173,7 @@ const UserManagement = () => {
 
   useEffect(() => {
     fetchUsers(currentPage, pageSize, searchValue, statusFilter);
-  }, [fetchUsers, currentPage, pageSize, searchValue, statusFilter]);
+  }, [fetchUsers, currentPage, pageSize, statusFilter]);
 
   // handlePageChange 구현
   const handlePageChange = (page: number) => {
@@ -326,6 +326,7 @@ const UserManagement = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
+    setSearchValue(value);
     fetchUsers(currentPage, pageSize, value, statusFilter);
   };
 
@@ -372,14 +373,23 @@ const UserManagement = () => {
         accessor: "email" as keyof User,
         cell: (value: unknown, row: User) => (
           <span
-            className="text-blue-600 hover:underline cursor-pointer"
+            className="text-blue-600 hover:underline cursor-pointer truncate block max-w-xs"
+            title={value as string}
             onClick={() => handleEditUser(row.id)}
           >
             {value as string}
           </span>
         ),
       },
-      { header: "닉네임", accessor: "nickname" as keyof User },
+      {
+        header: "닉네임",
+        accessor: "nickname" as keyof User,
+        cell: (value: unknown, row: User) => (
+          <span className="truncate block max-w-xs" title={value as string}>
+            {value as string}
+          </span>
+        ),
+      },
       {
         header: "등급",
         accessor: "rank" as keyof User,

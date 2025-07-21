@@ -6,6 +6,7 @@ export interface TableProps<T> {
     accessor: keyof T | "id";
     className?: string;
     cell?: (value: unknown, row: T, index: number) => ReactNode;
+    colSpan?: (row: T) => number;
   }[];
   data: T[];
   loading?: boolean;
@@ -188,18 +189,22 @@ const DataTable = <T extends Record<string, any>>({
                     />
                   </td>
                 )}
-                {columns.map((column, colIndex) => (
-                  <td
-                    key={colIndex}
-                    className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${
-                      column.className || ""
-                    }`}
-                  >
-                    {column.cell
-                      ? column.cell(getCellValue(row, column.accessor), row, rowIndex)
-                      : getCellValue(row, column.accessor)}
-                  </td>
-                ))}
+                {columns.map((column, colIndex) => {
+                  const colSpanValue = column.colSpan ? column.colSpan(row) : 1;
+                  return colSpanValue > 0 ? (
+                    <td
+                      key={colIndex}
+                      colSpan={colSpanValue}
+                      className={`px-6 py-4 whitespace-nowrap text-sm text-gray-900 ${
+                        column.className || ""
+                      }`}
+                    >
+                      {column.cell
+                        ? column.cell(getCellValue(row, column.accessor), row, rowIndex)
+                        : getCellValue(row, column.accessor)}
+                    </td>
+                  ) : null;
+                })}
               </tr>
             ))
           )}

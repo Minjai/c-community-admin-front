@@ -36,6 +36,8 @@ const SportsAnalysisDetail: React.FC = () => {
   const [leagueName, setLeagueName] = useState<string>("");
   const [displayOrder, setDisplayOrder] = useState(0);
   const [sportCategories, setSportCategories] = useState<SportCategory[]>([]);
+  const [contentType, setContentType] = useState<string>("analysis"); // analysis 또는 banner
+  const [customTitle, setCustomTitle] = useState<string>(""); // 배너용 커스텀 제목
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -71,6 +73,8 @@ const SportsAnalysisDetail: React.FC = () => {
           setDisplayOrder(analysis.displayOrder);
           setHomeTeamImageUrl(analysis.homeTeamImageUrl || "");
           setAwayTeamImageUrl(analysis.awayTeamImageUrl || "");
+          setContentType((analysis as any).type || "analysis");
+          setCustomTitle((analysis as any).title || "");
         }
       } catch (err) {
         setError("데이터를 불러오는 중 오류가 발생했습니다.");
@@ -107,19 +111,40 @@ const SportsAnalysisDetail: React.FC = () => {
         return;
       }
 
-      if (!homeTeam) {
-        setError("Home 팀명을 입력해주세요.");
-        return;
-      }
+      if (contentType === "analysis") {
+        if (!homeTeam) {
+          setError("Home 팀명을 입력해주세요.");
+          return;
+        }
 
-      if (!awayTeam) {
-        setError("Away 팀명을 입력해주세요.");
-        return;
-      }
+        if (!awayTeam) {
+          setError("Away 팀명을 입력해주세요.");
+          return;
+        }
 
-      if (!matchDate) {
-        setError("경기 일시를 선택해주세요.");
-        return;
+        if (!matchDate) {
+          setError("경기 일시를 선택해주세요.");
+          return;
+        }
+
+        if (!content) {
+          setError("내용을 입력해주세요.");
+          return;
+        }
+
+        if (!leagueName.trim()) {
+          setError("대회(리그명) 확인해주세요.");
+          return;
+        }
+      } else {
+        if (!customTitle.trim()) {
+          setError("배너 제목을 입력해주세요.");
+          return;
+        }
+        if (!content) {
+          setError("내용을 입력해주세요.");
+          return;
+        }
       }
 
       if (!startDate) {
@@ -129,28 +154,6 @@ const SportsAnalysisDetail: React.FC = () => {
 
       if (!endDate) {
         setError("노출 종료일을 선택해주세요.");
-        return;
-      }
-
-      if (!content) {
-        setError("내용을 입력해주세요.");
-        return;
-      }
-
-      // Home/Away 이미지 필수 체크
-      if (!homeTeamImage && !homeTeamImageUrl) {
-        setError("Home/Away 이미지 확인해주세요.");
-        return;
-      }
-
-      if (!awayTeamImage && !awayTeamImageUrl) {
-        setError("Home/Away 이미지 확인해주세요.");
-        return;
-      }
-
-      // 리그명 필수 체크
-      if (!leagueName.trim()) {
-        setError("대회(리그명) 확인해주세요.");
         return;
       }
 
@@ -165,14 +168,25 @@ const SportsAnalysisDetail: React.FC = () => {
       formData.append("endTime", endDate);
       formData.append("isPublic", String(isPublic));
       formData.append("displayOrder", String(displayOrder));
-
-      if (homeTeamImage instanceof File) {
-        const homeTeamBase64 = await convertFileToBase64(homeTeamImage);
-        formData.append("homeTeamImage", homeTeamBase64);
+      formData.append("type", contentType);
+      if (contentType === "banner") {
+        formData.append("title", customTitle);
       }
-      if (awayTeamImage instanceof File) {
-        const awayTeamBase64 = await convertFileToBase64(awayTeamImage);
-        formData.append("awayTeamImage", awayTeamBase64);
+
+      if (contentType === "analysis") {
+        if (homeTeamImage instanceof File) {
+          const homeTeamBase64 = await convertFileToBase64(homeTeamImage);
+          formData.append("homeTeamImage", homeTeamBase64);
+        }
+        if (awayTeamImage instanceof File) {
+          const awayTeamBase64 = await convertFileToBase64(awayTeamImage);
+          formData.append("awayTeamImage", awayTeamBase64);
+        }
+      } else {
+        if (homeTeamImage instanceof File) {
+          const homeTeamBase64 = await convertFileToBase64(homeTeamImage);
+          formData.append("homeTeamImage", homeTeamBase64);
+        }
       }
 
       if (id) {
@@ -254,81 +268,142 @@ const SportsAnalysisDetail: React.FC = () => {
             ]}
             className="w-60"
           />
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4">
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="contentType"
+                  value="analysis"
+                  checked={contentType === "analysis"}
+                  onChange={(e) => setContentType(e.target.value)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  disabled={saving}
+                />
+                <span className="ml-2 text-sm text-gray-700">분석</span>
+              </label>
+              <label className="inline-flex items-center">
+                <input
+                  type="radio"
+                  name="contentType"
+                  value="banner"
+                  checked={contentType === "banner"}
+                  onChange={(e) => setContentType(e.target.value)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                  disabled={saving}
+                />
+                <span className="ml-2 text-sm text-gray-700">배너</span>
+              </label>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Team Information */}
-      <div className="grid grid-cols-2 gap-8 mb-4">
-        <div className="flex items-start space-x-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Home 팀명</label>
-            <Input
-              value={homeTeam}
-              onChange={(e) => setHomeTeam(e.target.value)}
-              placeholder="Home 팀명"
-              className="w-full"
-            />
+      {contentType === "analysis" ? (
+        <div className="grid grid-cols-2 gap-8 mb-4">
+          <div className="flex items-start space-x-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Home 팀명</label>
+              <Input
+                value={homeTeam}
+                onChange={(e) => setHomeTeam(e.target.value)}
+                placeholder="Home 팀명"
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Home 팀 이미지</label>
+              <FileUpload
+                accept="image/*"
+                onChange={(file) => setHomeTeamImage(file)}
+                disabled={saving}
+                preview={true}
+                initialPreview={homeTeamImageUrl}
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Home 팀 이미지</label>
-            <FileUpload
-              accept="image/*"
-              onChange={(file) => setHomeTeamImage(file)}
-              disabled={saving}
-              preview={true}
-              initialPreview={homeTeamImageUrl}
-            />
+          <div className="flex items-start space-x-4">
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Away 팀명</label>
+              <Input
+                value={awayTeam}
+                onChange={(e) => setAwayTeam(e.target.value)}
+                placeholder="Away 팀명"
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Away 팀 이미지</label>
+              <FileUpload
+                accept="image/*"
+                onChange={(file) => setAwayTeamImage(file)}
+                disabled={saving}
+                preview={true}
+                initialPreview={awayTeamImageUrl}
+              />
+            </div>
           </div>
         </div>
-        <div className="flex items-start space-x-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Away 팀명</label>
-            <Input
-              value={awayTeam}
-              onChange={(e) => setAwayTeam(e.target.value)}
-              placeholder="Away 팀명"
-              className="w-full"
-            />
-          </div>
+      ) : (
+        <div className="mb-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Away 팀 이미지</label>
-            <FileUpload
-              accept="image/*"
-              onChange={(file) => setAwayTeamImage(file)}
-              disabled={saving}
-              preview={true}
-              initialPreview={awayTeamImageUrl}
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">배너 이미지</label>
+            <div className="w-full max-w-md">
+              <FileUpload
+                accept="image/*"
+                onChange={(file) => setHomeTeamImage(file)}
+                disabled={saving}
+                preview={true}
+                initialPreview={homeTeamImageUrl}
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Match Information */}
-      <div className="grid grid-cols-2 gap-8 mb-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">경기 일시</label>
-          <DatePicker
-            value={matchDate}
-            onChange={(value) => setMatchDate(value)}
-            label=""
-            className="w-full"
-          />
+      {contentType === "analysis" && (
+        <div className="grid grid-cols-2 gap-8 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">경기 일시</label>
+            <DatePicker
+              value={matchDate}
+              onChange={(value) => setMatchDate(value)}
+              label=""
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">대회(리그)명</label>
+            <Input
+              value={leagueName}
+              onChange={(e) => setLeagueName(e.target.value)}
+              placeholder="대회(리그)명"
+              className="w-full"
+              disabled={saving}
+            />
+          </div>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">대회(리그)명</label>
+      )}
+
+      {/* Content Editor */}
+      {contentType === "banner" && (
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">제목</label>
           <Input
-            value={leagueName}
-            onChange={(e) => setLeagueName(e.target.value)}
-            placeholder="대회(리그)명"
+            value={customTitle}
+            onChange={(e) => setCustomTitle(e.target.value)}
+            placeholder="배너 제목을 입력하세요"
             className="w-full"
             disabled={saving}
           />
         </div>
-      </div>
-
-      {/* Content Editor */}
+      )}
       <div ref={editorContainerRef}>
-        <label className="block text-sm font-medium text-gray-700 mb-1">내용</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {contentType === "banner" ? "배너 내용" : "내용"}
+        </label>
         <TextEditor content={content} setContent={setContent} height="400px" />
       </div>
     </div>

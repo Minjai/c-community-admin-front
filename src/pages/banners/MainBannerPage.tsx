@@ -199,6 +199,12 @@ const MainBannerPage: React.FC = () => {
         return;
       }
 
+      // 링크 URL 필수 검증
+      if (!currentBanner.linkUrl || currentBanner.linkUrl.trim() === "") {
+        setModalError("링크 등록은 필수 항목입니다.");
+        return;
+      }
+
       // 저장 시작 시 로딩 상태 활성화
       setIsSaving(true);
       setModalError(null);
@@ -466,7 +472,8 @@ const MainBannerPage: React.FC = () => {
       accessor: "title" as keyof Banner,
       cell: (value: unknown, row: Banner) => (
         <span
-          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer truncate block max-w-xs"
+          title={value as string}
           onClick={() => handleEditBanner(row)}
         >
           {value as string}

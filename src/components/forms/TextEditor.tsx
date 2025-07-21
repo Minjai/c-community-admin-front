@@ -35,7 +35,7 @@ const SUPPORTED_IMAGE_TYPES = [
   "image/png",
   "image/gif",
   "image/webp",
-  // "image/svg+xml", // SVG 제거
+  "image/svg+xml",
 ];
 
 // 이미지 크기 제한 설정

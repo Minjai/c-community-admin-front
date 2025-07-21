@@ -973,9 +973,6 @@ const CasinoCompanyPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-4 max-h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
-                  <div className="text-sm text-gray-500 mb-2 sticky top-0 bg-white py-1">
-                    댓글 목록 ({companyReviews.length}개)
-                  </div>
                   {companyReviews.map((review) => (
                     <div key={review.id} className="bg-white border border-gray-200 rounded-lg p-4">
                       <div className="flex justify-between items-start mb-2">

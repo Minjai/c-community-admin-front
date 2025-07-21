@@ -173,11 +173,11 @@ const GuidelineManagement: React.FC<GuidelineManagementProps> = ({ boardId }) =>
 
   useEffect(() => {
     fetchGuidelines(currentPage, pageSize, searchValue);
-  }, [boardId, currentPage, pageSize, searchValue]); // useEffect 의존성 배열 복원
+  }, [boardId, currentPage, pageSize]); // searchValue 의존성 제거
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages && page !== currentPage) {
-      fetchGuidelines(page, pageSize, searchValue);
+      setCurrentPage(page);
     }
   };
 

@@ -46,6 +46,17 @@ interface SportRecommendation {
   updatedAt: string;
 }
 
+interface SportWidget {
+  id: number;
+  title: string;
+  nightWidget: string;
+  dayWidget: string;
+  isPublic: number;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface SelectedItem {
   id: number;
   title: string;
@@ -75,6 +86,7 @@ const HomeManagementPage: React.FC = () => {
   const [sectionTypes, setSectionTypes] = useState<string[]>([]);
   const [casinoRecommendations, setCasinoRecommendations] = useState<CasinoRecommendation[]>([]);
   const [sportRecommendations, setSportRecommendations] = useState<SportRecommendation[]>([]);
+  const [sportWidgets, setSportWidgets] = useState<SportWidget[]>([]);
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +101,7 @@ const HomeManagementPage: React.FC = () => {
   const [expandedSections, setExpandedSections] = useState<{ [key: string]: boolean }>({
     casino: false,
     sports: false,
+    sportWidgets: false,
   });
 
   // 페이지네이션 상태
@@ -240,6 +253,27 @@ const HomeManagementPage: React.FC = () => {
     }
   };
 
+  const fetchSportWidgets = async () => {
+    try {
+      const response = await axios.get("/sport-widgets/admin");
+      if (response.data) {
+        const transformedWidgets = response.data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          nightWidget: item.nightWidget || "",
+          dayWidget: item.dayWidget || "",
+          isPublic: item.isPublic === 1 || item.isPublic === true ? 1 : 0,
+          displayOrder: item.displayOrder || 0,
+          createdAt: item.createdAt || new Date().toISOString(),
+          updatedAt: item.updatedAt || new Date().toISOString(),
+        }));
+        setSportWidgets(transformedWidgets);
+      }
+    } catch (err) {
+      console.error("Error fetching sport widgets:", err);
+    }
+  };
+
   useEffect(() => {
     fetchSections(currentPage);
     fetchSectionTypes();
@@ -249,6 +283,7 @@ const HomeManagementPage: React.FC = () => {
     if (showModal) {
       fetchCasinoRecommendations();
       fetchSportRecommendations();
+      fetchSportWidgets();
     }
   }, [showModal]);
 
@@ -612,9 +647,11 @@ const HomeManagementPage: React.FC = () => {
                   />
                   <label
                     htmlFor={`casino-${recommendation.id}`}
-                    className="ml-3 flex-1 cursor-pointer"
+                    className="ml-3 flex-1 cursor-pointer min-w-0"
                   >
-                    <div className="font-medium">{recommendation.title}</div>
+                    <div className="font-medium truncate max-w-xs" title={recommendation.title}>
+                      {recommendation.title}
+                    </div>
                   </label>
                 </div>
               ))}
@@ -663,9 +700,64 @@ const HomeManagementPage: React.FC = () => {
                   />
                   <label
                     htmlFor={`sports-${recommendation.id}`}
-                    className="ml-3 flex-1 cursor-pointer"
+                    className="ml-3 flex-1 cursor-pointer min-w-0"
                   >
-                    <div className="font-medium">{recommendation.title}</div>
+                    <div className="font-medium truncate max-w-xs" title={recommendation.title}>
+                      {recommendation.title}
+                    </div>
+                  </label>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 스포츠 위젯 관리 */}
+        <div className="border rounded-lg">
+          <div
+            className="flex items-center justify-between p-3 cursor-pointer hover:bg-gray-50"
+            onClick={() => toggleSection("sportWidgets")}
+          >
+            <div className="font-medium">스포츠 위젯 관리</div>
+            <svg
+              className={`w-5 h-5 transform transition-transform ${
+                expandedSections.sportWidgets ? "rotate-180" : ""
+              }`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 9l-7 7-7-7"
+              />
+            </svg>
+          </div>
+          {expandedSections.sportWidgets && (
+            <div className="border-t max-h-[300px] overflow-y-auto">
+              {sportWidgets.map((widget) => (
+                <div
+                  key={`sportWidget-${widget.id}`}
+                  className="flex items-center p-3 border-b hover:bg-gray-50"
+                >
+                  <input
+                    type="checkbox"
+                    id={`sportWidget-${widget.id}`}
+                    checked={selectedItems.some(
+                      (item) => item.id === widget.id && item.type === "SPORTS_WIDGET"
+                    )}
+                    onChange={() => handleItemSelect(widget, "SPORTS_WIDGET")}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor={`sportWidget-${widget.id}`}
+                    className="ml-3 flex-1 cursor-pointer min-w-0"
+                  >
+                    <div className="font-medium truncate max-w-xs" title={widget.title}>
+                      {widget.title}
+                    </div>
                   </label>
                 </div>
               ))}
@@ -738,15 +830,19 @@ const HomeManagementPage: React.FC = () => {
                 onDrop={() => handleDrop(index)}
                 style={{ cursor: "grab" }}
               >
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm font-medium text-gray-500">{index + 1}</span>
-                  <div>
-                    <div className="font-medium">{item.title}</div>
+                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                  <span className="text-sm font-medium text-gray-500 flex-shrink-0">
+                    {index + 1}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate" title={item.title}>
+                      {item.title}
+                    </div>
                   </div>
                 </div>
                 <button
                   onClick={() => handleRemoveSelectedItem(item.id, item.type)}
-                  className="text-red-500 hover:text-red-700 p-1"
+                  className="text-red-500 hover:text-red-700 p-1 flex-shrink-0 ml-2"
                   disabled={isSaving}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -26,6 +26,7 @@ interface Column {
   accessor: keyof SportGameAnalysis | "id";
   className?: string;
   cell?: (value: unknown, row: SportGameAnalysis, index: number) => React.ReactNode;
+  colSpan?: (row: SportGameAnalysis) => number;
 }
 
 const SportsAnalysisManagement = () => {
@@ -223,6 +224,24 @@ const SportsAnalysisManagement = () => {
       ),
     },
     {
+      header: "분류",
+      accessor: "type" as keyof SportGameAnalysis,
+      className: "text-center w-[100px]",
+      cell: (value: unknown, row: SportGameAnalysis) => {
+        const type = (row as any).type || "analysis";
+        return (
+          <span
+            className={`px-2 py-1 rounded-full text-xs font-medium ${
+              type === "analysis" ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"
+            }`}
+          >
+            {type === "analysis" ? "분석" : "배너"}
+          </span>
+        );
+      },
+    },
+
+    {
       header: "종목",
       accessor: "categoryId",
       className: "text-center w-[120px]",
@@ -232,50 +251,91 @@ const SportsAnalysisManagement = () => {
       },
     },
     {
-      header: "홈팀",
+      header: "Home 팀",
       accessor: "homeTeam",
       className: "text-center w-[150px]",
-      cell: (value: unknown, row: SportGameAnalysis) => (
-        <div className="flex flex-col items-center space-y-2 py-3">
-          {row.homeTeamImageUrl && (
-            <img
-              src={row.homeTeamImageUrl}
-              alt={`${row.homeTeam} 로고`}
-              className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80"
-              onClick={() => handleEdit(row.id)}
-            />
-          )}
-          <span
-            className="text-sm font-medium truncate w-[120px] text-center cursor-pointer hover:text-blue-600 hover:underline"
-            onClick={() => handleEdit(row.id)}
-          >
-            {row.homeTeam}
-          </span>
-        </div>
-      ),
+      colSpan: (row: SportGameAnalysis) => {
+        const type = (row as any).type || "analysis";
+        return type === "banner" ? 2 : 1; // 배너 타입일 때 2칸 병합
+      },
+      cell: (value: unknown, row: SportGameAnalysis) => {
+        const type = (row as any).type || "analysis";
+        return (
+          <div className="flex flex-col items-center space-y-2 py-3">
+            {type === "banner" ? (
+              // 배너 타입일 때는 Home 팀과 Away 팀 이미지를 합쳐서 가로로 길게 표시
+              <div className="w-full flex justify-center">
+                {(row.homeTeamImageUrl || row.awayTeamImageUrl) && (
+                  <img
+                    src={row.homeTeamImageUrl || row.awayTeamImageUrl}
+                    alt="배너 이미지"
+                    className="w-full h-16 object-contain rounded cursor-pointer hover:opacity-80"
+                    onClick={() => handleEdit(row.id)}
+                  />
+                )}
+              </div>
+            ) : (
+              // 분석 타입일 때는 기존과 동일
+              <>
+                {row.homeTeamImageUrl && (
+                  <img
+                    src={row.homeTeamImageUrl}
+                    alt={`${row.homeTeam} 로고`}
+                    className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80"
+                    onClick={() => handleEdit(row.id)}
+                  />
+                )}
+                <span
+                  className="text-sm font-medium truncate w-[120px] text-center cursor-pointer hover:text-blue-600 hover:underline"
+                  onClick={() => handleEdit(row.id)}
+                >
+                  {row.homeTeam}
+                </span>
+              </>
+            )}
+          </div>
+        );
+      },
     },
     {
-      header: "원정팀",
+      header: "Away 팀",
       accessor: "awayTeam",
       className: "text-center w-[150px]",
-      cell: (value: unknown, row: SportGameAnalysis) => (
-        <div className="flex flex-col items-center space-y-2 py-3">
-          {row.awayTeamImageUrl && (
-            <img
-              src={row.awayTeamImageUrl}
-              alt={`${row.awayTeam} 로고`}
-              className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80"
-              onClick={() => handleEdit(row.id)}
-            />
-          )}
-          <span
-            className="text-sm font-medium truncate w-[120px] text-center cursor-pointer hover:text-blue-600 hover:underline"
-            onClick={() => handleEdit(row.id)}
-          >
-            {row.awayTeam}
-          </span>
-        </div>
-      ),
+      colSpan: (row: SportGameAnalysis) => {
+        const type = (row as any).type || "analysis";
+        return type === "banner" ? 0 : 1; // 배너 타입일 때는 숨김 (Home 팀에서 병합)
+      },
+      cell: (value: unknown, row: SportGameAnalysis) => {
+        const type = (row as any).type || "analysis";
+        return (
+          <div className="flex flex-col items-center space-y-2 py-3">
+            {type === "banner" ? (
+              // 배너 타입일 때는 빈 공간 (Home 팀에서 이미지 표시)
+              <div className="w-full flex justify-center">
+                {/* 배너 타입일 때는 Home 팀 칼럼에서 이미지 표시하므로 여기는 빈 공간 */}
+              </div>
+            ) : (
+              // 분석 타입일 때는 기존과 동일
+              <>
+                {row.awayTeamImageUrl && (
+                  <img
+                    src={row.awayTeamImageUrl}
+                    alt={`${row.awayTeam} 로고`}
+                    className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80"
+                    onClick={() => handleEdit(row.id)}
+                  />
+                )}
+                <span
+                  className="text-sm font-medium truncate w-[120px] text-center cursor-pointer hover:text-blue-600 hover:underline"
+                  onClick={() => handleEdit(row.id)}
+                >
+                  {row.awayTeam}
+                </span>
+              </>
+            )}
+          </div>
+        );
+      },
     },
     {
       header: "경기 일자",

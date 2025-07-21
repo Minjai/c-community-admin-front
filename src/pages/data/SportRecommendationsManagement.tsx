@@ -1184,8 +1184,20 @@ export default function SportRecommendationsManagement() {
       accessor: "isPublic" as keyof SportRecommendation,
       cell: (value: unknown, row: SportRecommendation, index: number) => {
         const now = new Date();
-        const startTime = row.startTime ? new Date(row.startTime) : null;
-        const endTime = row.endTime ? new Date(row.endTime) : null;
+        let startTime: Date | null = null;
+        let endTime: Date | null = null;
+
+        // 수동 등록: manualGames에서 시간 가져오기
+        if ((row as any).manualGames && (row as any).manualGames.length > 0) {
+          const manualGame = (row as any).manualGames[0];
+          startTime = new Date(manualGame.startTime);
+          endTime = new Date(manualGame.endTime);
+        } else {
+          // 자동 등록: 추천 레벨의 시간 사용
+          startTime = row.startTime ? new Date(row.startTime) : null;
+          endTime = row.endTime ? new Date(row.endTime) : null;
+        }
+
         if (value !== 1) {
           return <span className="px-2 py-1 rounded text-xs bg-red-100 text-red-800">비공개</span>;
         }
@@ -1654,8 +1666,14 @@ export default function SportRecommendationsManagement() {
 
                         {/* 텍스트 정보 */}
                         <div className="flex-1 min-w-0 overflow-hidden">
-                          <div className="font-medium truncate">
-                            {game.home} vs {game.away}
+                          <div className="font-medium flex items-center space-x-2">
+                            <span className="truncate flex-1 min-w-0" title={game.home}>
+                              {game.home}
+                            </span>
+                            <span className="text-gray-500 flex-shrink-0">vs</span>
+                            <span className="truncate flex-1 min-w-0" title={game.away}>
+                              {game.away}
+                            </span>
                           </div>
                           <div className="text-sm text-gray-500 truncate">
                             {game.league} | {new Date(game.time).toLocaleDateString()}

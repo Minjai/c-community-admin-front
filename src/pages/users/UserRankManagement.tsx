@@ -133,7 +133,7 @@ const UserRankManagement: React.FC = () => {
 
   useEffect(() => {
     fetchRanks(currentPage, pageSize, searchValue);
-  }, [fetchRanks, currentPage, pageSize, searchValue]);
+  }, [fetchRanks, currentPage, pageSize]);
 
   // 페이지 변경 핸들러 추가
   const handlePageChange = (page: number) => {
@@ -393,6 +393,7 @@ const UserRankManagement: React.FC = () => {
 
   // 검색 핸들러
   const handleSearch = (value: string) => {
+    setSearchValue(value);
     fetchRanks(currentPage, pageSize, value);
   };
 

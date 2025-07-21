@@ -330,7 +330,7 @@ export default function SportsManagement() {
         displayName: category.displayName || getKoreanSportName(category.sportName),
         isPublic: category.isPublic,
       });
-      setSelectedSport(getKoreanSportName(category.sportName));
+      setSelectedSport(category.icon || ""); // icon 필드에서 이미지 로드
       setShowModal(true);
     }
   };
@@ -371,7 +371,7 @@ export default function SportsManagement() {
   // handleSaveCategory: 새 항목 추가 시 displayOrder=1, 기존 항목 +1
   const handleSaveCategory = async () => {
     if (!selectedSport) {
-      setError("종목 경기를 선택해주세요.");
+      setError("종목 이미지를 선택해주세요.");
       return;
     }
     if (!formData.displayName?.trim()) {
@@ -389,13 +389,14 @@ export default function SportsManagement() {
         displayOrder = currentCategory?.displayOrder ?? 1;
       }
       const payload = {
-        sportName: sportNameMapping[selectedSport.trim()] || selectedSport.trim(),
+        sportName: formData.displayName.trim(), // 표시 이름을 스포츠 네임으로 사용
         displayName: formData.displayName.trim(),
-        category: "goalserve", // 카테고리 추가는 goalserve
+        category: "manual", // 카테고리 추가는 manual
         isPublic: formData.isPublic,
         displayOrder,
+        icon: selectedSport, // icon 필드로 base64 이미지 전송
       };
-      const finalPayload: Omit<SportCategory, "id" | "createdAt" | "updatedAt" | "icon"> = payload;
+      const finalPayload: Omit<SportCategory, "id" | "createdAt" | "updatedAt"> = payload;
       if (modalType === "edit" && currentCategory) {
         await updateSportCategory(currentCategory.id, finalPayload);
       } else {
@@ -937,27 +938,30 @@ export default function SportsManagement() {
             />
           </div>
 
-          {/* 3. 종목 경기 선택 (기존 필드 순서 유지) */}
+          {/* 3. 종목 선택 (이미지만 받기) */}
           <div className="mt-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">종목 선택</label>
-            <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 gap-2 p-2 border rounded-md">
-              {sportOptions.map((sport) => (
-                <label key={sport} className="inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    value={sport}
-                    checked={selectedSport === sport}
-                    onChange={(e) => handleSportSelect(e.target.value)}
-                    className="form-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                    disabled={loading}
-                  />
-                  <span className="ml-2 text-sm text-gray-700">{sport}</span>
-                </label>
-              ))}
+            <div className="mt-1">
+              <FileUpload
+                onFileSelect={(file) => {
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                      setSelectedSport(reader.result as string);
+                    };
+                    reader.readAsDataURL(file);
+                  } else {
+                    setSelectedSport("");
+                  }
+                }}
+                accept="image/*"
+                disabled={loading}
+                initialPreview={selectedSport}
+              />
             </div>
             {/* 에러 메시지 */}
             {!selectedSport && modalType === "add" && (
-              <p className="mt-1 text-xs text-red-600">종목을 선택해주세요.</p>
+              <p className="mt-1 text-xs text-red-600">종목 이미지를 선택해주세요.</p>
             )}
           </div>
 
