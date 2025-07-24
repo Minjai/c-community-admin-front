@@ -495,7 +495,7 @@ const SportsAnalysisManagement = () => {
             {`선택 삭제 (${selectedIds.length})`}
           </Button>
           <Button variant="primary" onClick={() => handleOpenModal("add")} disabled={loading}>
-            분석 분석 추가
+            경기 분석 추가
           </Button>
         </div>
       </div>

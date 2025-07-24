@@ -39,6 +39,7 @@ export const validExcelTypes = [
   // 회원 관리
   "userAccounts",
   "adminAccounts",
+  "adminMessages",
 
   // 기타 관리
   "userRanks",

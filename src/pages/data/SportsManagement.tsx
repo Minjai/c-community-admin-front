@@ -200,7 +200,7 @@ export default function SportsManagement() {
       setError(null);
       try {
         const response = await getAllSportCategoriesAdmin(page, limit, searchValue);
-        console.log("Fetched categories:", response.data);
+
         const fetchedCategories = response.data || [];
         const pagination: any = response.pagination || {
           totalItems: 0,
@@ -225,7 +225,6 @@ export default function SportsManagement() {
                   gameCount: detailData?.games?.length || 0,
                 };
               } catch (error) {
-                console.error(`Error fetching detail for category ${category.id}:`, error);
                 return {
                   ...category,
                   games: [],
@@ -361,7 +360,7 @@ export default function SportsManagement() {
     } catch (err) {
       const apiError = (err as any)?.response?.data?.message || "카테고리 삭제 중 오류 발생";
       setError(apiError);
-      console.error("Error deleting sport category:", err);
+
       fetchSportCategories(currentPage, pageSize); // 실패 시 현재 페이지 리프레시
     } finally {
       setLoading(false);
@@ -398,9 +397,15 @@ export default function SportsManagement() {
       };
       const finalPayload: Omit<SportCategory, "id" | "createdAt" | "updatedAt"> = payload;
       if (modalType === "edit" && currentCategory) {
-        await updateSportCategory(currentCategory.id, finalPayload);
+        const response = await updateSportCategory(currentCategory.id, finalPayload);
+        if (!response) {
+          throw new Error("수정에 실패했습니다.");
+        }
       } else {
-        await createSportCategory(finalPayload as SportCategory);
+        const response = await createSportCategory(finalPayload as SportCategory);
+        if (!response) {
+          throw new Error("생성에 실패했습니다.");
+        }
       }
       setSuccess(
         modalType === "edit"
@@ -410,7 +415,7 @@ export default function SportsManagement() {
       setShowModal(false);
       fetchSportCategories(currentPage, PAGE_SIZE);
     } catch (error: any) {
-      setError(error.response?.data?.message || "저장 중 오류가 발생했습니다.");
+      setError(error.response?.data?.message || error.message || "저장 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -468,7 +473,7 @@ export default function SportsManagement() {
     } catch (err) {
       const apiError = (err as any)?.response?.data?.message || "선택 삭제 중 오류 발생";
       setError(apiError);
-      console.error("Error bulk deleting categories:", err);
+
       fetchSportCategories(currentPage, pageSize); // 실패 시 현재 페이지 리프레시
     } finally {
       setLoading(false);
@@ -779,16 +784,12 @@ export default function SportsManagement() {
     setLoading(true);
     setError(null);
     try {
-      // 디버깅: 실제 데이터 확인
-      console.log("manualForm.selectedGames:", manualForm.selectedGames);
-
       const categoryData = {
         displayName: manualForm.displayName,
         sportName: manualForm.displayName, // 표시이름을 스포츠 네임으로 사용
         category: "sport", // 수동 등록은 sport
         isPublic: manualForm.isPublic,
         games: manualForm.selectedGames.map((game) => {
-          console.log("Processing game:", game); // 각 게임 객체 확인
           return {
             home: game.home,
             away: game.away,
@@ -799,17 +800,48 @@ export default function SportsManagement() {
         }),
       };
 
-      console.log("Final categoryData:", categoryData); // 최종 데이터 확인
-
       let response;
       // 편집 모드인지 확인 (currentCategory가 있고 category가 sport이면 편집)
       if (currentCategory && currentCategory.category === "sport") {
-        response = await updateSportCategory(currentCategory.id, categoryData);
+        // 수동 등록 수정은 FormData로 전송
+        const formData = new FormData();
+        formData.append("displayName", categoryData.displayName);
+        formData.append("sportName", categoryData.sportName);
+        formData.append("category", categoryData.category);
+        formData.append("isPublic", categoryData.isPublic.toString());
+        formData.append("games", JSON.stringify(categoryData.games));
+
+        // 아이콘 파일들 처리
+        categoryData.games.forEach((game, index) => {
+          if (game.icon && game.icon.startsWith("data:image/")) {
+            formData.append(`icon_${index}`, game.icon);
+          }
+        });
+
+        // 수동 등록 카테고리 수정은 기존 엔드포인트 사용하되 데이터 구조 맞춤
+        try {
+          response = await axios.put(
+            `/sport-categories/admin/${currentCategory.id}/manual`,
+            formData,
+            {
+              headers: {
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          );
+        } catch (error) {
+          // 별도 엔드포인트가 없으면 기존 엔드포인트 사용
+          response = await axios.put(`/sport-categories/admin/${currentCategory.id}`, formData, {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          });
+        }
       } else {
         response = await createSportCategory(categoryData);
       }
 
-      if (response) {
+      if (response && response.data && response.data.success) {
         // 성공 시 모달 닫고 목록 새로고침
         handleCloseManualModal();
         fetchSportCategories(currentPage, pageSize);
@@ -1076,11 +1108,22 @@ export default function SportsManagement() {
 
                       {/* 텍스트 정보 */}
                       <div className="flex-1">
-                        <div className="font-medium">
-                          {game.home} vs {game.away}
+                        <div
+                          className="font-medium truncate"
+                          title={`${game.home} vs ${game.away}`}
+                        >
+                          {game.home.length > 15 ? `${game.home.substring(0, 15)}...` : game.home}{" "}
+                          vs{" "}
+                          {game.away.length > 15 ? `${game.away.substring(0, 15)}...` : game.away}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {game.league} | {formatDate(game.time)}
+                        <div
+                          className="text-sm text-gray-500 truncate"
+                          title={`${game.league} | ${formatDate(game.time)}`}
+                        >
+                          {game.league.length > 20
+                            ? `${game.league.substring(0, 20)}...`
+                            : game.league}{" "}
+                          | {formatDate(game.time)}
                         </div>
                       </div>
                     </div>

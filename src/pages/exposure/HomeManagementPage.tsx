@@ -327,20 +327,99 @@ const HomeManagementPage: React.FC = () => {
     setIsEditing(false);
   };
 
-  const handleEdit = (section: HomeSection) => {
+  const handleEdit = async (section: HomeSection) => {
     setModalError(null);
     setCurrentSection(section);
 
-    // 기존 선택된 항목들을 로드
-    if (section.selectedItems && section.selectedItems.length > 0) {
-      setSelectedItems(section.selectedItems);
-    } else {
-      // API에서 데이터가 제대로 변환되지 않은 경우 기본값 설정
-      setSelectedItems([]);
-    }
+    // 먼저 최신 데이터를 가져옴
+    try {
+      const [casinoData, sportsData, widgetsData] = await Promise.all([
+        axios.get("/casino-recommends"),
+        getSportRecommendations({}),
+        axios.get("/sport-widgets/admin"),
+      ]);
 
-    setShowModal(true);
-    setIsEditing(true);
+      // 최신 데이터로 상태 업데이트
+      let transformedCasino: any[] = [];
+      let transformedSports: any[] = [];
+      let transformedWidgets: any[] = [];
+
+      if (casinoData.data && casinoData.data.success && Array.isArray(casinoData.data.data)) {
+        transformedCasino = casinoData.data.data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          isMainDisplay: item.isMainDisplay === 1 || item.isMainDisplay === true,
+          games: item.games || [],
+          startDate: item.startDate || item.start_date || "",
+          endDate: item.endDate || item.end_date || "",
+          isPublic: item.isPublic === 1 || item.isPublic === true ? 1 : 0,
+          displayOrder: item.displayOrder || item.position || 0,
+          createdAt: item.createdAt || item.created_at || new Date().toISOString(),
+          updatedAt:
+            item.updatedAt || item.updated_at || item.createdAt || new Date().toISOString(),
+        }));
+        setCasinoRecommendations(transformedCasino);
+      }
+
+      if (sportsData.data) {
+        transformedSports = sportsData.data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          description: item.description || "",
+          isPublic: item.isPublic === 1 || item.isPublic === true ? 1 : 0,
+          displayOrder: item.displayOrder || 0,
+          startTime: item.startTime || "",
+          endTime: item.endTime || "",
+          createdAt: item.createdAt || new Date().toISOString(),
+          updatedAt: item.updatedAt || new Date().toISOString(),
+        }));
+        setSportRecommendations(transformedSports);
+      }
+
+      if (widgetsData.data) {
+        transformedWidgets = widgetsData.data.map((item: any) => ({
+          id: item.id,
+          title: item.title,
+          nightWidget: item.nightWidget || "",
+          dayWidget: item.dayWidget || "",
+          isPublic: item.isPublic === 1 || item.isPublic === true ? 1 : 0,
+          displayOrder: item.displayOrder || 0,
+          createdAt: item.createdAt || new Date().toISOString(),
+          updatedAt: item.updatedAt || new Date().toISOString(),
+        }));
+        setSportWidgets(transformedWidgets);
+      }
+
+      // 최신 데이터로 선택된 항목들 업데이트
+      if (section.selectedItems && section.selectedItems.length > 0) {
+        const updatedItems = section.selectedItems.map((item) => {
+          switch (item.type) {
+            case "CASINO_GAMES":
+              const casinoItem = transformedCasino.find((c: any) => c.id === item.id);
+              return casinoItem ? { ...item, title: casinoItem.title } : item;
+            case "SPORTS_MATCHES":
+              const sportsItem = transformedSports.find((s: any) => s.id === item.id);
+              return sportsItem ? { ...item, title: sportsItem.title } : item;
+            case "SPORTS_WIDGET":
+              const widgetItem = transformedWidgets.find((w: any) => w.id === item.id);
+              return widgetItem ? { ...item, title: widgetItem.title } : item;
+            default:
+              return item;
+          }
+        });
+        setSelectedItems(updatedItems);
+      } else {
+        setSelectedItems([]);
+      }
+
+      setShowModal(true);
+      setIsEditing(true);
+    } catch (error) {
+      console.error("Error fetching latest data:", error);
+      setSelectedItems(section.selectedItems || []);
+      setShowModal(true);
+      setIsEditing(true);
+    }
   };
 
   const handleCloseModal = () => {

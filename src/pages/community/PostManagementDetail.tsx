@@ -9,7 +9,7 @@ import Button from "@/components/Button";
 import { formatDate } from "@/utils/dateUtils";
 import FileUpload from "@/components/forms/FileUpload";
 import { useScrollToTop } from "@/hooks/useScrollToTop";
-import { CloudArrowUpIcon } from "@heroicons/react/24/outline";
+import { CloudArrowUpIcon, XMarkIcon } from "@heroicons/react/24/outline";
 
 // replaceAsync 유틸리티 함수 추가
 const replaceAsync = async (
@@ -180,6 +180,14 @@ const TempUserImageUpload = ({
     }
   };
 
+  const handleReset = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!disabled) {
+      setPreviewUrl(null);
+      onChange(null);
+    }
+  };
+
   return (
     <div className={className}>
       <input
@@ -203,6 +211,14 @@ const TempUserImageUpload = ({
             className="w-full h-full object-cover cursor-pointer"
             onClick={handleClick}
           />
+          <button
+            type="button"
+            onClick={handleReset}
+            className="absolute top-1 right-1 w-5 h-5 bg-black bg-opacity-50 hover:bg-opacity-70 text-white rounded-full flex items-center justify-center transition-all duration-200 backdrop-blur-sm"
+            title="이미지 초기화"
+          >
+            <XMarkIcon className="w-3 h-3" />
+          </button>
         </div>
       ) : (
         <div
@@ -264,6 +280,7 @@ const PostDetail = () => {
     nickname: "",
     rank: "",
     profileImageFile: null as string | null,
+    profileImageUrl: "",
   });
   const [editingComment, setEditingComment] = useState<Comment | null>(null);
 
@@ -380,10 +397,6 @@ const PostDetail = () => {
           setError("더미유저 등급을 선택해주세요.");
           return;
         }
-        if (!tempUser.profileImageUrl.trim() && !profileImageFile) {
-          setError("더미유저 프로필 이미지를 등록해주세요.");
-          return;
-        }
       }
 
       // 에디터 내용 분석
@@ -409,32 +422,24 @@ const PostDetail = () => {
         formData.append("tempUser[title]", "");
         formData.append("tempUser[content]", "");
 
-        // 프로필 이미지 처리: 새 파일이 있으면 base64를, 없으면 기존 URL을 전송
+        // 프로필 이미지 처리: 새 파일이 있으면 새 파일을, 없으면 빈 값으로 전송
         if (profileImageFile) {
           formData.append("tempUser[profileImage]", profileImageFile);
-        } else if (post.tempUser.profileImageUrl) {
-          formData.append("tempUser[profileImageUrl]", post.tempUser.profileImageUrl);
+        } else {
+          formData.append("tempUser[profileImage]", "");
         }
       } else if (!isEditMode && tempUser.nickname.trim()) {
         // 새 게시물이고 새로 입력한 tempUser 정보가 있는 경우
         formData.append("tempUser[nickname]", tempUser.nickname.trim());
-
-        // 등급이 선택되지 않았으면 가장 낮은 등급(스코어 0)을 자동 설정
-        let selectedRank = tempUser.rank;
-        if (!selectedRank && userRanks.length > 0) {
-          const lowestRank = userRanks.reduce((lowest, current) =>
-            current.score < lowest.score ? current : lowest
-          );
-          selectedRank = lowestRank.rankName;
-        }
-        formData.append("tempUser[rank]", selectedRank || "");
-
+        formData.append("tempUser[rank]", tempUser.rank);
         formData.append("tempUser[title]", tempUser.title);
         formData.append("tempUser[content]", tempUser.content);
 
-        // 프로필 이미지 base64가 있으면 추가
+        // 프로필 이미지 처리: 있으면 파일을, 없으면 빈 값으로 전송
         if (profileImageFile) {
           formData.append("tempUser[profileImage]", profileImageFile);
+        } else {
+          formData.append("tempUser[profileImage]", "");
         }
       } else if (isEditMode && post?.authorId) {
         // 수정 모드이고 기존에 실제 사용자가 작성한 게시물인 경우
@@ -683,10 +688,6 @@ const PostDetail = () => {
         alert("더미유저 등급을 선택해주세요.");
         return;
       }
-      if (!commentCreateTempUser.profileImageFile) {
-        alert("더미유저 프로필 이미지를 등록해주세요.");
-        return;
-      }
     }
 
     try {
@@ -701,8 +702,11 @@ const PostDetail = () => {
         formData.append("tempUser[title]", "");
         formData.append("tempUser[content]", "");
 
+        // 프로필 이미지 처리: 있으면 파일을, 없으면 빈 값으로 전송
         if (commentCreateTempUser.profileImageFile) {
           formData.append("tempUserProfileImage", commentCreateTempUser.profileImageFile);
+        } else {
+          formData.append("tempUserProfileImage", "");
         }
       }
 
@@ -717,7 +721,7 @@ const PostDetail = () => {
         setCommentContent("");
         setCommentCreateTempUser({
           nickname: "",
-          rank: "",
+          rank: userRanks.length > 0 ? userRanks[0].rankName : "",
           profileImageFile: null,
         });
         getPostDetail(); // 댓글 목록 새로고침
@@ -748,6 +752,7 @@ const PostDetail = () => {
             ? comment.tempUser.rank
             : (comment.tempUser.rank as any)?.rankName || "",
         profileImageFile: null,
+        profileImageUrl: comment.tempUser.profileImageUrl || "", // 기존 이미지 URL 저장
       });
     } else {
       // 실제 사용자 댓글인 경우 빈 값으로 설정
@@ -755,6 +760,7 @@ const PostDetail = () => {
         nickname: "",
         rank: "",
         profileImageFile: null,
+        profileImageUrl: "",
       });
     }
   };
@@ -779,10 +785,6 @@ const PostDetail = () => {
         alert("더미유저 등급을 선택해주세요.");
         return;
       }
-      if (!commentEditTempUser.profileImageFile && !editingComment?.tempUser?.profileImageUrl) {
-        alert("더미유저 프로필 이미지를 등록해주세요.");
-        return;
-      }
     }
 
     try {
@@ -796,10 +798,13 @@ const PostDetail = () => {
         formData.append("tempUser[title]", "");
         formData.append("tempUser[content]", "");
 
+        // 프로필 이미지 처리: 새 파일이 있으면 새 파일을, 기존 URL이 있으면 기존 URL을, 없으면 빈 값으로 전송
         if (commentEditTempUser.profileImageFile) {
           formData.append("tempUserProfileImage", commentEditTempUser.profileImageFile);
-        } else if (editingComment?.tempUser?.profileImageUrl) {
-          formData.append("tempUserProfileImageUrl", editingComment.tempUser.profileImageUrl);
+        } else if (commentEditTempUser.profileImageUrl) {
+          formData.append("tempUserProfileImageUrl", commentEditTempUser.profileImageUrl);
+        } else {
+          formData.append("tempUserProfileImage", "");
         }
       }
       // 실제 사용자 댓글인 경우 내용만 전송 (작성자 정보는 변경하지 않음)
@@ -818,9 +823,18 @@ const PostDetail = () => {
           nickname: "",
           rank: "",
           profileImageFile: null,
+          profileImageUrl: "",
         });
         setEditingComment(null);
         getPostDetail(); // 댓글 목록 새로고침
+
+        // 댓글 작성 폼의 등급을 첫 번째 등급으로 재설정
+        if (userRanks.length > 0) {
+          setCommentCreateTempUser((prev) => ({
+            ...prev,
+            rank: userRanks[0].rankName,
+          }));
+        }
       } else {
         alert("댓글 수정에 실패했습니다.");
       }
@@ -837,6 +851,26 @@ const PostDetail = () => {
     getPostDetail();
     fetchUserRanks();
   }, [id]);
+
+  // 새 게시물 작성 시 첫 번째 등급을 기본값으로 설정
+  useEffect(() => {
+    if (isNewPost && userRanks.length > 0 && !tempUser.rank) {
+      setTempUser((prev) => ({
+        ...prev,
+        rank: userRanks[0].rankName,
+      }));
+    }
+  }, [userRanks, isNewPost]);
+
+  // 댓글 작성 시 첫 번째 등급을 기본값으로 설정
+  useEffect(() => {
+    if (userRanks.length > 0 && !commentCreateTempUser.rank) {
+      setCommentCreateTempUser((prev) => ({
+        ...prev,
+        rank: userRanks[0].rankName,
+      }));
+    }
+  }, [userRanks, commentCreateTempUser.rank]);
 
   // 에디터 컨테이너 참조가 변경되면 스크롤을 최상단으로 이동
   useEffect(() => {

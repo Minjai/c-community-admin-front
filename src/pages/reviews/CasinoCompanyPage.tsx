@@ -709,7 +709,7 @@ const CasinoCompanyPage: React.FC = () => {
         <div className="flex space-x-2">
           <button
             onClick={() => handleOpenCommentModal(row)}
-            className="inline-flex items-center justify-center px-2 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md focus:outline-none transition-colors w-20"
+            className="inline-flex items-center justify-center px-3 py-1 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md focus:outline-none transition-colors min-w-[100px]"
           >
             <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -999,10 +999,10 @@ const CasinoCompanyPage: React.FC = () => {
                         <div className="text-xs text-gray-500">{formatDate(review.createdAt)}</div>
                       </div>
                       <div className="flex justify-between items-start">
-                        <p className="text-gray-700 text-sm flex-1 break-words overflow-hidden">
+                        <p className="text-gray-700 text-sm flex-1 break-words overflow-hidden mr-4">
                           {review.content}
                         </p>
-                        <div className="flex flex-col space-y-1 ml-4 flex-shrink-0">
+                        <div className="flex flex-col space-y-1 flex-shrink-0 min-w-[80px]">
                           <ActionButton
                             label="수정"
                             action="edit"

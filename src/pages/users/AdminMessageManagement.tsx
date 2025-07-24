@@ -10,7 +10,7 @@ import SearchInput from "@/components/SearchInput";
 import ExcelDownloadButton from "@/components/ExcelDownloadButton";
 import { formatDate } from "@/utils/dateUtils";
 import LoadingOverlay from "@/components/LoadingOverlay";
-import TextEditor from "@/components/forms/TextEditor";
+import TextEditor, { TextDisplay } from "@/components/forms/TextEditor";
 import Select from "@/components/forms/Select";
 
 enum MessageStatus {
@@ -791,10 +791,10 @@ const AdminMessageManagement = () => {
     {
       header: "제목",
       accessor: "title" as keyof AdminMessage,
-      className: "w-60",
+      className: "max-w-xs !whitespace-nowrap",
       cell: (value: unknown, row: AdminMessage) => (
         <div
-          className="max-w-xs truncate text-blue-600 hover:underline cursor-pointer"
+          className="max-w-full text-blue-600 hover:underline cursor-pointer text-ellipsis overflow-hidden whitespace-nowrap"
           title={row.title}
           onClick={() => handleOpenDetailModal(row)}
         >
@@ -1287,9 +1287,10 @@ const AdminMessageManagement = () => {
               {/* 내용 (읽기 전용) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
-                <div
-                  className="w-full min-h-[300px] max-h-[400px] p-4 border border-gray-300 rounded-md bg-gray-50 text-gray-700 overflow-y-auto prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: selectedMessage.content }}
+                <TextEditor
+                  content={selectedMessage.content}
+                  setContent={() => {}} // 빈 함수로 설정하여 수정 불가
+                  readOnly={true}
                 />
               </div>
 
@@ -1366,9 +1367,10 @@ const AdminMessageManagement = () => {
               {/* 내용 (읽기 전용) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">내용</label>
-                <div
-                  className="w-full min-h-[300px] max-h-[400px] p-4 border border-gray-300 rounded-md bg-gray-50 text-gray-700 overflow-y-auto prose prose-sm max-w-none"
-                  dangerouslySetInnerHTML={{ __html: selectedMessage.content }}
+                <TextEditor
+                  content={selectedMessage.content}
+                  setContent={() => {}} // 빈 함수로 설정하여 수정 불가
+                  readOnly={true}
                 />
               </div>
 

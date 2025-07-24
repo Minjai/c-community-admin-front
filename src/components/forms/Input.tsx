@@ -19,10 +19,8 @@ const Input: React.FC<InputProps> = ({ label, error, helperText, className = "",
           error ? "border-red-500 focus:ring-red-500 focus:border-red-500" : ""
         } ${className}`}
         style={{
-          wordWrap: "break-word",
-          whiteSpace: "pre-wrap",
-          minHeight: "2.5rem",
-          resize: "vertical",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
         }}
         {...props}
       />

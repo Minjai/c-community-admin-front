@@ -296,7 +296,7 @@ function FooterManagementPage() {
         accessor: "content",
         cell: (value: string) => (
           <div className="truncate max-w-xs" title={createPreview(value, 500)}>
-            {createPreview(value, 50)}
+            {createPreview(value, 100)}
           </div>
         ),
       },

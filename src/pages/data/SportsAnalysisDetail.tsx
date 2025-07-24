@@ -136,6 +136,16 @@ const SportsAnalysisDetail: React.FC = () => {
           setError("대회(리그명) 확인해주세요.");
           return;
         }
+
+        if (!homeTeamImage && !homeTeamImageUrl) {
+          setError("Home/Away 이미지 확인해주세요.");
+          return;
+        }
+
+        if (!awayTeamImage && !awayTeamImageUrl) {
+          setError("Home/Away 이미지 확인해주세요.");
+          return;
+        }
       } else {
         if (!customTitle.trim()) {
           setError("배너 제목을 입력해주세요.");
@@ -174,18 +184,38 @@ const SportsAnalysisDetail: React.FC = () => {
       }
 
       if (contentType === "analysis") {
+        // Home 팀 이미지 처리
         if (homeTeamImage instanceof File) {
           const homeTeamBase64 = await convertFileToBase64(homeTeamImage);
           formData.append("homeTeamImage", homeTeamBase64);
+        } else if (homeTeamImageUrl) {
+          // 기존 이미지가 있는 경우
+          formData.append("homeTeamImage", homeTeamImageUrl);
+        } else {
+          setError("Home 팀 이미지를 선택해주세요.");
+          return;
         }
+
+        // Away 팀 이미지 처리
         if (awayTeamImage instanceof File) {
           const awayTeamBase64 = await convertFileToBase64(awayTeamImage);
           formData.append("awayTeamImage", awayTeamBase64);
+        } else if (awayTeamImageUrl) {
+          // 기존 이미지가 있는 경우
+          formData.append("awayTeamImage", awayTeamImageUrl);
+        } else {
+          setError("Away 팀 이미지를 선택해주세요.");
+          return;
         }
       } else {
         if (homeTeamImage instanceof File) {
           const homeTeamBase64 = await convertFileToBase64(homeTeamImage);
           formData.append("homeTeamImage", homeTeamBase64);
+        } else if (homeTeamImageUrl) {
+          formData.append("homeTeamImage", homeTeamImageUrl);
+        } else {
+          setError("배너 이미지를 선택해주세요.");
+          return;
         }
       }
 
@@ -316,7 +346,12 @@ const SportsAnalysisDetail: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Home 팀 이미지</label>
               <FileUpload
                 accept="image/*"
-                onChange={(file) => setHomeTeamImage(file)}
+                onChange={(file) => {
+                  setHomeTeamImage(file);
+                  if (!file) {
+                    setHomeTeamImageUrl(""); // 이미지를 지우면 기존 URL도 지움
+                  }
+                }}
                 disabled={saving}
                 preview={true}
                 initialPreview={homeTeamImageUrl}
@@ -337,7 +372,12 @@ const SportsAnalysisDetail: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Away 팀 이미지</label>
               <FileUpload
                 accept="image/*"
-                onChange={(file) => setAwayTeamImage(file)}
+                onChange={(file) => {
+                  setAwayTeamImage(file);
+                  if (!file) {
+                    setAwayTeamImageUrl(""); // 이미지를 지우면 기존 URL도 지움
+                  }
+                }}
                 disabled={saving}
                 preview={true}
                 initialPreview={awayTeamImageUrl}
@@ -352,7 +392,12 @@ const SportsAnalysisDetail: React.FC = () => {
             <div className="w-full max-w-md">
               <FileUpload
                 accept="image/*"
-                onChange={(file) => setHomeTeamImage(file)}
+                onChange={(file) => {
+                  setHomeTeamImage(file);
+                  if (!file) {
+                    setHomeTeamImageUrl(""); // 이미지를 지우면 기존 URL도 지움
+                  }
+                }}
                 disabled={saving}
                 preview={true}
                 initialPreview={homeTeamImageUrl}

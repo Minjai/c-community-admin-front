@@ -1475,9 +1475,7 @@ export default function SportRecommendationsManagement() {
           >
             수동 등록
           </Button>
-          <Button variant="primary" onClick={handleAddRecommendation} disabled={loading}>
-            추천 추가
-          </Button>
+
           <Button
             variant="danger"
             onClick={handleBulkDelete}

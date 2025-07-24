@@ -544,6 +544,31 @@ const TextEditor: React.FC<TextEditorProps> = ({
     [setContent, onChange]
   );
 
+  // 복사 이벤트 핸들러 추가
+  useEffect(() => {
+    const editor = quillRef.current?.getEditor();
+    if (!editor) return;
+
+    const handleCopy = (e: ClipboardEvent) => {
+      // 선택된 텍스트가 있는지 확인
+      const selection = editor.getSelection();
+      if (!selection || selection.length === 0) return;
+
+      // 선택된 텍스트를 순수 텍스트로 가져오기
+      const text = editor.getText(selection.index, selection.length);
+
+      // 클립보드에 순수 텍스트만 설정
+      e.clipboardData?.setData("text/plain", text);
+      e.preventDefault();
+    };
+
+    editor.root.addEventListener("copy", handleCopy);
+
+    return () => {
+      editor.root.removeEventListener("copy", handleCopy);
+    };
+  }, []);
+
   // 포커스 핸들러
   const handleFocus = useCallback(() => {
     // 에디터 포커스 시 onFocus 호출
@@ -1390,6 +1415,22 @@ const TextEditor: React.FC<TextEditorProps> = ({
         `}
       </style>
     </ErrorBoundary>
+  );
+};
+
+// 조회용 텍스트 표시 컴포넌트
+export const TextDisplay = ({
+  content,
+  className = "",
+}: {
+  content: string;
+  className?: string;
+}) => {
+  return (
+    <div
+      className={`w-full min-h-[300px] max-h-[400px] p-4 border border-gray-300 rounded-md bg-gray-50 overflow-y-auto overflow-x-hidden break-words ${className}`}
+      dangerouslySetInnerHTML={{ __html: content }}
+    />
   );
 };
 
