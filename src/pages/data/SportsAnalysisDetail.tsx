@@ -172,7 +172,11 @@ const SportsAnalysisDetail: React.FC = () => {
       formData.append("homeTeam", homeTeam);
       formData.append("awayTeam", awayTeam);
       formData.append("league", leagueName);
-      formData.append("gameDate", matchDate);
+      if (contentType === "analysis") {
+        formData.append("gameDate", matchDate);
+      } else {
+        formData.append("gameDate", new Date().toISOString());
+      }
       formData.append("content", content);
       formData.append("startTime", startDate);
       formData.append("endTime", endDate);

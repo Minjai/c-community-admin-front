@@ -537,12 +537,14 @@ const UserManagement = () => {
         <div>
           <h3 className="text-md font-semibold text-gray-900 mb-3">등급별 분포</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {statistics.rankDistribution.map((rank, index) => (
-              <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                <p className="text-sm font-medium text-gray-800">{rank.rankName}</p>
-                <p className="text-lg font-bold text-gray-900">{rank.count}명</p>
-              </div>
-            ))}
+            {statistics.rankDistribution
+              .filter((rank) => !rank.rankName.toLowerCase().includes("manager"))
+              .map((rank, index) => (
+                <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                  <p className="text-sm font-medium text-gray-800">{rank.rankName}</p>
+                  <p className="text-lg font-bold text-gray-900">{rank.count}명</p>
+                </div>
+              ))}
           </div>
         </div>
       </div>

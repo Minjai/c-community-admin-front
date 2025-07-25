@@ -281,6 +281,7 @@ const PostDetail = () => {
     rank: "",
     profileImageFile: null as string | null,
     profileImageUrl: "",
+    profileImageRemoved: false, // 이미지 삭제 여부 추가
   });
   const [editingComment, setEditingComment] = useState<Comment | null>(null);
 
@@ -368,6 +369,7 @@ const PostDetail = () => {
         setCommentEditTempUser((prev) => ({
           ...prev,
           profileImageFile: reader.result as string,
+          profileImageRemoved: false, // 새 이미지가 있으면 삭제 상태 해제
         }));
       };
       reader.readAsDataURL(file);
@@ -375,6 +377,7 @@ const PostDetail = () => {
       setCommentEditTempUser((prev) => ({
         ...prev,
         profileImageFile: null,
+        profileImageRemoved: true, // 이미지가 없으면 삭제 상태로 설정
       }));
     }
   };
@@ -753,6 +756,7 @@ const PostDetail = () => {
             : (comment.tempUser.rank as any)?.rankName || "",
         profileImageFile: null,
         profileImageUrl: comment.tempUser.profileImageUrl || "", // 기존 이미지 URL 저장
+        profileImageRemoved: false, // 이미지 삭제 여부 초기화
       });
     } else {
       // 실제 사용자 댓글인 경우 빈 값으로 설정
@@ -761,6 +765,7 @@ const PostDetail = () => {
         rank: "",
         profileImageFile: null,
         profileImageUrl: "",
+        profileImageRemoved: false, // 이미지 삭제 여부 초기화
       });
     }
   };
@@ -798,13 +803,13 @@ const PostDetail = () => {
         formData.append("tempUser[title]", "");
         formData.append("tempUser[content]", "");
 
-        // 프로필 이미지 처리: 새 파일이 있으면 새 파일을, 기존 URL이 있으면 기존 URL을, 없으면 빈 값으로 전송
+        // 프로필 이미지 처리: 새 파일이 있으면 새 파일을, 이미지 삭제했으면 빈 문자열을, 기존 URL이 있으면 기존 URL을 전송
         if (commentEditTempUser.profileImageFile) {
           formData.append("tempUserProfileImage", commentEditTempUser.profileImageFile);
+        } else if (commentEditTempUser.profileImageRemoved) {
+          formData.append("tempUserProfileImage", "");
         } else if (commentEditTempUser.profileImageUrl) {
           formData.append("tempUserProfileImageUrl", commentEditTempUser.profileImageUrl);
-        } else {
-          formData.append("tempUserProfileImage", "");
         }
       }
       // 실제 사용자 댓글인 경우 내용만 전송 (작성자 정보는 변경하지 않음)
@@ -824,6 +829,7 @@ const PostDetail = () => {
           rank: "",
           profileImageFile: null,
           profileImageUrl: "",
+          profileImageRemoved: false, // 이미지 삭제 여부 초기화
         });
         setEditingComment(null);
         getPostDetail(); // 댓글 목록 새로고침
