@@ -377,6 +377,37 @@ export const getAllSportGameAnalyses = async (
   }
 };
 
+// 관리자용 스포츠 분석 목록 조회 (공개 필터 없음)
+export const getAllSportGameAnalysesAdmin = async (
+  params: any = {}
+): Promise<ApiResponse<SportGameAnalysis[]>> => {
+  try {
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        queryParams.append(key, String(value));
+      }
+    });
+
+    const url = queryParams.toString()
+      ? `/sport-analyses/admin?${queryParams.toString()}`
+      : "/sport-analyses/admin";
+    const response = await axios.get(url);
+
+    // 서버 응답 구조에 맞게 contentViewStats와 pagination 정보 포함
+    return {
+      success: response.data.success,
+      data: response.data.data || [],
+      contentViewStats: response.data.contentViewStats,
+      pagination: response.data.pagination,
+      message: response.data.message,
+    };
+  } catch (error) {
+    console.error("Error fetching sport game analyses admin:", error);
+    throw error;
+  }
+};
+
 export const getSportGameAnalysisById = async (
   id: number
 ): Promise<ApiResponse<SportGameAnalysis>> => {

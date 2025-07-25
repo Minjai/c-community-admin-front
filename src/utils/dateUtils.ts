@@ -1,5 +1,6 @@
 import { format } from "date-fns";
 import { ko } from "date-fns/locale"; // 한국어 로케일 추가
+import React from "react";
 
 /**
  * ISO 형식의 날짜 문자열을 로컬 시간대 기준 'yyyy.MM.dd HH:mm:ss' 형식으로 변환합니다.
@@ -207,6 +208,30 @@ export function getCurrentUTCDateTimeLocalString(): string {
     // 오류 발생 시 빈 문자열 대신 현재 로컬 시간 기반의 기본값이라도 반환하거나,
     // 혹은 특정 에러 값을 반환하는 것을 고려할 수 있음. 여기서는 빈 문자열 반환.
     return "";
+  }
+}
+
+/**
+ * 경기 일자를 위한 포맷 함수 (yyyy.MM.dd와 HH:mm을 두 줄로 표시)
+ * @param dateString ISO 형식의 날짜 문자열
+ * @returns 포맷된 날짜 문자열
+ */
+export function formatGameDate(dateString: string | null | undefined): string {
+  if (!dateString) return "";
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      console.error("Invalid date string provided:", dateString);
+      return "유효하지 않은 날짜";
+    }
+
+    const datePart = format(date, "yyyy.MM.dd", { locale: ko });
+    const timePart = format(date, "HH:mm", { locale: ko });
+
+    return `${datePart}\n${timePart}`;
+  } catch (error) {
+    console.error("Error formatting game date:", error);
+    return "날짜 형식 오류";
   }
 }
 

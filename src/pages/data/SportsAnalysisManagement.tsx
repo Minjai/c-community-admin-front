@@ -11,11 +11,12 @@ import ExcelDownloadButton from "../../components/ExcelDownloadButton";
 import { SportGameAnalysis, SportCategory } from "@/types";
 import {
   getAllSportGameAnalyses,
+  getAllSportGameAnalysesAdmin,
   deleteSportGameAnalysis,
   updateSportGameAnalysisDisplayOrder,
   getAllSportCategoriesAdmin,
 } from "@/api";
-import { formatDate } from "@/utils/dateUtils";
+import { formatDate, formatGameDate, formatDateForDisplay } from "@/utils/dateUtils";
 import Input from "@/components/forms/Input";
 import FileUpload from "@/components/forms/FileUpload";
 import TextEditor from "@/components/forms/TextEditor";
@@ -62,7 +63,7 @@ const SportsAnalysisManagement = () => {
         params.search = searchValue;
       }
 
-      const response = await getAllSportGameAnalyses(params);
+      const response = await getAllSportGameAnalysesAdmin(params);
       if (response.success) {
         setAnalyses(response.data || []);
         setOriginalAnalyses(response.data ? [...response.data] : []);
@@ -212,7 +213,7 @@ const SportsAnalysisManagement = () => {
         />
       ),
       accessor: "id",
-      className: "w-[30px] text-center",
+      className: "w-[25px] text-center",
       cell: (value: unknown, row: SportGameAnalysis) => (
         <input
           type="checkbox"
@@ -226,7 +227,7 @@ const SportsAnalysisManagement = () => {
     {
       header: "분류",
       accessor: "type" as keyof SportGameAnalysis,
-      className: "text-center w-[100px]",
+      className: "text-center w-[80px]",
       cell: (value: unknown, row: SportGameAnalysis) => {
         const type = (row as any).type || "analysis";
         return (
@@ -341,7 +342,17 @@ const SportsAnalysisManagement = () => {
       header: "경기 일자",
       accessor: "gameDate",
       className: "text-center w-[150px]",
-      cell: (value: unknown, row: SportGameAnalysis) => formatDate(row.gameDate),
+      cell: (value: unknown, row: SportGameAnalysis) => {
+        const formattedDate = formatGameDate(row.gameDate);
+        const [datePart, timePart] = formattedDate.split("\n");
+
+        return (
+          <div className="flex flex-col items-center">
+            <div className="text-sm font-medium">{datePart}</div>
+            <div className="text-sm font-medium text-gray-900">{timePart}</div>
+          </div>
+        );
+      },
     },
     {
       header: "노출 기간",
@@ -349,8 +360,8 @@ const SportsAnalysisManagement = () => {
       className: "text-center w-[200px]",
       cell: (value: unknown, row: SportGameAnalysis) => (
         <div className="flex flex-col">
-          <div>{formatDate(row.startTime)}</div>
-          <div>~ {formatDate(row.endTime)}</div>
+          <div>{formatDateForDisplay(row.startTime)}</div>
+          <div>~ {formatDateForDisplay(row.endTime)}</div>
         </div>
       ),
     },
