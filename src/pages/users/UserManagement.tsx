@@ -373,22 +373,24 @@ const UserManagement = () => {
         accessor: "email" as keyof User,
         cell: (value: unknown, row: User) => (
           <span
-            className="text-blue-600 hover:underline cursor-pointer truncate block max-w-xs"
+            className="text-blue-600 hover:underline cursor-pointer truncate block max-w-[180px]"
             title={value as string}
             onClick={() => handleEditUser(row.id)}
           >
             {value as string}
           </span>
         ),
+        className: "w-[180px]",
       },
       {
         header: "닉네임",
         accessor: "nickname" as keyof User,
         cell: (value: unknown, row: User) => (
-          <span className="truncate block max-w-xs" title={value as string}>
+          <span className="truncate block max-w-[120px]" title={value as string}>
             {value as string}
           </span>
         ),
+        className: "w-[120px]",
       },
       {
         header: "등급",
@@ -537,14 +539,12 @@ const UserManagement = () => {
         <div>
           <h3 className="text-md font-semibold text-gray-900 mb-3">등급별 분포</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {statistics.rankDistribution
-              .filter((rank) => !rank.rankName.toLowerCase().includes("manager"))
-              .map((rank, index) => (
-                <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                  <p className="text-sm font-medium text-gray-800">{rank.rankName}</p>
-                  <p className="text-lg font-bold text-gray-900">{rank.count}명</p>
-                </div>
-              ))}
+            {statistics.rankDistribution.map((rank, index) => (
+              <div key={index} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <p className="text-sm font-medium text-gray-800">{rank.rankName}</p>
+                <p className="text-lg font-bold text-gray-900">{rank.count}명</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

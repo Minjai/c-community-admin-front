@@ -155,6 +155,22 @@ export const getAllSportCategoriesAdmin = async (
   }
 };
 
+// 분석용 스포츠 카테고리 조회 (페이지네이션 없음)
+export const getAnalysesSportCategories = async (): Promise<SportCategory[]> => {
+  try {
+    const response = await axios.get("/sport-categories/analyses-categories/admin");
+
+    if (response.data && response.data.success) {
+      return response.data.data || [];
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Error fetching analyses sport categories:", error);
+    throw error;
+  }
+};
+
 export const createSportCategory = async (data: {
   sportName: string;
   displayName?: string;
@@ -412,7 +428,7 @@ export const getSportGameAnalysisById = async (
   id: number
 ): Promise<ApiResponse<SportGameAnalysis>> => {
   try {
-    const response = await axios.get(`/sport-analyses/${id}`);
+    const response = await axios.get(`/sport-analyses/admin/${id}`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching sport game analysis with id ${id}:`, error);

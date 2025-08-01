@@ -10,7 +10,7 @@ import Alert from "@/components/Alert";
 import {
   createSportGameAnalysis,
   updateSportGameAnalysis,
-  getAllSportCategoriesAdmin,
+  getAnalysesSportCategories,
   getSportGameAnalysisById,
 } from "@/api";
 import { SportGameAnalysisFormData, SportCategory } from "@/types";
@@ -42,7 +42,7 @@ const SportsAnalysisDetail: React.FC = () => {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const { data } = await getAllSportCategoriesAdmin();
+        const data = await getAnalysesSportCategories();
         setSportCategories(data || []);
       } catch (err) {
         console.error("Error fetching sport categories:", err);
@@ -172,11 +172,7 @@ const SportsAnalysisDetail: React.FC = () => {
       formData.append("homeTeam", homeTeam);
       formData.append("awayTeam", awayTeam);
       formData.append("league", leagueName);
-      if (contentType === "analysis") {
-        formData.append("gameDate", matchDate);
-      } else {
-        formData.append("gameDate", new Date().toISOString());
-      }
+      formData.append("gameDate", matchDate);
       formData.append("content", content);
       formData.append("startTime", startDate);
       formData.append("endTime", endDate);

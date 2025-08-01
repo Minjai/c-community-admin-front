@@ -14,7 +14,7 @@ import {
   getAllSportGameAnalysesAdmin,
   deleteSportGameAnalysis,
   updateSportGameAnalysisDisplayOrder,
-  getAllSportCategoriesAdmin,
+  getAnalysesSportCategories,
 } from "@/api";
 import { formatDate, formatGameDate, formatDateForDisplay } from "@/utils/dateUtils";
 import Input from "@/components/forms/Input";
@@ -51,42 +51,54 @@ const SportsAnalysisManagement = () => {
   }>({});
 
   const handleSearch = (value: string) => {
-    fetchAnalyses(value);
+    setPage(1); // 검색 시 첫 페이지로 리셋
+    setSearchValue(value);
   };
 
-  const fetchAnalyses = useCallback(async (searchValue: string = "") => {
-    setLoading(true);
-    try {
-      const params: any = {};
+  const fetchAnalyses = useCallback(
+    async (searchValue: string = "") => {
+      setLoading(true);
+      try {
+        const params: any = {
+          page,
+          limit,
+        };
 
-      if (searchValue.trim()) {
-        params.search = searchValue;
-      }
-
-      const response = await getAllSportGameAnalysesAdmin(params);
-      if (response.success) {
-        setAnalyses(response.data || []);
-        setOriginalAnalyses(response.data ? [...response.data] : []);
-
-        // 조회수 통계 저장
-        if (response.contentViewStats) {
-          setViewStats(response.contentViewStats);
+        if (searchValue.trim()) {
+          params.search = searchValue;
         }
 
-        setError(null);
-      } else if (!response.success && response.message) {
-        setError(response.message);
+        const response = await getAllSportGameAnalysesAdmin(params);
+        if (response.success) {
+          setAnalyses(response.data || []);
+          setOriginalAnalyses(response.data ? [...response.data] : []);
+
+          // 조회수 통계 저장
+          if (response.contentViewStats) {
+            setViewStats(response.contentViewStats);
+          }
+
+          // 페이지네이션 정보 저장
+          if (response.pagination) {
+            setTotal(response.pagination.totalItems);
+          }
+
+          setError(null);
+        } else if (!response.success && response.message) {
+          setError(response.message);
+          setAnalyses([]);
+          setOriginalAnalyses([]);
+        }
+      } catch (err) {
+        setError("서버 오류가 발생했습니다.");
         setAnalyses([]);
         setOriginalAnalyses([]);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      setError("서버 오류가 발생했습니다.");
-      setAnalyses([]);
-      setOriginalAnalyses([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [page, limit]
+  );
 
   const handleSaveOrder = async () => {
     setLoading(true);
@@ -387,15 +399,44 @@ const SportsAnalysisManagement = () => {
       header: "공개 여부",
       accessor: "isPublic",
       className: "text-center w-[100px]",
-      cell: (value: unknown, row: SportGameAnalysis) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            row.isPublic ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
-          }`}
-        >
-          {row.isPublic ? "공개" : "비공개"}
-        </span>
-      ),
+      cell: (value: unknown, row: SportGameAnalysis) => {
+        // 비공개면 무조건 비공개
+        if (!row.isPublic) {
+          return (
+            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              비공개
+            </span>
+          );
+        }
+
+        // 공개인 경우 노출 기간 계산
+        const now = new Date();
+        const startTime = new Date(row.startTime);
+        const endTime = new Date(row.endTime);
+
+        let status = "";
+        let className = "";
+
+        if (now < startTime) {
+          // 시작일자 전
+          status = "공개전";
+          className = "bg-gray-100 text-gray-800";
+        } else if (now >= startTime && now <= endTime) {
+          // 시작일자 후, 종료일자 전
+          status = "공개";
+          className = "bg-green-100 text-green-800";
+        } else {
+          // 종료일자 후
+          status = "공개종료";
+          className = "bg-gray-100 text-gray-800";
+        }
+
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${className}`}>
+            {status}
+          </span>
+        );
+      },
     },
     {
       header: "순서",
@@ -436,16 +477,14 @@ const SportsAnalysisManagement = () => {
   ];
 
   useEffect(() => {
-    fetchAnalyses();
-  }, [fetchAnalyses]);
+    fetchAnalyses(searchValue);
+  }, [fetchAnalyses, searchValue]);
 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const response = await getAllSportCategoriesAdmin(1, 1000);
-        if (response.data) {
-          setSportCategories(response.data);
-        }
+        const data = await getAnalysesSportCategories();
+        setSportCategories(data || []);
       } catch (err) {
         console.error("Failed to fetch categories:", err);
       }
@@ -523,7 +562,9 @@ const SportsAnalysisManagement = () => {
             currentPage: page,
             pageSize: limit,
             totalItems: total,
-            onPageChange: setPage,
+            onPageChange: (newPage) => {
+              setPage(newPage);
+            },
           }}
         />
       </div>

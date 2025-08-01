@@ -1139,8 +1139,17 @@ const CasinoFilterPage: React.FC = () => {
               }
               placeholder="대분류 제목을 입력하세요"
               required
-              className="input w-full min-h-[2.5rem] resize-y"
-              rows={3}
+              className="input w-full min-h-[2.5rem] resize-none overflow-hidden"
+              rows={1}
+              style={{
+                resize: "none",
+                overflow: "hidden",
+              }}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = "auto";
+                target.style.height = target.scrollHeight + "px";
+              }}
             />
           </div>
 

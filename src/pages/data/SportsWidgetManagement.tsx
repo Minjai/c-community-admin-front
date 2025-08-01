@@ -346,6 +346,12 @@ const SportsWidgetManagement = () => {
     {
       header: "제목",
       accessor: "title" as keyof SportsWidget,
+      cell: (value: unknown, row: SportsWidget) => (
+        <div className="max-w-[200px] truncate" title={row.title}>
+          {row.title}
+        </div>
+      ),
+      className: "w-[200px]",
     },
     {
       header: "등록일시",
