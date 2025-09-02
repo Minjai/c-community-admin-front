@@ -853,6 +853,13 @@ const CasinoRecommendationManagement = () => {
       updated[actualIndex] = { ...updated[actualIndex], displayOrder: newOrder };
       return updated;
     });
+
+    // recommendations도 함께 업데이트 (UI 반영을 위해)
+    setRecommendations((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], displayOrder: newOrder };
+      return updated;
+    });
   };
 
   // displayOrder 일괄 저장 핸들러 (공통 함수)

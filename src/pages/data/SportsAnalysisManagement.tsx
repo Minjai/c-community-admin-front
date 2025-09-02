@@ -44,6 +44,7 @@ const SportsAnalysisManagement = () => {
   const [limit] = useState(10);
   const [total, setTotal] = useState(0);
   const [searchValue, setSearchValue] = useState("");
+  const [searchQuery, setSearchQuery] = useState(""); // 실제 검색에 사용될 쿼리
 
   // 조회수 통계 상태 추가
   const [viewStats, setViewStats] = useState<{
@@ -52,7 +53,7 @@ const SportsAnalysisManagement = () => {
 
   const handleSearch = (value: string) => {
     setPage(1); // 검색 시 첫 페이지로 리셋
-    setSearchValue(value);
+    setSearchQuery(value); // 실제 검색에 사용될 쿼리 설정
   };
 
   const fetchAnalyses = useCallback(
@@ -477,8 +478,8 @@ const SportsAnalysisManagement = () => {
   ];
 
   useEffect(() => {
-    fetchAnalyses(searchValue);
-  }, [fetchAnalyses, searchValue]);
+    fetchAnalyses(searchQuery);
+  }, [fetchAnalyses, searchQuery]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -557,7 +558,7 @@ const SportsAnalysisManagement = () => {
           columns={columns}
           data={filteredData}
           loading={loading}
-          emptyMessage={searchValue ? "검색된 결과가 없습니다." : "등록된 분석글이 없습니다."}
+          emptyMessage={searchQuery ? "검색된 결과가 없습니다." : "등록된 분석글이 없습니다."}
           pagination={{
             currentPage: page,
             pageSize: limit,
