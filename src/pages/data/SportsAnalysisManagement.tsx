@@ -57,7 +57,7 @@ const SportsAnalysisManagement = () => {
   };
 
   const fetchAnalyses = useCallback(
-    async (searchValue: string = "") => {
+    async (searchValue: string = "", categoryId?: string) => {
       setLoading(true);
       try {
         const params: any = {
@@ -67,6 +67,11 @@ const SportsAnalysisManagement = () => {
 
         if (searchValue.trim()) {
           params.search = searchValue;
+        }
+
+        // 종목 필터 추가
+        if (categoryId && categoryId !== "") {
+          params.categoryId = categoryId;
         }
 
         const response = await getAllSportGameAnalysesAdmin(params);
@@ -478,8 +483,8 @@ const SportsAnalysisManagement = () => {
   ];
 
   useEffect(() => {
-    fetchAnalyses(searchQuery);
-  }, [fetchAnalyses, searchQuery]);
+    fetchAnalyses(searchQuery, selectedCategory);
+  }, [fetchAnalyses, searchQuery, selectedCategory]);
 
   useEffect(() => {
     const fetchCategories = async () => {
