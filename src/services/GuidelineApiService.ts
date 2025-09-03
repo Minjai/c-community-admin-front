@@ -24,7 +24,7 @@ export class GuidelineApiService {
     searchValue: any
   ): Promise<ApiResponse<Guideline[]>> {
     try {
-      const response: AxiosResponse<any> = await axios.get("/guidelines", {
+      const response: AxiosResponse<any> = await axios.get("/guidelines/admin", {
         params: {
           boardId,
           page,

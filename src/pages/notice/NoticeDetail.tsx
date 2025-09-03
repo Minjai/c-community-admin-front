@@ -17,7 +17,6 @@ const NoticeDetail = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPublic, setIsPublic] = useState<number>(1);
-  const [tags, setTags] = useState("");
   const isNewPost = id === "new";
   const isEditMode = !isNewPost;
 
@@ -49,7 +48,6 @@ const NoticeDetail = () => {
         content: trimmedContent,
         boardId: 1, // Notice board ID
         isPublic: isPublic.toString(), // Use state value
-        tags: tags.trim() ? tags : undefined,
       };
 
       let response;
@@ -117,7 +115,6 @@ const NoticeDetail = () => {
           setContent(postData.content || "");
         }, 0);
         setIsPublic(postData.isPublic === 1 || postData.isPublic === true ? 1 : 0);
-        setTags(postData.tags || "");
       } else {
         setError("공지사항을 찾을 수 없습니다.");
       }
@@ -211,22 +208,6 @@ const NoticeDetail = () => {
             <p className="mt-1 text-xs text-gray-500">
               이미지는 에디터에 직접 드래그 앤 드롭하여 첨부할 수 있습니다.
             </p>
-          </div>
-
-          <div>
-            <label htmlFor="tags" className="block text-sm font-medium text-gray-700">
-              태그
-            </label>
-            <input
-              type="text"
-              id="tags"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="태그는 쉼표(,)로 구분하여 입력해주세요"
-              className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-              disabled={saving}
-            />
-            <p className="mt-1 text-xs text-gray-500">예시: 중요,공지,업데이트</p>
           </div>
         </div>
       </div>

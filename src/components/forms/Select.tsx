@@ -26,6 +26,10 @@ const Select: React.FC<SelectProps> = ({
         className={`input ${
           error ? "border-red-500 focus:ring-red-500 focus:border-red-500" : ""
         } ${className}`}
+        style={{
+          maxHeight: "200px",
+          overflowY: "auto",
+        }}
         {...props}
       >
         {options.map((option) => (

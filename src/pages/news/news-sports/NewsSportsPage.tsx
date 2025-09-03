@@ -90,13 +90,10 @@ const NewsSportsPage = () => {
       console.log("뉴스 관리 응답:", response.data);
 
       // 새로운 서버 응답 구조 처리: data[], count{}
-      if (
-        response.data?.success &&
-        Array.isArray(response.data?.data) && // data가 배열인지 확인
-        response.data?.count // count 객체 확인
-      ) {
-        const articles = response.data.data; // 뉴스 목록 직접 사용
-        const totalCount = response.data.count; // 전체 개수 추출
+      if (response.data?.success) {
+        const articles = response.data.data || []; // 데이터가 없으면 빈 배열
+        const totalCount = response.data.count || 0; // count가 없으면 0
+
         console.log("추출된 뉴스 데이터:", articles);
         console.log("추출된 전체 개수:", totalCount);
 
@@ -131,14 +128,12 @@ const NewsSportsPage = () => {
           setViewStats(response.data.contentViewStats);
         }
       } else {
-        console.warn("뉴스 데이터를 찾지 못했거나 형식이 다릅니다. 응답:", response.data);
+        // 실제 에러인 경우만 에러 처리
+        setError(response.data?.message || "뉴스 목록을 불러오는데 실패했습니다.");
         setNews([]);
-        setSelectedNewsIds([]); // 에러 시 선택 초기화
-        setError(response.data?.message || "뉴스 목록 형식이 올바르지 않습니다.");
-        // 페이지네이션 상태 초기화
+        setSelectedNewsIds([]);
         setTotalItems(0);
         setCurrentPage(1);
-        setPageSize(pageSize); // 요청 시 사용한 pageSize 값으로 초기화
         setTotalPages(1);
       }
     } catch (err: any) {

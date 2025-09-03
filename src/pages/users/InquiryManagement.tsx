@@ -457,7 +457,9 @@ const InquiryManagement = () => {
   const handleSaveAnswer = async () => {
     if (!selectedInquiry) return;
 
-    if (answerContent.trim() === "") {
+    // HTML 태그 제거 후 빈 내용 검증
+    const strippedContent = answerContent.replace(/<[^>]*>/g, "").trim();
+    if (strippedContent === "") {
       setAlertMessage({
         type: "error",
         message: "답변 내용을 입력해주세요.",

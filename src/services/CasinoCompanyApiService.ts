@@ -266,7 +266,7 @@ const CasinoCompanyApiService = {
   // 업체별 리뷰 조회
   getCompanyReviews: async (companyId: number): Promise<CompanyReview[]> => {
     try {
-      const response = await axios.get(`/company-reviews/company/${companyId}`);
+      const response = await axios.get(`/company-reviews/admin/company/${companyId}`);
       if (response.data && response.data.success) {
         return response.data.data;
       }
